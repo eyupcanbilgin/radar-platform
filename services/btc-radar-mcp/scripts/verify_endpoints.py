@@ -1,0 +1,642 @@
+"""SPEC §2'deki ⚠️ işaretli endpoint'lerin canlı doğrulaması (Faz 0; `make smoke` temeli).
+
+Yalnızca public, salt-okunur GET istekleri atar; hiçbir borsa hesabına bağlanmaz.
+
+Kullanım:
+    uv run python scripts/verify_endpoints.py
+    uv run python scripts/verify_endpoints.py --skip-bitcoin-data
+    uv run python scripts/verify_endpoints.py --json-out sonuc.json
+
+bitcoin-data.com bütçesi: script başına en fazla 5 istek (API limiti 8/saat, 15/gün —
+CLAUDE.md kural 8). Önce OpenAPI dokümanı üzerinden metrik adları keşfedilir; veri
+endpoint'lerine en fazla 3 çağrı yapılır.
+"""
+
+import argparse
+import asyncio
+import json
+import sys
+import time
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+import httpx
+
+TIMEOUT = 20.0
+HEADERS = {"User-Agent": "btc-radar-verify/0.1 (Faz 0 smoke; read-only)"}
+
+
+@dataclass
+class Check:
+    check_id: str
+    layer: str
+    spec_ref: str  # SPEC.md satır/bölüm referansı
+    url: str
+    params: dict[str, str] | None = None
+    validate: Callable[[Any], str | None] | None = None  # None → OK, str → sorun açıklaması
+    expect_failure: bool = False  # kaldırıldığı DOĞRULANAN endpoint'ler için tersine kontrol
+    html_ok: bool = False  # JSON değil, HTML sayfa erişilebilirliği yeterli
+    required: bool = True  # False: bilgilendirme amaçlı (ör. FX adayları tek tek)
+    notes: str = ""
+
+
+@dataclass
+class Result:
+    check_id: str
+    layer: str
+    spec_ref: str
+    url: str
+    ok: bool
+    required: bool
+    status: int | None = None
+    latency_ms: int | None = None
+    detail: str = ""
+    sample: Any = field(default=None)
+
+
+def _need(data: Any, *keys: str) -> str | None:
+    """Düz sözlükte anahtar varlığı kontrolü."""
+    if not isinstance(data, dict):
+        return f"dict bekleniyordu, {type(data).__name__} geldi"
+    missing = [k for k in keys if k not in data]
+    return f"eksik alan(lar): {missing}" if missing else None
+
+
+def _need_list_item(data: Any, *keys: str) -> str | None:
+    """Boş olmayan liste + ilk elemanda anahtar varlığı kontrolü."""
+    if not isinstance(data, list) or not data:
+        return f"boş olmayan liste bekleniyordu, {type(data).__name__} geldi"
+    return _need(data[0], *keys)
+
+
+def _bybit_ok(data: Any) -> str | None:
+    if not isinstance(data, dict) or data.get("retCode") != 0:
+        return f"retCode != 0: {str(data)[:200]}"
+    lst = (data.get("result") or {}).get("list")
+    if not lst:
+        return "result.list boş"
+    return None
+
+
+def _fx_krw(path: list[str]):
+    def check(data: Any) -> str | None:
+        cur = data
+        for p in path:
+            if not isinstance(cur, dict) or p not in cur:
+                return f"'{'.'.join(path)}' bulunamadı"
+            cur = cur[p]
+        try:
+            rate = float(cur)
+        except (TypeError, ValueError):
+            return f"KRW kuru sayı değil: {cur!r}"
+        return None if rate > 100 else f"KRW kuru şüpheli: {rate}"
+
+    return check
+
+
+def _cbbi_ok(data: Any) -> str | None:
+    if not isinstance(data, dict) or not data:
+        return "boş yanıt"
+    if "Confidence" not in data:
+        return f"'Confidence' anahtarı yok; mevcut anahtarlar: {sorted(data)[:15]}"
+    series = data["Confidence"]
+    if not isinstance(series, dict) or not series:
+        return "Confidence serisi boş"
+    return None
+
+
+def _fng_ok(data: Any) -> str | None:
+    if err := _need(data, "data"):
+        return err
+    return _need_list_item(data["data"], "value", "value_classification", "timestamp")
+
+
+def _cg_global_ok(data: Any) -> str | None:
+    if err := _need(data, "data"):
+        return err
+    d = data["data"]
+    if err := _need(d, "market_cap_percentage", "total_market_cap"):
+        return err
+    if "btc" not in d["market_cap_percentage"]:
+        return "market_cap_percentage.btc yok"
+    return None
+
+
+CHECKS: list[Check] = [
+    # ── §2.1 Türevler (SPEC satır 41-48; tablo başlığı gereği TÜM satırlar canlı doğrulanır)
+    Check(
+        "binance_oi",
+        "derivatives",
+        "SPEC:43",
+        "https://fapi.binance.com/fapi/v1/openInterest",
+        {"symbol": "BTCUSDT"},
+        lambda d: _need(d, "openInterest", "symbol", "time"),
+    ),
+    Check(
+        "binance_oi_hist",
+        "derivatives",
+        "SPEC:43",
+        "https://fapi.binance.com/futures/data/openInterestHist",
+        {"symbol": "BTCUSDT", "period": "1h", "limit": "2"},
+        lambda d: _need_list_item(d, "sumOpenInterest", "sumOpenInterestValue", "timestamp"),
+    ),
+    Check(
+        "binance_premium_index",
+        "derivatives",
+        "SPEC:44",
+        "https://fapi.binance.com/fapi/v1/premiumIndex",
+        {"symbol": "BTCUSDT"},
+        lambda d: _need(d, "markPrice", "lastFundingRate", "nextFundingTime"),
+    ),
+    Check(
+        "binance_funding_hist",
+        "derivatives",
+        "SPEC:44",
+        "https://fapi.binance.com/fapi/v1/fundingRate",
+        {"symbol": "BTCUSDT", "limit": "2"},
+        lambda d: _need_list_item(d, "fundingRate", "fundingTime"),
+    ),
+    Check(
+        "binance_global_ls_ratio",
+        "derivatives",
+        "SPEC:45",
+        "https://fapi.binance.com/futures/data/globalLongShortAccountRatio",
+        {"symbol": "BTCUSDT", "period": "1h", "limit": "2"},
+        lambda d: _need_list_item(d, "longShortRatio", "longAccount", "shortAccount"),
+    ),
+    Check(
+        "binance_top_ls_position",
+        "derivatives",
+        "SPEC:45",
+        "https://fapi.binance.com/futures/data/topLongShortPositionRatio",
+        {"symbol": "BTCUSDT", "period": "1h", "limit": "2"},
+        lambda d: _need_list_item(d, "longShortRatio"),
+    ),
+    Check(
+        "binance_taker_ratio",
+        "derivatives",
+        "SPEC:46",
+        "https://fapi.binance.com/futures/data/takerlongshortRatio",
+        {"symbol": "BTCUSDT", "period": "1h", "limit": "2"},
+        lambda d: _need_list_item(d, "buySellRatio", "buyVol", "sellVol"),
+    ),
+    Check(
+        "binance_forceorders_removed",
+        "derivatives",
+        "SPEC:47",
+        "https://fapi.binance.com/fapi/v1/allForceOrders",
+        {"symbol": "BTCUSDT", "limit": "5"},
+        expect_failure=True,
+        notes="SPEC varsayımı: REST likidasyon endpoint'i kaldırıldı; hata dönmesi BEKLENİR.",
+    ),
+    Check(
+        "bybit_oi",
+        "derivatives",
+        "SPEC:48",
+        "https://api.bybit.com/v5/market/open-interest",
+        {"category": "linear", "symbol": "BTCUSDT", "intervalTime": "1h", "limit": "2"},
+        _bybit_ok,
+    ),
+    Check(
+        "bybit_funding_hist",
+        "derivatives",
+        "SPEC:48",
+        "https://api.bybit.com/v5/market/funding/history",
+        {"category": "linear", "symbol": "BTCUSDT", "limit": "2"},
+        _bybit_ok,
+    ),
+    # ── §2.2 On-chain: bitcoin-data.com ayrı, bütçeli akışta; ChainExposed sadece erişim
+    Check(
+        "chainexposed_html",
+        "onchain",
+        "SPEC:57",
+        "https://chainexposed.com/",
+        None,
+        html_ok=True,
+        required=False,
+        notes="API yok; Faz 2 scrape fizibilitesi için sayfanın ayakta olduğunu doğrula.",
+    ),
+    # ── §2.3 Spot ve premium (SPEC satır 63-64)
+    Check(
+        "coinbase_ticker",
+        "spot_regional",
+        "SPEC:63",
+        "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
+        None,
+        lambda d: _need(d, "price", "time"),
+    ),
+    Check(
+        "binance_spot_price",
+        "spot_regional",
+        "SPEC:63",
+        "https://api.binance.com/api/v3/ticker/price",
+        {"symbol": "BTCUSDT"},
+        lambda d: _need(d, "price", "symbol"),
+    ),
+    Check(
+        "upbit_ticker",
+        "spot_regional",
+        "SPEC:64",
+        "https://api.upbit.com/v1/ticker",
+        {"markets": "KRW-BTC"},
+        lambda d: _need_list_item(d, "trade_price", "timestamp"),
+    ),
+    # USDKRW adayları (SPEC satır 64 ⚠️: kaynak implementasyonda seçilecek) — en az biri yeterli
+    Check(
+        "fx_erapi",
+        "spot_regional",
+        "SPEC:64",
+        "https://open.er-api.com/v6/latest/USD",
+        None,
+        _fx_krw(["rates", "KRW"]),
+        required=False,
+        notes="Aday A: open.er-api.com (anahtarsız, günlük güncelleme).",
+    ),
+    Check(
+        "fx_frankfurter",
+        "spot_regional",
+        "SPEC:64",
+        "https://api.frankfurter.dev/v1/latest",
+        {"base": "USD", "symbols": "KRW"},
+        _fx_krw(["rates", "KRW"]),
+        required=False,
+        notes="Aday B: frankfurter.dev (ECB referans kurları, anahtarsız).",
+    ),
+    Check(
+        "fx_fawazahmed",
+        "spot_regional",
+        "SPEC:64",
+        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
+        None,
+        _fx_krw(["usd", "krw"]),
+        required=False,
+        notes="Aday C: fawazahmed0/currency-api (jsDelivr CDN, anahtarsız, günlük).",
+    ),
+    # ── §2.4 Genişlik (SPEC satır 70-72)
+    Check(
+        "coingecko_global",
+        "breadth_rotation",
+        "SPEC:70",
+        "https://api.coingecko.com/api/v3/global",
+        None,
+        _cg_global_ok,
+        notes="Anahtarsız deneme; 429 görülürse demo key notu SPEC'e işlenecek.",
+    ),
+    Check(
+        "coingecko_markets",
+        "breadth_rotation",
+        "SPEC:71",
+        "https://api.coingecko.com/api/v3/coins/markets",
+        {
+            "vs_currency": "usd",
+            "order": "market_cap_desc",
+            "per_page": "10",
+            "page": "1",
+            "price_change_percentage": "24h",
+        },
+        lambda d: _need_list_item(d, "price_change_percentage_24h", "market_cap"),
+    ),
+    Check(
+        "binance_ethbtc",
+        "breadth_rotation",
+        "SPEC:72",
+        "https://api.binance.com/api/v3/ticker/price",
+        {"symbol": "ETHBTC"},
+        lambda d: _need(d, "price"),
+    ),
+    # ── §2.5 Döngü ve duyarlılık (SPEC satır 77-78)
+    Check(
+        "alternative_me_fng",
+        "cycle_sentiment",
+        "SPEC:77",
+        "https://api.alternative.me/fng/",
+        {"limit": "2"},
+        _fng_ok,
+    ),
+    Check(
+        "cbbi_latest",
+        "cycle_sentiment",
+        "SPEC:78",
+        "https://colintalkscrypto.com/cbbi/data/latest.json",
+        None,
+        _cbbi_ok,
+    ),
+]
+
+# bitcoin-data.com keşfi (SPEC satır 47, 54-56): önce OpenAPI dokümanından metrik adları.
+# OpenAPI tanımı docs host'undadır (Faz 0 keşfi, 2026-08-03); production server'ı
+# api.bitcoin-data.com olarak ilan eder. Veri çağrıları bitcoin-data.com üzerinden de çalışır.
+BD_HOST = "https://bitcoin-data.com"
+BD_DOC_CANDIDATES = [
+    "https://api.bgeometrics.com/v3/api-docs",
+    BD_HOST + "/v3/api-docs",
+]
+BD_KEYWORDS = (
+    "sopr",
+    "cdd",
+    "mvrv",
+    "nupl",
+    "netflow",
+    "reserve",
+    "balance",
+    "address",
+    "liquidation",
+)
+BD_REQUEST_BUDGET = 5  # host başına toplam; CLAUDE.md kural 8
+
+
+async def run_check(client: httpx.AsyncClient, chk: Check) -> Result:
+    t0 = time.perf_counter()
+    try:
+        resp = await client.get(chk.url, params=chk.params)
+    except httpx.HTTPError as exc:
+        if chk.expect_failure:
+            return Result(
+                chk.check_id,
+                chk.layer,
+                chk.spec_ref,
+                chk.url,
+                ok=True,
+                required=chk.required,
+                detail=f"erişilemedi ({type(exc).__name__}) — 'kaldırıldı' varsayımıyla uyumlu",
+            )
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=False,
+            required=chk.required,
+            detail=f"istek hatası: {type(exc).__name__}: {exc}",
+        )
+    ms = int((time.perf_counter() - t0) * 1000)
+
+    if chk.expect_failure:
+        ok = resp.status_code >= 400
+        detail = (
+            f"HTTP {resp.status_code} — beklendiği gibi hata (endpoint kaldırılmış): "
+            f"{resp.text[:120]}"
+            if ok
+            else f"BEKLENMEDİK: HTTP {resp.status_code} — endpoint hâlâ yanıt veriyor, SPEC yanlış!"
+        )
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=ok,
+            required=chk.required,
+            status=resp.status_code,
+            latency_ms=ms,
+            detail=detail,
+        )
+
+    if resp.status_code != 200:
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=False,
+            required=chk.required,
+            status=resp.status_code,
+            latency_ms=ms,
+            detail=f"HTTP {resp.status_code}: {resp.text[:200]}",
+        )
+
+    if chk.html_ok:
+        ctype = resp.headers.get("content-type", "")
+        ok = "html" in ctype
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=ok,
+            required=chk.required,
+            status=200,
+            latency_ms=ms,
+            detail=f"content-type={ctype}, {len(resp.content)} bayt",
+        )
+
+    try:
+        data = resp.json()
+    except ValueError:
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=False,
+            required=chk.required,
+            status=200,
+            latency_ms=ms,
+            detail=f"JSON parse edilemedi: {resp.text[:120]}",
+        )
+
+    problem = chk.validate(data) if chk.validate else None
+    sample = data[0] if isinstance(data, list) and data else data
+    return Result(
+        chk.check_id,
+        chk.layer,
+        chk.spec_ref,
+        chk.url,
+        ok=problem is None,
+        required=chk.required,
+        status=200,
+        latency_ms=ms,
+        detail=problem or ("alanlar doğrulandı" + (f" — {chk.notes}" if chk.notes else "")),
+        sample=str(sample)[:200],
+    )
+
+
+async def verify_bitcoin_data(client: httpx.AsyncClient) -> list[Result]:
+    """OpenAPI keşfi + en fazla 3 veri çağrısı. Toplam host bütçesi: BD_REQUEST_BUDGET."""
+    results: list[Result] = []
+    budget = BD_REQUEST_BUDGET
+    paths: list[str] = []
+
+    for doc_url in BD_DOC_CANDIDATES:
+        if budget <= 0:
+            break
+        budget -= 1
+        try:
+            resp = await client.get(doc_url)
+        except httpx.HTTPError:
+            continue
+        if resp.status_code != 200:
+            continue
+        try:
+            doc = resp.json()
+        except ValueError:
+            continue
+        if isinstance(doc, dict) and "paths" in doc:
+            paths = sorted(doc["paths"])
+            interesting = [p for p in paths if any(k in p.lower() for k in BD_KEYWORDS)]
+            results.append(
+                Result(
+                    "bitcoin_data_openapi",
+                    "onchain",
+                    "SPEC:54-56",
+                    doc_url,
+                    ok=True,
+                    required=True,
+                    status=200,
+                    detail=(
+                        f"OpenAPI bulundu: {len(paths)} path. "
+                        f"İlgili metrik path'leri ({len(interesting)}): {interesting[:40]}"
+                    ),
+                )
+            )
+            break
+
+    if not paths:
+        results.append(
+            Result(
+                "bitcoin_data_openapi",
+                "onchain",
+                "SPEC:54-56",
+                BD_HOST,
+                ok=False,
+                required=True,
+                detail=(
+                    "OpenAPI dokümanı bulunamadı; metrik adları elle doğrulanmalı "
+                    f"(denenen: {BD_DOC_CANDIDATES})"
+                ),
+            )
+        )
+
+    # Veri çağrıları: tam seriyi çekmemek için "/{last}" varyantı tercih edilir
+    # (API deseni: /v1/sth-sopr/{last} → /v1/sth-sopr/last son gözlemi döndürür)
+    probe_targets: list[tuple[str, str]] = []
+    if paths:
+
+        def pick(*keys: str) -> str | None:
+            for p in paths:
+                lp = p.lower()
+                if p.endswith("/{last}") and all(k in lp for k in keys):
+                    return p.replace("{last}", "last")
+            return None
+
+        for label, keys in [
+            ("sth_sopr", ("sth", "sopr")),
+            ("whale_balance", ("balance", "1k")),
+            ("liquidation", ("liquidation", "1d")),
+        ]:
+            p = pick(*keys)
+            if p and not any(lbl == label for lbl, _ in probe_targets):
+                probe_targets.append((label, p))
+    else:
+        probe_targets = [("sth_sopr", "/v1/sth-sopr/last")]  # dokümansız tek tahmin
+
+    for label, path in probe_targets[:3]:
+        if budget <= 0:
+            break
+        budget -= 1
+        url = BD_HOST + path
+        t0 = time.perf_counter()
+        try:
+            resp = await client.get(url)
+        except httpx.HTTPError as exc:
+            results.append(
+                Result(
+                    f"bitcoin_data_{label}",
+                    "onchain",
+                    "SPEC:54-56",
+                    url,
+                    ok=False,
+                    required=False,
+                    detail=f"istek hatası: {type(exc).__name__}",
+                )
+            )
+            continue
+        ms = int((time.perf_counter() - t0) * 1000)
+        ok = resp.status_code == 200
+        detail = f"HTTP {resp.status_code}"
+        sample = None
+        if ok:
+            try:
+                data = resp.json()
+                sample = str(data[0] if isinstance(data, list) and data else data)[:200]
+                detail = "veri döndü"
+            except ValueError:
+                ok, detail = False, f"JSON parse edilemedi: {resp.text[:120]}"
+        else:
+            detail = f"HTTP {resp.status_code}: {resp.text[:160]}"
+        results.append(
+            Result(
+                f"bitcoin_data_{label}",
+                "onchain",
+                "SPEC:54-56",
+                url,
+                ok=ok,
+                required=False,
+                status=resp.status_code,
+                latency_ms=ms,
+                detail=detail,
+                sample=sample,
+            )
+        )
+        await asyncio.sleep(1.0)  # aynı hosta nazik davran
+
+    return results
+
+
+async def main_async(skip_bitcoin_data: bool) -> list[Result]:
+    limits = httpx.Limits(max_connections=5)
+    async with httpx.AsyncClient(
+        timeout=TIMEOUT, headers=HEADERS, limits=limits, follow_redirects=True
+    ) as client:
+        sem = asyncio.Semaphore(5)
+
+        async def guarded(chk: Check) -> Result:
+            async with sem:
+                return await run_check(client, chk)
+
+        results = list(await asyncio.gather(*(guarded(c) for c in CHECKS)))
+        if not skip_bitcoin_data:
+            results.extend(await verify_bitcoin_data(client))
+    return results
+
+
+def render(results: list[Result]) -> tuple[str, int]:
+    lines = ["| durum | check | HTTP | ms | SPEC | detay |", "|---|---|---|---|---|---|"]
+    fails_required = 0
+    for r in results:
+        mark = "OK" if r.ok else ("FAIL" if r.required else "warn")
+        if not r.ok and r.required:
+            fails_required += 1
+        lines.append(
+            f"| {mark} | {r.check_id} | {r.status or '-'} | {r.latency_ms or '-'} "
+            f"| {r.spec_ref} | {r.detail[:220]} |"
+        )
+    ok_count = sum(1 for r in results if r.ok)
+    lines.append(f"\nToplam: {len(results)} kontrol, {ok_count} OK, {fails_required} zorunlu FAIL")
+    return "\n".join(lines), fails_required
+
+
+def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--skip-bitcoin-data",
+        action="store_true",
+        help="bitcoin-data.com bütçesini koru (CI cron için önerilir)",
+    )
+    ap.add_argument("--json-out", type=str, default=None)
+    args = ap.parse_args()
+
+    results = asyncio.run(main_async(args.skip_bitcoin_data))
+    report, fails = render(results)
+    print(report)
+    if args.json_out:
+        with open(args.json_out, "w", encoding="utf-8") as f:
+            json.dump([asdict(r) for r in results], f, ensure_ascii=False, indent=2)
+        print(f"\nJSON: {args.json_out}")
+    sys.exit(1 if fails else 0)
+
+
+if __name__ == "__main__":
+    main()

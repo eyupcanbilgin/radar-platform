@@ -1,0 +1,43 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+.cache/
+btc_radar/_config/
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+!.env.example
+
+# Databases & Runtime Data
+*.sqlite
+*.db
+*.sqlite3
+data/
+
+# IDE & AI Tool Configurations
+.vscode/
+.idea/
+.claude/*.local.json
+.gemini/
+
+# Logs
+*.log
+logs/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Kurulum paketi arşivi + referans repolar (git dışı; tek doğruluk kaynağı repolardır)
+KURULUM-REHBERI.md
+radar-signal/
+btc-radar-ek/
+borsapy-master/
+awesome-ai-in-finance-main/
+

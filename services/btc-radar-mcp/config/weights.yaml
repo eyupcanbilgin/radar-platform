@@ -1,0 +1,23 @@
+# Metodoloji v1.0 katman ağırlıkları (SPEC §2 başlıkları). Toplam 1.0 olmak zorunda;
+# doğrulama btc_radar/models/config.py'de. Ağırlıklar ASLA koda gömülmez (CLAUDE.md kural 3).
+version: "0.1.0"
+
+layers:
+  derivatives: 0.25 # §2.1 Türevler ve likidasyonlar
+  onchain: 0.25 # §2.2 On-chain
+  spot_regional: 0.15 # §2.3 Spot ve bölgesel talep
+  breadth_rotation: 0.10 # §2.4 Genişlik ve rotasyon
+  cycle_sentiment: 0.10 # §2.5 Döngü ve duyarlılık
+  news_catalyst: 0.10 # §2.6 Haber ve katalizör (MVP'de ölçülmez → güven skorunu düşürür)
+  execution_context: 0.05 # §2.7 Yürütme/teknik bağlam (MVP vekili: taker ratio + likidasyon)
+
+confidence:
+  # compute_scores: güven bu eşiğin altındaysa rejim etiketi "veri yetersiz" (SPEC §4, araç 7)
+  insufficient_below: 55
+
+freshness:
+  # f katsayısı (SPEC §3.3): beklenen periyot içinde 1.0, sonra doğrusal azalarak
+  # stale_multiple × periyot'ta 0. Beklenen periyot kaynak başına provider'dan gelir.
+  stale_multiple: 3.0
+  # f bu değerin altındaysa kaynak snapshot'ta stale_sources listesine yazılır.
+  stale_below_f: 0.5
