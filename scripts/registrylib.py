@@ -7,10 +7,10 @@ Kayıt git'e girer (`registry/experiments.jsonl`) — kanıt zinciri repoda yaş
     experiment_id, schema_version, created_at_utc, hypothesis_id, strategy,
     strategy_version (git commit), param_hash, dataset_snapshot, cost_model_version,
     scenario, effective_fee, timerange, timeframe_detail, result, verdict, parent,
-    created_by, provenance (lockfile/config hash'leri — ŞART A)
+    created_by, pairs, provenance (lockfile/config hash'leri — ŞART A)
 
-`verdict` üç değer alır: `pending`, `accepted`, `rejected`. Reddedilen koşu SİLİNMEZ —
-yayın yanlılığına karşı iç önlem (SINYAL-SPEC §3.5).
+`verdict` dört temel değer alır: `pending`, `accepted`, `rejected`, `invalid`.
+Reddedilen/geçersiz koşu SİLİNMEZ — yayın yanlılığına karşı iç önlem (SINYAL-SPEC §3.5).
 
 DSR'a giren N buradan gelir: `trials_for_dsr(hypothesis_id)`. Elle sayı girmek yasaktır.
 """
@@ -29,7 +29,7 @@ MANIFEST_DIR = REPO / "docs" / "data"
 STRATEGY_DIR = REPO / "user_data" / "strategies"
 
 SCHEMA_VERSION = "2"
-VALID_VERDICTS = ("pending", "accepted", "rejected")
+VALID_VERDICTS = ("pending", "accepted", "rejected", "invalid")
 VALID_CREATORS = ("insan", "claude", "codex")
 REQUIRED_FIELDS = ("hypothesis_id", "strategy", "scenario", "effective_fee", "exit_code")
 
@@ -88,11 +88,14 @@ def record_run(*, registry_path: Path | None = None, **fields) -> dict:
             raise ValueError(f"registry kaydı eksik alan: {required}")
 
     verdict = fields.pop("verdict", "pending")
-    if verdict not in VALID_VERDICTS:
+    verdict_base = verdict.split()[0].lower()
+    if verdict_base not in VALID_VERDICTS:
         raise ValueError(f"geçersiz verdict: {verdict!r}; izinli: {VALID_VERDICTS}")
     created_by = fields.pop("created_by", "claude")
     if created_by not in VALID_CREATORS:
         raise ValueError(f"geçersiz created_by: {created_by!r}; izinli: {VALID_CREATORS}")
+
+    pairs = fields.pop("pairs", None)
 
     entry = {
         "experiment_id": f"E-{datetime.now(UTC):%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}",
@@ -103,6 +106,7 @@ def record_run(*, registry_path: Path | None = None, **fields) -> dict:
         "dataset_snapshot": latest_manifest_hash(),
         "cost_model_version": cost_model_version(),
         "verdict": verdict,
+        "pairs": pairs,
         "parent": fields.pop("parent", None),
         "created_by": created_by,
         "provenance": _provenance(),
@@ -115,6 +119,30 @@ def record_run(*, registry_path: Path | None = None, **fields) -> dict:
     return entry
 
 
+def update_verdict(
+    experiment_id: str, verdict: str, reason: str | None = None, registry_path: Path | None = None
+) -> bool:
+    """Belirtilen experiment_id'nin verdict'ini güncelle (kaydı korur)."""
+    path = registry_path or REGISTRY_PATH
+    if not path.exists():
+        return False
+    rows = read_all(path)
+    updated = False
+    new_rows = []
+    for r in rows:
+        if r.get("experiment_id") == experiment_id:
+            r["verdict"] = verdict
+            if reason:
+                r["verdict_reason"] = reason
+            updated = True
+        new_rows.append(r)
+    if updated:
+        with path.open("w", encoding="utf-8") as f:
+            for r in new_rows:
+                f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
+    return updated
+
+
 def read_all(registry_path: Path | None = None) -> list[dict]:
     path = registry_path or REGISTRY_PATH
     if not path.exists():
@@ -123,16 +151,10 @@ def read_all(registry_path: Path | None = None) -> list[dict]:
 
 
 def count_runs(strategy_family: str, registry_path: Path | None = None) -> int:
-    """Aile için registry'deki gerçek toplam deneme sayısı (P0-2).
-
-    Reddedilen ve başarısız koşular DA sayılır: çoklu-deneme düzeltmesinin tüm anlamı
-    "kaç kez denedik"tir; yalnız beğenilenleri saymak düzeltmeyi anlamsızlaştırır.
-    """
     return sum(1 for e in read_all(registry_path) if e.get("hypothesis_id") == strategy_family)
 
 
 def trials_for_dsr(strategy_family: str, registry_path: Path | None = None) -> int:
-    """DSR'ın N girdisi. TEK kaynak burasıdır; çağıran elle sayı veremez."""
     n = count_runs(strategy_family, registry_path)
     if n < 2:
         raise ValueError(

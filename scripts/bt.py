@@ -83,6 +83,7 @@ def main() -> None:
         scenario=args.scenario,
         effective_fee=fee,
         timerange=args.timerange,
+        pairs=args.pairs,
         timeframe_detail=None if args.no_detail else args.timeframe_detail,
         no_detail_reason=args.reason,
         exit_code=proc.returncode,

@@ -40,14 +40,15 @@ radar-signal/
 10. **Yatırım tavsiyesi dili yasak.** "Al/sat/kesin" kalıpları hiçbir çıktıda yer almaz; "STOP ÇALIŞTI—kapandı" yerine "SİSTEM İNVALIDASYONU—gerçek pozisyonunuz otomatik kapatılmadı" dili (CR-002 P2-8). Her bildirimde invalidasyon + yasal not.
 11. **Aynı anda yayında ≤3 strateji; araç/strateji eklemeden önce mevcut olana parametre eklemek değerlendirilir**, yeni strateji ADR ister.
 12. Hipotez kartı olmayan strateji kodu yazılmaz; kart `docs/hypotheses/` altında ve kanıt düzeyi etiketli olmalı.
+13. **Main dalına doğrudan commit atılamaz:** Tüm geliştirmeler `feature/<görev-adı>` dalında yürütülür; kabul kapıları ve temiz ağaç zorunludur (ADR-0004).
 
 ## Test disiplini (Definition of Done)
-İş şu dördü olmadan bitmedi sayılmaz: (1) birim/sözleşme testi yeşil, (2) ruff temiz, (3) davranış değişikliğinde SPEC/CR/ADR güncel, (4) strateji değişikliğinde freqtrade `lookahead-analysis` + `recursive-analysis` çıktısı temiz ve hipotez kartına eklenmiş.
+İş şu dördü olmadan bitmedi sayılmaz: (1) birim/sözleşme testi yeşil, (2) ruff temiz, (3) davranış değişikliğinde SPEC/CR/ADR güncel, (4) strateji değişikliğinde freqtrade `lookahead-analysis` + `recursive-analysis` çıktısı temiz, kart-kod uyumu doğrulanmış ve hipotez kartına eklenmiş.
 - Replay determinizm testi korunur: aynı veri + aynı commit → bit-bit aynı sinyal/skor/gerekçe.
 - Canlı API'ye giden test yazılmaz; canlı kontrol yalnız `scripts/smoke` içindir.
 
 ## Oturum akışı
 1. Büyük değişiklikte önce plan yaz, onay al, sonra uygula.
 2. SPEC/CR'daki varsayım gerçekle çelişirse: dur, SPEC'i güncelle, ADR yaz, devam et. Sessiz uyarlama yasak.
-3. Bu repo tek yazarlıdır (Claude Code). Başka araç çıktıları yalnız inceleme girdisidir; doğrudan merge edilmez.
+3. Görev başına tek yazar; yazar ≠ incelemeci (ADR-0004). Başka araç/model çıktıları yalnız inceleme girdisidir; doğrudan merge edilmez.
 4. CR uygulanınca dosyasının başına "DURUM: UYGULANDI (commit hash)" satırı eklenir.
