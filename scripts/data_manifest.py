@@ -10,7 +10,7 @@ Kullanım: .venv/Scripts/python scripts/data_manifest.py
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -43,7 +43,7 @@ def main() -> None:
 
     entries = [file_entry(p) for p in files]
     manifest = {
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "exchange": "binance",
         "trading_mode": "futures",
         "files": entries,
@@ -53,7 +53,7 @@ def main() -> None:
     manifest["manifest_sha256"] = manifest_hash
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    stamp = datetime.now(UTC).strftime("%Y%m%d")
     json_path = OUT_DIR / f"MANIFEST-{stamp}.json"
     json_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
