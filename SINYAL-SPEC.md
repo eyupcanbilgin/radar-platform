@@ -82,12 +82,20 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
 6. **Dry-run karantinası:** backtest'i geçen strateji ≥4 hafta dry-run'da izlenir; canlı sinyal kalitesi backtest'ten anlamlı sapıyorsa geri alınır.
 
-### 3.1 İlk strateji seti
-| Kod | Hipotez | Amaç |
-|---|---|---|
-| S-0001 | EMA(20/50) kesişimi + ATR stop | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
-| S-0002 | 1h trend yönünde 15m geri çekilme (RSI + EMA bandı) | İlk gerçek aday: trend-takip + pullback |
-| S-0003 | Funding aşırılığında ters yön (btc-radar verisiyle) | Faz D adayı: rejim-bilinçli ilk strateji |
+### 3.1 İlk strateji seti (CR-4 ile yeniden tanımlandı; S-0004 ayrımı CR-002 P0-7)
+| Kod | Hipotez (kaynak kart) | Öncelik | Not |
+|---|---|---|---|
+| S-0001 | EMA(20/50) kesişimi + ATR stop | Taban | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
+| S-0002 | **Hacim-koşullu intraday momentum (Kart A)** | 1 | En güçlü akademik temelli yönsel aday (Wen ve ark. 2022); koşullar kartın test taslağından |
+| S-0003 | **Rejim filtresi = funding–OI–likidasyon (Kart E+G+L), meta-labeling** | 2 | Yön üretmez; S-0002+ sinyallerine izin/boyut verir. btc-radar Faz D entegrasyonunun hedefi. Önce GÖZLEM modunda (bloklamaz, loglar — CR-002 yol haritası 7) |
+| S-0004a | **Seans volatilite kırılması (Kart I)** | 3 | Neredeyse günlük örneklem; seans tanımı Kart I kurallarıyla (TZ-aware) |
+| S-0005 | **FOMC event-study (Kart K)** | 4 | Seyrek olay, ayrı pipeline; karartma penceresinde "armed" bekler (P0-7) |
+| PARK | Jump-reversal (B/H) | — | Maliyet hassasiyeti "çok yüksek" + tek-olay kanıtı; stres-slippage altyapısı (CR-5) oturmadan test edilmez |
+| PARK | Mum sınırı (D) | — | 1m/tick veri gerektirir + bozunmaya en açık aday |
+| RET | Delta-neutral basis arb (F) | — | Ürün kapsamı dışı (iki bacak, borç, sermaye operasyonu) |
+| HAVUZ | N, O, P, Q | — | Düşük kanıt; hipotez havuzunda kanıt etiketiyle bekler, kör test edilmez |
+
+A–Q kartlarının her biri `docs/hypotheses/` altına kanıt düzeyi + kaynak + zayıflık alanlarıyla birer dosya olarak işlenir (kaynak: `docs/research/hipotez-arastirmasi.md`).
 
 ---
 
