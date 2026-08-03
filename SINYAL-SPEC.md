@@ -43,7 +43,16 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
    ├─ backtesting + hyperopt  ← strateji fabrikasının test bankosu
    └─ Telegram + webhook      ← sinyal + gerekçe teslimatı
         ▼
-[ rationale enricher ]  — webhook alıcısı (küçük FastAPI servisi, Faz B sonu)
+[ blackout modülü ]  — planlı olay takvimi (FOMC, CPI, büyük vade/expiry;
+   kaynak: ekonomik takvim + Deribit expiry takvimi) → olay penceresinde yeni sinyal
+   üretimi susturulur, Telegram'a "karartma aktif" bildirimi düşer. Varsayılan pencere:
+   olay öncesi 30 dk + sonrası 60 dk (config/blackout.yaml). Gerekçe: Kart K — FOMC
+   sonrası ilk saatte BTC mutlak getirisi ~2×, hacim ~2,5×; bu pencerede teknik sinyal
+   gürültüdür (CR-2). Karartma-politika matrisi CR-002 P0-7: normal stratejiler bloklu,
+   S-0005 "armed" bekler; AÇIK POZİSYON ÇIKIŞLARI HER ZAMAN İZİNLİ.
+        ▼
+[ rationale enricher ]  — webhook alıcısı (küçük FastAPI servisi; CR-002 yol haritası
+   gereği yaşam döngüsüyle birlikte 2. sıraya öne çekildi — eski "Faz B sonu" planı geçersiz)
    sinyale ekler: tetikleyen koşullar (enter_tag), indikatör değerleri,
    (Faz D'den itibaren) btc-radar rejim/kırılganlık skoru
         ▼
