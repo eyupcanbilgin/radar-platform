@@ -7,3 +7,10 @@ dist/
 *.egg-info/
 .cache/
 btc_radar/_config/
+
+# Kurulum paketi arşivi + referans repolar (git dışı; tek doğruluk kaynağı repolardır)
+KURULUM-REHBERI.md
+radar-signal/
+btc-radar-ek/
+borsapy-master/
+awesome-ai-in-finance-main/
