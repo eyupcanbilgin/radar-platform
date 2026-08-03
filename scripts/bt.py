@@ -29,16 +29,19 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--strategy", required=True)
     ap.add_argument("--hypothesis", required=True, help="Hipotez kartı kimliği (ör. S-0001)")
-    ap.add_argument("--scenario", default="realistic",
-                    help="CR-5 senaryo adı (varsayılan: realistic)")
+    ap.add_argument(
+        "--scenario", default="realistic", help="CR-5 senaryo adı (varsayılan: realistic)"
+    )
     ap.add_argument("--timerange", default=None)
     ap.add_argument("--pairs", nargs="*", default=None)
     ap.add_argument("--timeframe-detail", default="1m")
-    ap.add_argument("--no-detail", action="store_true",
-                    help="1m detayı kapat (gerekçe --reason ile zorunlu)")
+    ap.add_argument(
+        "--no-detail", action="store_true", help="1m detayı kapat (gerekçe --reason ile zorunlu)"
+    )
     ap.add_argument("--reason", default=None, help="--no-detail gerekçesi")
-    ap.add_argument("--dry-print", action="store_true",
-                    help="freqtrade'i çalıştırmadan komutu yazdır (test)")
+    ap.add_argument(
+        "--dry-print", action="store_true", help="freqtrade'i çalıştırmadan komutu yazdır (test)"
+    )
     args = ap.parse_args()
 
     if args.no_detail and not args.reason:
@@ -48,12 +51,18 @@ def main() -> None:
     fee = effective_fee(costs, args.scenario)
 
     cmd = [
-        str(FREQTRADE), "backtesting",
-        "--userdir", "user_data",
-        "--config", "config/config.dryrun.json",
-        "--strategy", args.strategy,
-        "--fee", f"{fee:.6f}",
-        "--export", "trades",
+        str(FREQTRADE),
+        "backtesting",
+        "--userdir",
+        "user_data",
+        "--config",
+        "config/config.dryrun.json",
+        "--strategy",
+        args.strategy,
+        "--fee",
+        f"{fee:.6f}",
+        "--export",
+        "trades",
     ]
     if not args.no_detail:
         cmd += ["--timeframe-detail", args.timeframe_detail]

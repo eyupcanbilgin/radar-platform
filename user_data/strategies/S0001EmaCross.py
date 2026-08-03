@@ -10,14 +10,13 @@ stratejide değil config'de (CLAUDE.md Teknoloji seti).
 """
 
 import talib.abstract as ta
-from pandas import DataFrame
-
 from freqtrade.strategy import (
     DecimalParameter,
     IntParameter,
     IStrategy,
     stoploss_from_absolute,
 )
+from pandas import DataFrame
 
 
 class S0001EmaCross(IStrategy):
@@ -38,8 +37,17 @@ class S0001EmaCross(IStrategy):
     atr_period = IntParameter(7, 28, default=14, space="sell", optimize=False)
     atr_stop_mult = DecimalParameter(1.0, 4.0, default=2.0, space="sell", optimize=False)
 
-    def leverage(self, pair, current_time, current_rate, proposed_leverage,
-                 max_leverage, entry_tag, side, **kwargs) -> float:
+    def leverage(
+        self,
+        pair,
+        current_time,
+        current_rate,
+        proposed_leverage,
+        max_leverage,
+        entry_tag,
+        side,
+        **kwargs,
+    ) -> float:
         return 1.0  # kontrol stratejisi kaldıraçsız referans defter tutar
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -70,8 +78,9 @@ class S0001EmaCross(IStrategy):
         dataframe.loc[cross_up, ["exit_short", "exit_tag"]] = (1, "ema_cross_reverse")
         return dataframe
 
-    def custom_stoploss(self, pair, trade, current_time, current_rate,
-                        current_profit, after_fill, **kwargs) -> float | None:
+    def custom_stoploss(
+        self, pair, trade, current_time, current_rate, current_profit, after_fill, **kwargs
+    ) -> float | None:
         """Chandelier tarzı ATR trailing stop.
 
         freqtrade stop'u yalnız lehte yönde sıkılaştırır; None dönüşü mevcut stop'u korur

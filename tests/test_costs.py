@@ -22,8 +22,10 @@ def test_effective_fee_realistic():
 
 def test_effective_fee_cascade_is_heaviest():
     c = load_costs()
-    fees = [effective_fee(c, s) for s in
-            ("optimistic_maker", "realistic", "taker_heavy", "stressed", "cascade")]
+    fees = [
+        effective_fee(c, s)
+        for s in ("optimistic_maker", "realistic", "taker_heavy", "stressed", "cascade")
+    ]
     assert fees == sorted(fees)
     assert fees[-1] == pytest.approx(0.00045 + 0.006)
 

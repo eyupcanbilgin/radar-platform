@@ -19,7 +19,10 @@ MANIFEST_DIR = REPO / "docs" / "data"
 def git_commit_hash() -> str:
     out = subprocess.run(
         ["git", "rev-parse", "--short=12", "HEAD"],
-        cwd=REPO, capture_output=True, text=True, check=True,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return out.stdout.strip()
 

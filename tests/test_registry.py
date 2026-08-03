@@ -10,8 +10,11 @@ from registrylib import count_runs, record_run
 
 def _run(tmp: Path, **over):
     base = dict(
-        strategy="S0001EmaCross", hypothesis_id="S-0001", scenario="realistic",
-        effective_fee=0.00085, exit_code=0,
+        strategy="S0001EmaCross",
+        hypothesis_id="S-0001",
+        scenario="realistic",
+        effective_fee=0.00085,
+        exit_code=0,
     )
     base.update(over)
     return record_run(registry_path=tmp / "experiments.jsonl", **base)
@@ -26,8 +29,14 @@ def test_record_appends_valid_jsonl(tmp_path: Path):
     assert parsed[0]["experiment_id"] == e1["experiment_id"]
     assert parsed[1]["scenario"] == "taker_heavy"
     for entry in parsed:
-        for field in ("experiment_id", "created_at_utc", "strategy_version",
-                      "dataset_snapshot", "hypothesis_id", "created_by"):
+        for field in (
+            "experiment_id",
+            "created_at_utc",
+            "strategy_version",
+            "dataset_snapshot",
+            "hypothesis_id",
+            "created_by",
+        ):
             assert entry[field], field
     assert e1["experiment_id"] != e2["experiment_id"]
 
