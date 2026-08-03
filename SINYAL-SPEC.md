@@ -132,6 +132,24 @@ Kural: fiyat seviyeleri "bölge/referans" dilinde verilir, emir talimatı dilind
 
 ---
 
+## 5.1 Rejim Matrisi — S-0003 Tasarım Referansı (CR-8)
+
+Hipotez araştırmasındaki volatilite × funding/OI × likidasyon çerçevesi (kaynak: `docs/research/hipotez-arastirmasi.md`, "Rejim matrisi" bölümü). **Bu matris config değil tasarım dokümanıdır**; kurallara dönüşümü S-0003 hipotez kartında yapılır.
+
+| Volatilite | Funding/OI | Likidasyon | Tercih edilecek hipotez |
+|---|---|---|---|
+| Düşük | Nötr | Düşük | Range mean reversion |
+| Yükseliyor | Nötr | Düşük | Hacim teyitli breakout |
+| Yüksek | OI yükseliyor | Düşük | Momentum; fakat kırılganlık artıyor |
+| Yüksek | Funding aşırı | OI aşırı | Yeni giriş azalt; failure/reversal izle |
+| Çok yüksek | OI sert düşüyor | Çok yüksek | Kaskad devamı, sonra exhaustion |
+| FOMC/expiry penceresi | Herhangi | Herhangi | Olay modeli veya no-trade |
+| Hafta sonu | Herhangi | Düşük | Daha sıkı likidite ve cross-venue teyidi |
+
+Araştırmanın ana bulgusu tasarımı doğrular: funding/OI/seans verileri yön sinyali değil **rejim filtresidir**; en kalıcı etkiler yön değil volatilite zamanlamasıdır.
+
+---
+
 ## 6. Yol Haritası
 
 | Faz | İçerik | Bitti kriteri |
