@@ -1,0 +1,129 @@
+# SINYAL-SPEC.md — Radar Signal
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.0**
+
+| Alan | Değer |
+|---|---|
+| Proje sahibi | Eyüpcan |
+| Tarih | 3 Ağustos 2026 |
+| Çalışma adı | `radar-signal` (btc-radar'ın kardeş projesi; ayrı repo) |
+| Karar seti | Intraday (15m ana + 1h teyit) · freqtrade motoru · sadece sinyal + gerekçe (emir YOK) |
+| İlişkili proje | `btc-radar-mcp` — Faz D'de rejim filtresi olarak entegre edilir |
+
+> **Yasal ve etik çerçeve:** Bu sistem emir göndermez, borsa hesabına yazma yetkisiyle bağlanmaz, yatırım tavsiyesi değildir. Çıktısı "koşullu sinyal + gerekçe + invalidasyon"dur; işlem kararı ve sorumluluğu kullanıcıya aittir. Bu metin her bildirim şablonunun altında yer alır.
+
+---
+
+## 1. Ürün Tanımı
+
+### 1.1 Ne yapar
+BTCUSDT ve ETHUSDT için (USDT-M perpetual verisi üzerinden; spot fiyat bağlam olarak) 15 dakikalık mumlarda deterministik stratejilerle long/short sinyali üretir; her sinyali **gerekçe satırıyla** Telegram'a bildirir; dry-run defteriyle hipotetik performansı sürekli ölçer.
+
+### 1.2 Ne yapmaz
+- Emir göndermez; API anahtarı sadece public veri için (veya hiç — freqtrade public mumlarla çalışır).
+- LLM canlı sinyal döngüsünde yer almaz. Sinyal = deterministik Python. AI'ların rolü: strateji yazımı, backtest analizi, rejim bağlamı.
+- "Kesin al/sat" dili kullanmaz; her sinyal koşullu ve invalidasyonlu ifade edilir.
+
+### 1.3 Başarı tanımı (kusursuzluk değil)
+Bir strateji ancak şu üçünü aynı anda sağlarsa "yayında" kalır:
+1. **Maliyet sonrası pozitif beklenti:** komisyon (taker %0,05 varsayım — konfigürasyonda) + kayma (bar başına konservatif varsayım) düşüldükten sonra out-of-sample dönemde pozitif getiri.
+2. **İstatistiksel asgari:** out-of-sample'da ≥100 işlem (daha azı gürültüdür).
+3. **Risk sınırı:** out-of-sample max drawdown, aynı dönem buy&hold drawdown'ından kötü değil.
+
+---
+
+## 2. Mimari
+
+```
+[ Binance USDT-M public verisi (ccxt / freqtrade dahili) ]
+        ▼
+[ freqtrade çekirdeği ]  — dry-run modu (emir yok, hipotetik defter)
+   ├─ user_data/strategies/   ← bizim yazdığımız strateji sınıfları (TEK üretim noktası)
+   ├─ backtesting + hyperopt  ← strateji fabrikasının test bankosu
+   └─ Telegram + webhook      ← sinyal + gerekçe teslimatı
+        ▼
+[ rationale enricher ]  — webhook alıcısı (küçük FastAPI servisi, Faz B sonu)
+   sinyale ekler: tetikleyen koşullar (enter_tag), indikatör değerleri,
+   (Faz D'den itibaren) btc-radar rejim/kırılganlık skoru
+        ▼
+[ Telegram kanalı ]  — insan-okur formatı; her mesajda gerekçe + invalidasyon + yasal not
+```
+
+**Veri sorumluluğu ayrımı:** Mum verisini freqtrade kendisi çeker (ccxt) — btc-radar provider'ları burada KULLANILMAZ (tekrar yazım yok). btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı) ve Faz D'de HTTP endpoint'i üzerinden sorgulanır.
+
+---
+
+## 3. Strateji Fabrikası Protokolü
+
+Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme disiplinidir.** Her strateji şu hattan geçer:
+
+1. **Hipotez kartı** (`docs/hypotheses/NNNN.md`): tek paragraf — hangi piyasa davranışını yakalıyor, neden var olmalı, hangi rejimde çalışması/çalışmaması beklenir.
+2. **Claude Code implementasyonu:** freqtrade strateji sınıfı; her giriş koşulu ayrı `enter_tag` ile etiketlenir (gerekçe mekanizmasının temeli).
+3. **Backtest protokolü (pazarlıksız):**
+   - Veri: mevcut tüm 15m tarihçe; **train/test ayrımı** — son 6 ay yalnız out-of-sample, hyperopt ASLA görmez.
+   - Walk-forward: 3 ay pencere, 1 ay kaydırma; sonuçlar pencere bazında raporlanır.
+   - Maliyet: komisyon + kayma her koşuda açık; "maliyetsiz sonuç" raporlanmaz.
+   - Karşılaştırma tabanı: buy&hold BTC ve basit EMA-kesişim kontrol stratejisi (S-0001). Kontrolü geçemeyen strateji tartışılmaz.
+4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
+5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
+6. **Dry-run karantinası:** backtest'i geçen strateji ≥4 hafta dry-run'da izlenir; canlı sinyal kalitesi backtest'ten anlamlı sapıyorsa geri alınır.
+
+### 3.1 İlk strateji seti
+| Kod | Hipotez | Amaç |
+|---|---|---|
+| S-0001 | EMA(20/50) kesişimi + ATR stop | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
+| S-0002 | 1h trend yönünde 15m geri çekilme (RSI + EMA bandı) | İlk gerçek aday: trend-takip + pullback |
+| S-0003 | Funding aşırılığında ters yön (btc-radar verisiyle) | Faz D adayı: rejim-bilinçli ilk strateji |
+
+---
+
+## 4. Sinyal Bildirim Sözleşmesi
+
+Her Telegram mesajı şu alanları içerir (webhook enricher üretir):
+```
+[SİNYAL] ETHUSDT LONG · 15m · 2026-08-03 14:32 UTC
+Strateji: S-0002 (trend-pullback) · etiket: rsi_bounce_uptrend
+Gerekçe: 1h EMA50 üstünde; 15m RSI 34→41 dönüş; hacim 20-bar ort. üstü
+Rejim (radar): yön +31, kırılganlık 44, güven 78 [Faz D'den itibaren]
+Referans: giriş bölgesi X, invalidasyon Y (ATR tabanlı), hedef bölge Z
+Not: Araştırma sinyalidir; yatırım tavsiyesi değildir. Karar ve risk kullanıcıya aittir.
+```
+Kural: fiyat seviyeleri "bölge/referans" dilinde verilir, emir talimatı dilinde verilmez. Kırılganlık ≥60 iken sinyal mesajına otomatik uyarı satırı eklenir; güven <55 iken rejim satırı "veri yetersiz" der (btc-radar fail-closed ilkesi buraya taşınır).
+
+---
+
+## 5. AI Orkestrasyonu (bu projede)
+
+| Rol | Araç | İş |
+|---|---|---|
+| Tek yazar | Claude Code | Strateji sınıfları, enricher servisi, test/CI, hipotez kartları |
+| Backtest analisti | Claude Code (+ Gemini büyük CSV'lerde) | Koşu sonuçlarını okuma, pencere bazlı zayıflık tespiti |
+| İncelemeci | Cursor/Codex | Strateji PR'larında look-ahead bias, veri sızıntısı, off-by-one avı |
+| Rejim beyni | btc-radar MCP + skill | Faz D: sinyal filtreleme bağlamı; günlük rejim raporu |
+| Canlı döngü | — | LLM YOK. Deterministik kod. |
+
+**Look-ahead bias avı incelemenin 1 numaralı maddesidir:** intraday stratejilerde en sık hata, kapanmamış mum verisini veya geleceği gören shift hatasını kullanmaktır. Her strateji PR'ında incelemeciye açıkça bu sorulur.
+
+---
+
+## 6. Yol Haritası
+
+| Faz | İçerik | Bitti kriteri |
+|---|---|---|
+| **A — Kurulum** | freqtrade + repo iskeleti + Telegram botu + veri indirme (BTC/ETH 15m-1h tüm tarihçe) | S-0001 backtest'i maliyet dahil koşuyor; Telegram'a test mesajı düşüyor |
+| **B — Fabrika** | Backtest protokolü otomasyonu (make hedefleri), walk-forward scripti, hipotez kartı şablonu, enricher v1 (enter_tag → gerekçeli mesaj) | S-0002 protokolün tamamından geçti (kabul veya gerekçeli ret) |
+| **C — Karantina** | Kabul edilen strateji(ler) dry-run'da; günlük özet raporu (sinyal sayısı, hipotetik PnL, backtest sapması) | 4 hafta kesintisiz dry-run verisi ve sapma raporu |
+| **D — Rejim entegrasyonu** | btc-radar'a HTTP transport (kendi Faz 3'ü öne çekilir); enricher rejim skorunu çeker; S-0003 geliştirilir | Sinyal mesajlarında rejim satırı canlı; kırılganlık filtresi A/B olarak backtest'lendi |
+| **E — Değerlendirme** | 3 aylık dry-run verisiyle karar: devam / revizyon / (istersen ve veri desteklerse) otomasyon tartışması | Veriye dayalı yazılı değerlendirme raporu |
+
+---
+
+## 7. Riskler
+
+| # | Risk | Karşılık |
+|---|---|---|
+| 1 | Intraday'de maliyet avantajı yutar | Başarı tanımı maliyet-sonrası; kontrol stratejisi kıyası zorunlu |
+| 2 | Overfitting (en olası başarısızlık nedeni) | §3.4 korkulukları + out-of-sample kilidi + ret kayıtları |
+| 3 | Sinyal gecikmesi (insan okuma süresi) | 15m/1h seçimi bu yüzden; mum kapanışında sinyal, "bölge" dili |
+| 4 | Kullanıcının sinyale aşırı güveni | Her mesajda invalidasyon + yasal not; haftalık "sinyal karnesi" raporu (isabet/ıska şeffaflığı) |
+| 5 | Binance veri/erişim değişiklikleri | ccxt soyutlaması; Bybit yedek borsa olarak config'de hazır |
+| 6 | Strateji sayısı şişer, bakım çöker | Aynı anda yayında ≤3 strateji; yenisi girerken en zayıfı karantinaya döner |
