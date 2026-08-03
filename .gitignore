@@ -1,0 +1,46 @@
+# Yerel IDE/ajan ayarları
+**/.claude/settings.local.json
+**/.cursor/
+**/.vscode/
+
+# Python ortamları ve önbellekler
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.coverage
+**/htmlcov/
+**/dist/
+**/*.egg-info/
+
+# Secret ve ortam dosyaları
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/*.p12
+
+# Çalışma zamanı verisi
+**/.cache/
+**/var/
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/*.log
+
+# Freqtrade ham veri ve üretilmiş çıktılar
+**/user_data/data/
+**/user_data/backtest_results/
+**/user_data/logs/
+**/user_data/plot/
+**/user_data/hyperopt_results/
+**/user_data/notebooks/
+**/tradesv3*.dryrun.sqlite*
+
+# İşletim sistemi
+**/.DS_Store
+**/Thumbs.db
+
