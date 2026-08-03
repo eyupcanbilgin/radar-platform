@@ -1,0 +1,20 @@
+# Çalışma zamanı / ortam
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+.ruff_cache/
+
+# Ham veri git dışı — bütünlük manifesti docs/data/ altında tutulur (ŞART B)
+user_data/data/
+user_data/backtest_results/
+user_data/logs/
+user_data/plot/
+user_data/hyperopt_results/
+user_data/notebooks/
+
+# Çalışma zamanı defterleri (SQLite); Experiment Registry JSONL'i git İÇİNDEDİR
+*.sqlite
+*.sqlite3
+tradesv3*.dryrun.sqlite*
