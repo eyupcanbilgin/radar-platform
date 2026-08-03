@@ -70,9 +70,13 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
 1. **Hipotez kartı** (`docs/hypotheses/NNNN.md`): tek paragraf — hangi piyasa davranışını yakalıyor, neden var olmalı, hangi rejimde çalışması/çalışmaması beklenir.
 2. **Claude Code implementasyonu:** freqtrade strateji sınıfı; her giriş koşulu ayrı `enter_tag` ile etiketlenir (gerekçe mekanizmasının temeli).
 3. **Backtest protokolü (pazarlıksız):**
-   - Veri: mevcut tüm 15m tarihçe; **train/test ayrımı** — son 6 ay yalnız out-of-sample, hyperopt ASLA görmez.
-   - Walk-forward: 3 ay pencere, 1 ay kaydırma; sonuçlar pencere bazında raporlanır.
-   - Maliyet: komisyon + kayma her koşuda açık; "maliyetsiz sonuç" raporlanmaz.
+   - Veri: mevcut tüm 15m tarihçe; **train/test ayrımı** — son 6 ay yalnız out-of-sample, hyperopt ASLA görmez. Dönem disiplini CR-002 P1-3 ile derinleşir: Development / Validation / Locked-test / Forward-quarantine; locked sonuç bir kez açılır.
+   - **Purged walk-forward** (CR-3): 3 ay pencere, 1 ay kaydırma; train/test sınırında ≥1 gün embargo boşluğu — overlap eden örnek sızıntısı engellenir. Sonuçlar pencere bazında raporlanır.
+   - **BTC/ETH ayrı kalibrasyon** (CR-3): BTC'de geliştirilen parametre ETH'ye kopyalanmaz; ETH ayrıca bağımsız out-of-sample doğrulama seti olarak raporlanır.
+   - **A/B/C kıyası zorunlu** (CR-3): her strateji (A) çıplak, (B) + rejim filtresi, (C) + rejim + karartma varyantlarıyla backtest edilir; filtre sonucu iyileştirmiyorsa o stratejide kullanılmaz — birleşim inanç değil ölçümdür.
+   - **Zaman standardı** (CR-3): ham veri UTC; seans tanımları `Europe/London` / `America/New_York` timezone-aware (DST otomatik). Sabit İstanbul saatiyle seans tanımı yasak.
+   - **Türev verisi yayın-anı kuralı** (CR-3): funding/OI/likidasyon backtest'te ancak gerçek zamanda erişilebilir olduğu anda (`available_at ≤ karar_anı`) kullanılabilir; saat sonu verisiyle saat başında işlem = look-ahead.
+   - Maliyet: komisyon + kayma + funding her koşuda açık (`config/costs.yaml`); "maliyetsiz sonuç" raporlanmaz.
    - Karşılaştırma tabanı: buy&hold BTC ve basit EMA-kesişim kontrol stratejisi (S-0001). Kontrolü geçemeyen strateji tartışılmaz.
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
