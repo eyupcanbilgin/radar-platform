@@ -18,3 +18,4 @@ user_data/notebooks/
 *.sqlite
 *.sqlite3
 tradesv3*.dryrun.sqlite*
+var/
