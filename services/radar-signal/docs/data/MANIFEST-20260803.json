@@ -1,0 +1,64 @@
+{
+  "exchange": "binance",
+  "files": [
+    {
+      "date_max_utc": "2026-08-03T19:15:00+00:00",
+      "date_min_utc": "2019-09-08T17:45:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-15m-futures.feather",
+      "rows": 242023,
+      "sha256": "0086fc8b210d89bff6f1dd4a4a39a94ee8701d1b3e70115f5177392c96b45415"
+    },
+    {
+      "date_max_utc": "2026-08-03T16:00:00+00:00",
+      "date_min_utc": "2019-09-10T08:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-funding_rate.feather",
+      "rows": 7559,
+      "sha256": "fb669a3f968b7329fb3158fbae37eae79839268e868e0f09c1cb7ed808a80929"
+    },
+    {
+      "date_max_utc": "2026-08-03T18:00:00+00:00",
+      "date_min_utc": "2019-09-08T17:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-futures.feather",
+      "rows": 60506,
+      "sha256": "32d73a2ce0ab5f10dc7b4d8524c1301d6d4fe55409f95d480d06c09a8dd86d0b"
+    },
+    {
+      "date_max_utc": "2026-08-03T18:00:00+00:00",
+      "date_min_utc": "2019-12-23T11:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-mark.feather",
+      "rows": 57968,
+      "sha256": "9d5ee56f2104079d4b6dc5be79921289a3ff9b5076b1b53e75a4269206c45e1f"
+    },
+    {
+      "date_max_utc": "2026-08-03T19:15:00+00:00",
+      "date_min_utc": "2019-11-27T07:45:00+00:00",
+      "file": "user_data/data/binance/futures/ETH_USDT_USDT-15m-futures.feather",
+      "rows": 234383,
+      "sha256": "7b553cc1f926bc170032bb4ec2c67e96e46cde5e5982c7133f01b69a91c74e14"
+    },
+    {
+      "date_max_utc": "2026-08-03T16:00:00+00:00",
+      "date_min_utc": "2019-11-27T08:00:00+00:00",
+      "file": "user_data/data/binance/futures/ETH_USDT_USDT-1h-funding_rate.feather",
+      "rows": 7325,
+      "sha256": "6afd53b5392c2ee56c9d56f1450713de27811f7b6fb59ed0fe233f8f828496f1"
+    },
+    {
+      "date_max_utc": "2026-08-03T18:00:00+00:00",
+      "date_min_utc": "2019-11-27T07:00:00+00:00",
+      "file": "user_data/data/binance/futures/ETH_USDT_USDT-1h-futures.feather",
+      "rows": 58596,
+      "sha256": "69647da08587062fcd04061e5d9d176b9119a03173694f55c867ffa21cde3e5c"
+    },
+    {
+      "date_max_utc": "2026-08-03T18:00:00+00:00",
+      "date_min_utc": "2019-12-23T11:00:00+00:00",
+      "file": "user_data/data/binance/futures/ETH_USDT_USDT-1h-mark.feather",
+      "rows": 57968,
+      "sha256": "7395412c100f90bb4ab8e4cd73824fd9b13aca94b2672605a6d08188fd2e8530"
+    }
+  ],
+  "generated_at_utc": "2026-08-03T19:39:51.065027+00:00",
+  "manifest_sha256": "89f6dbb390dd8d89979343c1aa82049d4736a629125b29fccad91949de6cfdcf",
+  "trading_mode": "futures"
+}

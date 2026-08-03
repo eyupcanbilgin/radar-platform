@@ -1,0 +1,15 @@
+{
+    "strategy_name": "S0001EmaCross",
+    "params": {
+        "buy": {
+            "ema_fast": 20,
+            "ema_slow": 50
+        },
+        "sell": {
+            "atr_period": 14,
+            "atr_stop_mult": 2.0
+        }
+    },
+    "ft_stratparam_v": 1,
+    "export_time": "2026-08-03T20:00:00+00:00"
+}

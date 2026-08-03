@@ -1,0 +1,178 @@
+# SINYAL-SPEC.md — Radar Signal
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.1**
+
+> v1.1 (3 Ağu 2026): CR-001 maddeleri (CR-1…CR-8) ve CR-002 onaylı çelişki çözümleri işlendi. v1.0 → git geçmişi.
+
+| Alan | Değer |
+|---|---|
+| Proje sahibi | Eyüpcan |
+| Tarih | 3 Ağustos 2026 |
+| Çalışma adı | `radar-signal` (btc-radar'ın kardeş projesi; ayrı repo) |
+| Karar seti | Intraday (15m ana + 1h teyit) · freqtrade motoru · sadece sinyal + gerekçe (emir YOK) |
+| İlişkili proje | `btc-radar-mcp` — Faz D'de rejim filtresi olarak entegre edilir |
+
+> **Yasal ve etik çerçeve:** Bu sistem emir göndermez, borsa hesabına yazma yetkisiyle bağlanmaz, yatırım tavsiyesi değildir. Çıktısı "koşullu sinyal + gerekçe + invalidasyon"dur; işlem kararı ve sorumluluğu kullanıcıya aittir. Bu metin her bildirim şablonunun altında yer alır.
+
+---
+
+## 1. Ürün Tanımı
+
+### 1.1 Ne yapar
+BTCUSDT ve ETHUSDT için (USDT-M perpetual verisi üzerinden; spot fiyat bağlam olarak) 15 dakikalık mumlarda deterministik stratejilerle long/short sinyali üretir; her sinyali **gerekçe satırıyla** Telegram'a bildirir; dry-run defteriyle hipotetik performansı sürekli ölçer.
+
+### 1.2 Ne yapmaz
+- Emir göndermez; API anahtarı sadece public veri için (veya hiç — freqtrade public mumlarla çalışır).
+- LLM canlı sinyal döngüsünde yer almaz. Sinyal = deterministik Python. AI'ların rolü: strateji yazımı, backtest analizi, rejim bağlamı.
+- "Kesin al/sat" dili kullanmaz; her sinyal koşullu ve invalidasyonlu ifade edilir.
+
+### 1.3 Başarı tanımı (kusursuzluk değil)
+Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
+1. **Maliyet sonrası pozitif beklenti:** komisyon + kayma + funding (`config/costs.yaml`, CR-5) düşüldükten sonra out-of-sample dönemde pozitif getiri.
+2. **İstatistiksel asgari:** out-of-sample'da ≥100 işlem — bu eşik **yüksek-frekans strateji aileleri** içindir; olay-bazlı ailelerde (FOMC, seans) örneklem birimi aileye göre tanımlanır (CR-002 P1-2: olay sayısı + placebo pencere, event-clustered SE).
+3. **Risk sınırı:** out-of-sample max drawdown, aynı dönem buy&hold drawdown'ından kötü değil.
+4. **Deflated Sharpe (veri-tarama düzeltmesi):** eşik taraması/hyperopt yapılan her stratejide denenen konfigürasyon sayısı Experiment Registry'den alınır ve out-of-sample Sharpe, Deflated Sharpe Ratio (Bailey & López de Prado) ile düzeltilir. Düzeltme sonrası anlamlılık yoksa strateji **"şans" etiketiyle reddedilir** (CR-1).
+5. **Çoklu maliyet senaryosunda hayatta kalma:** CR-5 senaryo matrisinin "gerçekçi" VE "taker ağırlıklı" satırlarında pozitif kalmak zorunlu; "stres" satırındaki çökme derecesi risk notu olarak raporlanır, ret nedeni değildir (CR-1).
+
+---
+
+## 2. Mimari
+
+```
+[ Binance USDT-M public verisi (ccxt / freqtrade dahili) ]
+        ▼
+[ freqtrade çekirdeği ]  — dry-run modu (emir yok, hipotetik defter)
+   ├─ user_data/strategies/   ← bizim yazdığımız strateji sınıfları (TEK üretim noktası)
+   ├─ backtesting + hyperopt  ← strateji fabrikasının test bankosu
+   └─ Telegram + webhook      ← sinyal + gerekçe teslimatı
+        ▼
+[ blackout modülü ]  — planlı olay takvimi (FOMC, CPI, büyük vade/expiry;
+   kaynak: ekonomik takvim + Deribit expiry takvimi) → olay penceresinde yeni sinyal
+   üretimi susturulur, Telegram'a "karartma aktif" bildirimi düşer. Varsayılan pencere:
+   olay öncesi 30 dk + sonrası 60 dk (config/blackout.yaml). Gerekçe: Kart K — FOMC
+   sonrası ilk saatte BTC mutlak getirisi ~2×, hacim ~2,5×; bu pencerede teknik sinyal
+   gürültüdür (CR-2). Karartma-politika matrisi CR-002 P0-7: normal stratejiler bloklu,
+   S-0005 "armed" bekler; AÇIK POZİSYON ÇIKIŞLARI HER ZAMAN İZİNLİ.
+        ▼
+[ rationale enricher ]  — webhook alıcısı (küçük FastAPI servisi; CR-002 yol haritası
+   gereği yaşam döngüsüyle birlikte 2. sıraya öne çekildi — eski "Faz B sonu" planı geçersiz)
+   sinyale ekler: tetikleyen koşullar (enter_tag), indikatör değerleri,
+   (Faz D'den itibaren) btc-radar rejim/kırılganlık skoru
+        ▼
+[ Telegram kanalı ]  — insan-okur formatı; her mesajda gerekçe + invalidasyon + yasal not
+```
+
+**Veri sorumluluğu ayrımı:** Mum verisini freqtrade kendisi çeker (ccxt) — btc-radar provider'ları burada KULLANILMAZ (tekrar yazım yok). btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı) ve Faz D'de HTTP endpoint'i üzerinden sorgulanır.
+
+---
+
+## 3. Strateji Fabrikası Protokolü
+
+Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme disiplinidir.** Her strateji şu hattan geçer:
+
+1. **Hipotez kartı** (`docs/hypotheses/NNNN.md`): tek paragraf — hangi piyasa davranışını yakalıyor, neden var olmalı, hangi rejimde çalışması/çalışmaması beklenir.
+2. **Claude Code implementasyonu:** freqtrade strateji sınıfı; her giriş koşulu ayrı `enter_tag` ile etiketlenir (gerekçe mekanizmasının temeli).
+3. **Backtest protokolü (pazarlıksız):**
+   - Veri: mevcut tüm 15m tarihçe; **train/test ayrımı** — son 6 ay yalnız out-of-sample, hyperopt ASLA görmez. Dönem disiplini CR-002 P1-3 ile derinleşir: Development / Validation / Locked-test / Forward-quarantine; locked sonuç bir kez açılır.
+   - **Purged walk-forward** (CR-3): 3 ay pencere, 1 ay kaydırma; train/test sınırında ≥1 gün embargo boşluğu — overlap eden örnek sızıntısı engellenir. Sonuçlar pencere bazında raporlanır.
+   - **BTC/ETH ayrı kalibrasyon** (CR-3): BTC'de geliştirilen parametre ETH'ye kopyalanmaz; ETH ayrıca bağımsız out-of-sample doğrulama seti olarak raporlanır.
+   - **A/B/C kıyası zorunlu** (CR-3): her strateji (A) çıplak, (B) + rejim filtresi, (C) + rejim + karartma varyantlarıyla backtest edilir; filtre sonucu iyileştirmiyorsa o stratejide kullanılmaz — birleşim inanç değil ölçümdür.
+   - **Zaman standardı** (CR-3): ham veri UTC; seans tanımları `Europe/London` / `America/New_York` timezone-aware (DST otomatik). Sabit İstanbul saatiyle seans tanımı yasak.
+   - **Türev verisi yayın-anı kuralı** (CR-3): funding/OI/likidasyon backtest'te ancak gerçek zamanda erişilebilir olduğu anda (`available_at ≤ karar_anı`) kullanılabilir; saat sonu verisiyle saat başında işlem = look-ahead.
+   - Maliyet: komisyon + kayma + funding her koşuda açık (`config/costs.yaml`); "maliyetsiz sonuç" raporlanmaz.
+   - Karşılaştırma tabanı: buy&hold BTC ve basit EMA-kesişim kontrol stratejisi (S-0001). Kontrolü geçemeyen strateji tartışılmaz.
+4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
+
+**Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
+5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
+6. **Dry-run karantinası:** backtest'i geçen strateji ≥4 hafta dry-run'da izlenir; canlı sinyal kalitesi backtest'ten anlamlı sapıyorsa geri alınır.
+
+### 3.1 İlk strateji seti (CR-4 ile yeniden tanımlandı; S-0004 ayrımı CR-002 P0-7)
+| Kod | Hipotez (kaynak kart) | Öncelik | Not |
+|---|---|---|---|
+| S-0001 | EMA(20/50) kesişimi + ATR stop | Taban | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
+| S-0002 | **Hacim-koşullu intraday momentum (Kart A)** | 1 | En güçlü akademik temelli yönsel aday (Wen ve ark. 2022); koşullar kartın test taslağından |
+| S-0003 | **Rejim filtresi = funding–OI–likidasyon (Kart E+G+L), meta-labeling** | 2 | Yön üretmez; S-0002+ sinyallerine izin/boyut verir. btc-radar Faz D entegrasyonunun hedefi. Önce GÖZLEM modunda (bloklamaz, loglar — CR-002 yol haritası 7) |
+| S-0004a | **Seans volatilite kırılması (Kart I)** | 3 | Neredeyse günlük örneklem; seans tanımı Kart I kurallarıyla (TZ-aware) |
+| S-0005 | **FOMC event-study (Kart K)** | 4 | Seyrek olay, ayrı pipeline; karartma penceresinde "armed" bekler (P0-7) |
+| PARK | Jump-reversal (B/H) | — | Maliyet hassasiyeti "çok yüksek" + tek-olay kanıtı; stres-slippage altyapısı (CR-5) oturmadan test edilmez |
+| PARK | Mum sınırı (D) | — | 1m/tick veri gerektirir + bozunmaya en açık aday |
+| RET | Delta-neutral basis arb (F) | — | Ürün kapsamı dışı (iki bacak, borç, sermaye operasyonu) |
+| HAVUZ | N, O, P, Q | — | Düşük kanıt; hipotez havuzunda kanıt etiketiyle bekler, kör test edilmez |
+
+A–Q kartlarının her biri `docs/hypotheses/` altına kanıt düzeyi + kaynak + zayıflık alanlarıyla birer dosya olarak işlenir (kaynak: `docs/research/hipotez-arastirmasi.md`).
+
+---
+
+## 4. Sinyal Bildirim Sözleşmesi
+
+Her Telegram mesajı şu alanları içerir (webhook enricher üretir):
+```
+[SİNYAL] ETHUSDT LONG · 15m · 2026-08-03 14:32 UTC
+Strateji: S-0002 (trend-pullback) · etiket: rsi_bounce_uptrend
+Gerekçe: 1h EMA50 üstünde; 15m RSI 34→41 dönüş; hacim 20-bar ort. üstü
+Rejim (radar): yön +31, kırılganlık 44, güven 78 [Faz D'den itibaren]
+Referans: giriş bölgesi X, invalidasyon Y (ATR tabanlı), hedef bölge Z
+Not: Araştırma sinyalidir; yatırım tavsiyesi değildir. Karar ve risk kullanıcıya aittir.
+```
+Kural: fiyat seviyeleri "bölge/referans" dilinde verilir, emir talimatı dilinde verilmez. Kırılganlık ≥60 iken sinyal mesajına otomatik uyarı satırı eklenir; güven <55 iken rejim satırı "veri yetersiz" der (btc-radar fail-closed ilkesi buraya taşınır).
+
+---
+
+## 5. AI Orkestrasyonu (bu projede)
+
+| Rol | Araç | İş |
+|---|---|---|
+| Tek yazar | Claude Code | Strateji sınıfları, enricher servisi, test/CI, hipotez kartları |
+| Backtest analisti | Claude Code (+ Gemini büyük CSV'lerde) | Koşu sonuçlarını okuma, pencere bazlı zayıflık tespiti |
+| İncelemeci | Cursor/Codex | Strateji PR'larında look-ahead bias, veri sızıntısı, off-by-one avı |
+| Rejim beyni | btc-radar MCP + skill | Faz D: sinyal filtreleme bağlamı; günlük rejim raporu |
+| Canlı döngü | — | LLM YOK. Deterministik kod. |
+
+**Look-ahead bias avı incelemenin 1 numaralı maddesidir:** intraday stratejilerde en sık hata, kapanmamış mum verisini veya geleceği gören shift hatasını kullanmaktır. Her strateji PR'ında incelemeciye açıkça bu sorulur.
+
+**Raporlama kütüphanesi (CR-7):** Faz C/E performans raporlarında **quantstats** kullanılır, pyfolio KULLANILMAZ (pyfolio/empyrical 2020'den beri bakımsız — RESEARCH-RADAR v1.1). freqtrade'in quantstats entegrasyonundan yararlanılır.
+
+---
+
+## 5.1 Rejim Matrisi — S-0003 Tasarım Referansı (CR-8)
+
+Hipotez araştırmasındaki volatilite × funding/OI × likidasyon çerçevesi (kaynak: `docs/research/hipotez-arastirmasi.md`, "Rejim matrisi" bölümü). **Bu matris config değil tasarım dokümanıdır**; kurallara dönüşümü S-0003 hipotez kartında yapılır.
+
+| Volatilite | Funding/OI | Likidasyon | Tercih edilecek hipotez |
+|---|---|---|---|
+| Düşük | Nötr | Düşük | Range mean reversion |
+| Yükseliyor | Nötr | Düşük | Hacim teyitli breakout |
+| Yüksek | OI yükseliyor | Düşük | Momentum; fakat kırılganlık artıyor |
+| Yüksek | Funding aşırı | OI aşırı | Yeni giriş azalt; failure/reversal izle |
+| Çok yüksek | OI sert düşüyor | Çok yüksek | Kaskad devamı, sonra exhaustion |
+| FOMC/expiry penceresi | Herhangi | Herhangi | Olay modeli veya no-trade |
+| Hafta sonu | Herhangi | Düşük | Daha sıkı likidite ve cross-venue teyidi |
+
+Araştırmanın ana bulgusu tasarımı doğrular: funding/OI/seans verileri yön sinyali değil **rejim filtresidir**; en kalıcı etkiler yön değil volatilite zamanlamasıdır.
+
+---
+
+## 6. Yol Haritası
+
+**Sıralama otoritesi CR-002 "Yol haritası yeniden sıralaması"dır** (Değ-1 önerisi kabul): 1) S-0001 ayakta · 2) sinyal→snapshot→ledger→Telegram yaşam döngüsü uçtan uca · 3) replay testi · 4) gerçekçi giriş/çıkış simülatörü · 5) Experiment Registry · 6) S-0002 · 7) rejim filtresi önce gözlem modunda · 8) yeterli örnekle çıplak/+rejim kıyası · 9) S-0004a seans · 10) S-0005 FOMC ayrı pipeline · 11) jump-reversal tick verisi olmadan asla.
+
+| Faz | İçerik (CR-002 sırasıyla) | Bitti kriteri |
+|---|---|---|
+| **A — Kurulum + kanıt zinciri** (adım 1-5) | freqtrade + veri (bütünlük manifestli) + costs.yaml + Registry v0 + S-0001 + yaşam döngüsü uçtan uca (state machine, outbox, Telegram) + replay determinizmi + muhafazakâr simülatör + Registry tam şema | S-0001 maliyet dahil koşuyor; 100 replay bit-bit özdeş; 10dk Telegram kesintisi kayıpsız |
+| **B — Fabrika** (adım 6) | Walk-forward otomasyonu, hipotez kartı şablonu, S-0002 protokol koşusu | S-0002 protokolün tamamından geçti (kabul veya gerekçeli ret) |
+| **C — Karantina** (adım 7-8) | Dry-run izleme; rejim filtresi GÖZLEM modunda; çıplak/+rejim kıyası | 4 hafta kesintisiz dry-run verisi ve sapma raporu |
+| **D — Rejim entegrasyonu** (adım 7+) | btc-radar HTTP; enricher rejim satırı canlı; S-0003 meta-labeling | Kırılganlık filtresi A/B olarak backtest'lendi |
+| **E — Değerlendirme** (adım 9-10 dahil) | S-0004a/S-0005; 3 aylık dry-run verisiyle karar | Veriye dayalı yazılı değerlendirme raporu |
+
+---
+
+## 7. Riskler
+
+| # | Risk | Karşılık |
+|---|---|---|
+| 1 | Intraday'de maliyet avantajı yutar | Başarı tanımı maliyet-sonrası; kontrol stratejisi kıyası zorunlu |
+| 2 | Overfitting (en olası başarısızlık nedeni) | §3.4 korkulukları + out-of-sample kilidi + ret kayıtları |
+| 3 | Sinyal gecikmesi (insan okuma süresi) | 15m/1h seçimi bu yüzden; mum kapanışında sinyal, "bölge" dili |
+| 4 | Kullanıcının sinyale aşırı güveni | Her mesajda invalidasyon + yasal not; haftalık "sinyal karnesi" raporu (isabet/ıska şeffaflığı) |
+| 5 | Binance veri/erişim değişiklikleri | ccxt soyutlaması; Bybit yedek borsa olarak config'de hazır |
+| 6 | Strateji sayısı şişer, bakım çöker | Aynı anda yayında ≤3 strateji; yenisi girerken en zayıfı karantinaya döner |

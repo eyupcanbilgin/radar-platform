@@ -1,0 +1,47 @@
+{
+    "$comment": "radar-signal dry-run config — EMİR GÖNDERMEZ (CLAUDE.md kural 1). key/secret alanları BİLEREK boş; trade yetkili anahtar bu projede hiçbir zaman kullanılmaz. Telegram token'ı config'e yazılmaz; FREQTRADE__TELEGRAM__TOKEN / __CHAT_ID env değişkenleriyle (.env) verilir.",
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "dry_run": true,
+    "dry_run_wallet": 10000,
+    "stake_currency": "USDT",
+    "stake_amount": 1000,
+    "max_open_trades": 3,
+    "timeframe": "15m",
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "pair_whitelist": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "entry_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "check_depth_of_market": {
+            "enabled": false
+        }
+    },
+    "exit_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": ""
+    },
+    "internals": {
+        "process_throttle_secs": 5
+    }
+}

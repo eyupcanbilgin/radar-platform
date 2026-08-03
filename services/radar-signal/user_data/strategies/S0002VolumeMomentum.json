@@ -1,0 +1,14 @@
+{
+  "strategy_name": "S0002VolumeMomentum",
+  "params": {
+    "buy": {
+      "return_percentile": 0.80,
+      "volume_mult": 1.25
+    },
+    "sell": {
+      "atr_period": 14,
+      "atr_stop_mult": 1.0,
+      "holding_candles": 4
+    }
+  }
+}

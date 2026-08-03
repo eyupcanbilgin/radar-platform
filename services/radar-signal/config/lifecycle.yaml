@@ -1,0 +1,41 @@
+# Sinyal yaşam döngüsü politikası (CR-002 P0-4 + P0-8). Eşikler koda gömülmez.
+version: "1.0"
+
+# --- P0-8: fail-closed'un kesin tanımı -------------------------------------------------
+# zorunlu girdi eksik → BLOCK · opsiyonel katman erişilemez → sinyal gider ama etiketlenir
+inputs:
+  required:
+    - candle_close # mum kapanışı doğrulanmadan sinyal olmaz
+    - price # referans fiyat
+    - atr # invalidasyon seviyesi hesaplanamıyorsa sinyal gönderilmez
+  optional:
+    - regime # btc-radar rejim skoru: erişilemezse "REJİM ÇEVRİMDIŞI" etiketi
+    - blackout_calendar # takvim okunamazsa karartma değerlendirilemedi notu
+
+# Opsiyonel katman erişilemediğinde deftere yazılacak bayrak ve mesaj etiketi
+degraded_flags:
+  regime: "REJİM ÇEVRİMDIŞI — değerlendirilemedi"
+  blackout_calendar: "KARARTMA TAKVİMİ OKUNAMADI — olay penceresi doğrulanamadı"
+
+# --- Sinyal geçerliliği (P2-2) ---------------------------------------------------------
+validity:
+  window_minutes: 15 # sinyal bir sonraki mum kapanışına kadar geçerli
+  max_entry_deviation_pct: 0.35 # referans fiyattan bu kadar sapınca kurulum bozulur
+
+# --- Çıkış çakışma önceliği (P0-4 / P0-5) ---------------------------------------------
+# Aynı anda birden fazla çıkış tetiklenirse listede ÖNCE gelen kazanır.
+# "Canım yanıyor beklemez": koruma çıkışları kural çıkışlarının önündedir.
+exit_precedence:
+  - STOP_EXIT
+  - INVALIDATED
+  - DATA_FAILURE_EXIT
+  - ROI_EXIT
+  - STRATEGY_EXIT
+  - TIME_EXIT
+
+# --- Bildirim outbox'ı -----------------------------------------------------------------
+outbox:
+  max_attempts: 20
+  retry_backoff_seconds: [5, 15, 30, 60, 120, 300]
+  # Kesinti sonrası kuyruk bu yaştan eskiyse "geç teslim" notuyla gönderilir
+  late_delivery_after_minutes: 5

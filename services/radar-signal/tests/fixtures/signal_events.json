@@ -1,0 +1,83 @@
+[
+  {
+    "asset": "BTC",
+    "strategy": "S0001",
+    "direction": "LONG",
+    "candle_close_utc": "2026-08-03T12:00:00+00:00",
+    "enter_tag": "ema_cross_up",
+    "rationale": "EMA20 EMA50'yi yukarı kesti; 1h trend yukarı",
+    "counter_evidence": "Hacim 20-bar ortalamasının altında",
+    "entry_reference": 61250.0,
+    "invalidation": 60100.0,
+    "regime_line": "yön +31, kırılganlık 44, güven 78",
+    "data_health": "87/100",
+    "inputs_available": {
+      "candle_close": true,
+      "price": true,
+      "atr": true,
+      "regime": true,
+      "blackout_calendar": true
+    }
+  },
+  {
+    "asset": "ETH",
+    "strategy": "S0001",
+    "direction": "SHORT",
+    "candle_close_utc": "2026-08-03T12:15:00+00:00",
+    "enter_tag": "ema_cross_down",
+    "rationale": "EMA20 EMA50'yi aşağı kesti",
+    "counter_evidence": "Funding negatif — short kalabalığı riski",
+    "entry_reference": 2410.5,
+    "invalidation": 2465.0,
+    "regime_line": "REJİM ÇEVRİMDIŞI — değerlendirilemedi",
+    "data_health": "71/100 · Stale: Korea Premium 22dk",
+    "inputs_available": {
+      "candle_close": true,
+      "price": true,
+      "atr": true,
+      "regime": false,
+      "blackout_calendar": true
+    }
+  },
+  {
+    "asset": "BTC",
+    "strategy": "S0001",
+    "direction": "LONG",
+    "candle_close_utc": "2026-08-03T12:30:00+00:00",
+    "enter_tag": "ema_cross_up",
+    "rationale": "İkinci kesişim",
+    "counter_evidence": "ATR hesaplanamadı",
+    "entry_reference": 61800.0,
+    "invalidation": null,
+    "regime_line": "yön +12, kırılganlık 58, güven 66",
+    "data_health": "64/100",
+    "inputs_available": {
+      "candle_close": true,
+      "price": true,
+      "atr": false,
+      "regime": true,
+      "blackout_calendar": true
+    }
+  },
+  {
+    "asset": "BTC",
+    "strategy": "S0001",
+    "direction": "SHORT",
+    "candle_close_utc": "2026-08-03T12:45:00+00:00",
+    "enter_tag": "ema_cross_down",
+    "rationale": "Ters kesişim",
+    "counter_evidence": "FOMC penceresi yaklaşıyor",
+    "entry_reference": 61100.0,
+    "invalidation": 61900.0,
+    "regime_line": "yön -8, kırılganlık 71, güven 74",
+    "data_health": "88/100",
+    "blackout_reason": "FOMC 18:00 penceresi",
+    "inputs_available": {
+      "candle_close": true,
+      "price": true,
+      "atr": true,
+      "regime": true,
+      "blackout_calendar": true
+    }
+  }
+]
