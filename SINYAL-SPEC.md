@@ -128,6 +128,8 @@ Kural: fiyat seviyeleri "bölge/referans" dilinde verilir, emir talimatı dilind
 
 **Look-ahead bias avı incelemenin 1 numaralı maddesidir:** intraday stratejilerde en sık hata, kapanmamış mum verisini veya geleceği gören shift hatasını kullanmaktır. Her strateji PR'ında incelemeciye açıkça bu sorulur.
 
+**Raporlama kütüphanesi (CR-7):** Faz C/E performans raporlarında **quantstats** kullanılır, pyfolio KULLANILMAZ (pyfolio/empyrical 2020'den beri bakımsız — RESEARCH-RADAR v1.1). freqtrade'in quantstats entegrasyonundan yararlanılır.
+
 ---
 
 ## 6. Yol Haritası
