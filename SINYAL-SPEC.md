@@ -79,6 +79,8 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
    - Maliyet: komisyon + kayma + funding her koşuda açık (`config/costs.yaml`); "maliyetsiz sonuç" raporlanmaz.
    - Karşılaştırma tabanı: buy&hold BTC ve basit EMA-kesişim kontrol stratejisi (S-0001). Kontrolü geçemeyen strateji tartışılmaz.
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
+
+**Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
 6. **Dry-run karantinası:** backtest'i geçen strateji ≥4 hafta dry-run'da izlenir; canlı sinyal kalitesi backtest'ten anlamlı sapıyorsa geri alınır.
 
