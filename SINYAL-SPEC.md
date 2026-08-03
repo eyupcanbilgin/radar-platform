@@ -24,10 +24,12 @@ BTCUSDT ve ETHUSDT için (USDT-M perpetual verisi üzerinden; spot fiyat bağlam
 - "Kesin al/sat" dili kullanmaz; her sinyal koşullu ve invalidasyonlu ifade edilir.
 
 ### 1.3 Başarı tanımı (kusursuzluk değil)
-Bir strateji ancak şu üçünü aynı anda sağlarsa "yayında" kalır:
-1. **Maliyet sonrası pozitif beklenti:** komisyon (taker %0,05 varsayım — konfigürasyonda) + kayma (bar başına konservatif varsayım) düşüldükten sonra out-of-sample dönemde pozitif getiri.
-2. **İstatistiksel asgari:** out-of-sample'da ≥100 işlem (daha azı gürültüdür).
+Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
+1. **Maliyet sonrası pozitif beklenti:** komisyon + kayma + funding (`config/costs.yaml`, CR-5) düşüldükten sonra out-of-sample dönemde pozitif getiri.
+2. **İstatistiksel asgari:** out-of-sample'da ≥100 işlem — bu eşik **yüksek-frekans strateji aileleri** içindir; olay-bazlı ailelerde (FOMC, seans) örneklem birimi aileye göre tanımlanır (CR-002 P1-2: olay sayısı + placebo pencere, event-clustered SE).
 3. **Risk sınırı:** out-of-sample max drawdown, aynı dönem buy&hold drawdown'ından kötü değil.
+4. **Deflated Sharpe (veri-tarama düzeltmesi):** eşik taraması/hyperopt yapılan her stratejide denenen konfigürasyon sayısı Experiment Registry'den alınır ve out-of-sample Sharpe, Deflated Sharpe Ratio (Bailey & López de Prado) ile düzeltilir. Düzeltme sonrası anlamlılık yoksa strateji **"şans" etiketiyle reddedilir** (CR-1).
+5. **Çoklu maliyet senaryosunda hayatta kalma:** CR-5 senaryo matrisinin "gerçekçi" VE "taker ağırlıklı" satırlarında pozitif kalmak zorunlu; "stres" satırındaki çökme derecesi risk notu olarak raporlanır, ret nedeni değildir (CR-1).
 
 ---
 
