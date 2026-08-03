@@ -1,0 +1,25 @@
+# Maliyet konfigürasyonu (CR-001/CR-5). Kaynak: docs/research/maliyet-parametreleri.md.
+# Maliyetsiz backtest RAPORLANMAZ (CLAUDE.md kural 6); her koşu senaryo adıyla anılır.
+version: "1.0"
+
+fees:
+  taker: 0.00045 # VIP0 + BNB indirimi; muhafazakâr alternatif 0.0005
+  maker: 0.00018
+
+slippage_oneway: # 15m bar, gerçekçi taban (senaryo bps'i bunu OVERRIDE eder)
+  BTCUSDT: 0.0002
+  ETHUSDT: 0.00025
+
+funding:
+  mode: historical # freqtrade futures modunda tarihsel funding serisi indirildi ve kullanılır
+  fallback_flat_8h: 0.0001
+
+# Her strateji bu matrisle ayrıca koşulur (CR-1). Değer: TEK YÖN kayma, baz puan (bps).
+# "gerçekçi" VE "taker ağırlıklı" satırlarında pozitif kalmak zorunlu; "stres" çökme
+# derecesi risk notudur. cascade: PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu.
+stress_scenarios:
+  optimistic_maker_bps: 2
+  realistic_bps: 4
+  taker_heavy_bps: 8
+  stressed_bps: 18
+  cascade_bps: 60
