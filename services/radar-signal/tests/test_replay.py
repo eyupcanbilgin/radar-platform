@@ -70,3 +70,30 @@ def test_lockfile_missing_fails_loud(monkeypatch):
     monkeypatch.setattr(provenance, "LOCKFILE", REPO / "yok-boyle-bir-dosya.lock")
     with pytest.raises(FileNotFoundError, match="parmak izi"):
         provenance.lockfile_hash()
+
+
+def test_git_provenance_is_scoped_to_signal_service(monkeypatch):
+    import provenance
+
+    calls = []
+
+    class Completed:
+        stdout = "1234567890abcdef\n"
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Completed()
+
+    monkeypatch.setattr(provenance.subprocess, "run", fake_run)
+
+    assert provenance.git_commit() == "1234567890ab"
+    assert provenance.git_is_dirty() is True
+    assert calls[0][0] == ["git", "log", "-1", "--format=%H", "--", "."]
+    assert calls[1][0] == [
+        "git",
+        "status",
+        "--porcelain",
+        "--untracked-files=normal",
+        "--",
+        ".",
+    ]

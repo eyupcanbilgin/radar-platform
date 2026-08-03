@@ -36,7 +36,9 @@ def check_capital_depletion(
             if diff_days >= threshold_days:
                 return (
                     True,
-                    f"GEÇERSİZ — sermaye tükendi (son işlem dönem sonundan {diff_days:.1f} gün önce; kayıp %{loss_pct:.1f})",
+                    "GEÇERSİZ — sermaye tükendi "
+                    f"(son işlem dönem sonundan {diff_days:.1f} gün önce; "
+                    f"kayıp %{loss_pct:.1f})",
                 )
     return False, "OK"
 

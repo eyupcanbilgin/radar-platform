@@ -21,10 +21,10 @@
 
 ## 🛠️ Kurulum ve Başlangıç
 
-### 1. Depoyu Klonlama ve Sanal Ortam Oluşturma
+### 1. Monorepoyu Klonlama ve Sanal Ortam Oluşturma
 ```bash
-git clone git@github.com:KULLANICI_ADI/radar-signal.git
-cd radar-signal
+git clone git@github.com:KULLANICI_ADI/radar-platform.git
+cd radar-platform/services/radar-signal
 
 # Python sanal ortamı oluşturma (Python >= 3.11)
 python -m venv .venv

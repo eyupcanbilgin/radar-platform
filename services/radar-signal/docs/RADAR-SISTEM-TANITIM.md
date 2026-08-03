@@ -7,7 +7,7 @@
 
 ## 1. Ürün Nedir? (Tek paragraf)
 
-BTC ve ETH için **intraday (15 dakika ana / 1 saat teyit) al-sat sinyali üreten, her sinyali gerekçesi ve geçersizlik koşuluyla birlikte Telegram'a bildiren, pozisyonun yaşam döngüsünü (aç → izle → kapat) takip eden, ama asla emir göndermeyen** bir araştırma/karar-destek sistemidir. Sinyaller deterministik Python kodundan çıkar; LLM'ler canlı sinyal döngüsünde yer almaz. Sistem iki bağımsız ama entegre projeden oluşur: veri-ve-rejim beyni (**btc-radar**) ve sinyal motoru (**radar-signal**).
+BTC ve ETH için **intraday (15 dakika ana / 1 saat teyit) al-sat sinyali üreten, her sinyali gerekçesi ve geçersizlik koşuluyla birlikte Telegram'a bildiren, pozisyonun yaşam döngüsünü (aç → izle → kapat) takip eden, ama asla emir göndermeyen** bir araştırma/karar-destek sistemidir. Sinyaller deterministik Python kodundan çıkar; LLM'ler canlı sinyal döngüsünde yer almaz. Sistem aynı monorepoda geliştirilen iki bağımsız çalışma zamanı bileşeninden oluşur: veri-ve-rejim beyni (**btc-radar**) ve sinyal motoru (**radar-signal**).
 
 ## 2. Temel Felsefe (üç ilke + üç ret)
 
@@ -79,7 +79,7 @@ Metodoloji: her metrik yön katkısı d∈{−2..+2}, kırılganlık r∈{0,1,2}
 
 ## 5. Geliştirme Modeli (AI orkestrasyonu)
 
-Tek yazar: Claude Code (iki repo, SPEC+CLAUDE.md anayasalarıyla; kural: spec'ten sapınca sessiz uyarlama yok, dur-güncelle-ADR). Çapraz inceleme: farklı model ailesi (Cursor/Codex) her strateji PR'ında özellikle look-ahead avı yapar (yazar ≠ incelemeci). Araştırma: ChatGPT deep research (hipotez backlog'u, maliyet parametreleri, ürün-API doğrulamaları), Gemini (büyük repo/CSV analizi). LLM'lerin tümü **tasarım-zamanı** araçlarıdır; çalışma zamanında yalnız deterministik kod + (sohbet üzerinden istenirse) btc-radar MCP'nin okunması vardır.
+Tek yazar: Claude Code (tek monorepo, servis bazlı SPEC+CLAUDE.md anayasalarıyla; kural: spec'ten sapınca sessiz uyarlama yok, dur-güncelle-ADR). Çapraz inceleme: farklı model ailesi (Cursor/Codex) her strateji PR'ında özellikle look-ahead avı yapar (yazar ≠ incelemeci). Araştırma: ChatGPT deep research (hipotez backlog'u, maliyet parametreleri, ürün-API doğrulamaları), Gemini (büyük repo/CSV analizi). LLM'lerin tümü **tasarım-zamanı** araçlarıdır; çalışma zamanında yalnız deterministik kod + (sohbet üzerinden istenirse) btc-radar MCP'nin okunması vardır.
 
 ## 6. Mevcut Durum ve Yol
 

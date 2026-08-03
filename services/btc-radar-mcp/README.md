@@ -19,11 +19,17 @@ Claude Desktop yapılandırması:
   "mcpServers": {
     "btc-radar": {
       "command": "uvx",
-      "args": ["--from", "C:/Users/TKA/Desktop/btc-radar", "btc-radar"]
+      "args": [
+        "--from",
+        "C:/ABSOLUTE/PATH/radar-platform/services/btc-radar-mcp",
+        "btc-radar"
+      ]
     }
   }
 }
 ```
+
+`--from` değeri makinenizdeki monorepo konumuna giden mutlak yol olmalıdır.
 
 ## Geliştirme
 

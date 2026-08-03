@@ -5,7 +5,7 @@ sürümü değiştiğinde (ör. pandas yuvarlama davranışı) aynı girdi farkl
 Bu yüzden `requirements.lock` hash'i determinizm kaydının parçasıdır (onay ŞART A).
 
 Parmak izi bileşenleri:
-    git_commit      — kod sürümü
+    git_commit      — signal servisini en son değiştiren commit
     lockfile_sha256 — bağımlılık kilidi (ŞART A)
     costs_sha256    — maliyet modeli
     lifecycle_sha256— yaşam döngüsü politikası
@@ -34,19 +34,27 @@ def lockfile_hash() -> str:
 
 
 def git_commit() -> str:
+    """Signal servis ağacını en son değiştiren commit'in kısa SHA'sı.
+
+    Monorepoda yalnız MCP veya kök doküman değiştiğinde strateji sürümü değişmemelidir.
+    """
     out = subprocess.run(
-        ["git", "rev-parse", "--short=12", "HEAD"],
+        ["git", "log", "-1", "--format=%H", "--", "."],
         cwd=REPO,
         capture_output=True,
         text=True,
         check=True,
     )
-    return out.stdout.strip()
+    return out.stdout.strip()[:12]
 
 
 def git_is_dirty() -> bool:
     out = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=REPO, capture_output=True, text=True, check=True
+        ["git", "status", "--porcelain", "--untracked-files=normal", "--", "."],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return bool(out.stdout.strip())
 

@@ -70,15 +70,17 @@ class S0002VolumeMomentum(IStrategy):
 
         # 3. Son 4 mum getirisinin rolling persentil sırası (Look-ahead yok,
         # global normalizasyon yok)
-        dataframe["return_4bar_pct_rank"] = dataframe["return_4bar"].rolling(
-            window=self.LOOKBACK_WINDOW, min_periods=960
-        ).rank(pct=True)
+        dataframe["return_4bar_pct_rank"] = (
+            dataframe["return_4bar"]
+            .rolling(window=self.LOOKBACK_WINDOW, min_periods=960)
+            .rank(pct=True)
+        )
 
         # 4. Son 4 mumun toplam hacmi (1h volume) ve rolling medyanı
         dataframe["volume_1h"] = dataframe["volume"].rolling(4).sum()
-        dataframe["volume_1h_median"] = dataframe["volume_1h"].rolling(
-            window=self.LOOKBACK_WINDOW, min_periods=960
-        ).median()
+        dataframe["volume_1h_median"] = (
+            dataframe["volume_1h"].rolling(window=self.LOOKBACK_WINDOW, min_periods=960).median()
+        )
 
         # 5. Önceki 1 saatlik bar aralığı (shift(1) ile geleceğe sızıntı engellendi)
         dataframe["high_1h_max_shift1"] = dataframe["high"].shift(1).rolling(4).max()

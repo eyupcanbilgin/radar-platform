@@ -1,4 +1,4 @@
-.PHONY: test lint test-signal test-mcp lint-signal lint-mcp
+.PHONY: test lint policy test-signal test-mcp lint-signal lint-mcp
 
 SIGNAL_DIR=services/radar-signal
 MCP_DIR=services/btc-radar-mcp
@@ -6,6 +6,9 @@ MCP_DIR=services/btc-radar-mcp
 test: test-signal test-mcp
 
 lint: lint-signal lint-mcp
+
+policy:
+	python scripts/check_repo_policy.py
 
 test-signal:
 	$(MAKE) -C $(SIGNAL_DIR) test
@@ -18,4 +21,3 @@ lint-signal:
 
 lint-mcp:
 	$(MAKE) -C $(MCP_DIR) lint
-

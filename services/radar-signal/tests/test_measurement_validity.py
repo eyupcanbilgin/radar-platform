@@ -1,14 +1,15 @@
 """ADIM 2 — Ölçüm geçerliliği ve sermaye tükenmesi kontrolü birim testleri (DoD-1)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 from measurement_validity import calculate_expectancy, check_capital_depletion
 
 
 def test_check_capital_depletion_normal():
     is_depleted, reason = check_capital_depletion(
-        last_trade_date=datetime(2026, 2, 2, tzinfo=timezone.utc),
-        timerange_end=datetime(2026, 2, 3, tzinfo=timezone.utc),
+        last_trade_date=datetime(2026, 2, 2, tzinfo=UTC),
+        timerange_end=datetime(2026, 2, 3, tzinfo=UTC),
         final_balance=9500.0,
         starting_balance=10000.0,
     )

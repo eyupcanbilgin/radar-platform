@@ -105,9 +105,9 @@ class S0002bVolumeMomentum(IStrategy):
 
         # 6. Kart A 4. Koşulu: Funding Oranı Filtresi (%5 - %95 persentil aralığı)
         if "funding_rate" in dataframe.columns:
-            dataframe["funding_rate_pct_rank"] = dataframe["funding_rate"].rolling(
-                1920, min_periods=96
-            ).rank(pct=True)
+            dataframe["funding_rate_pct_rank"] = (
+                dataframe["funding_rate"].rolling(1920, min_periods=96).rank(pct=True)
+            )
             dataframe["funding_ok"] = (dataframe["funding_rate_pct_rank"] >= 0.05) & (
                 dataframe["funding_rate_pct_rank"] <= 0.95
             )

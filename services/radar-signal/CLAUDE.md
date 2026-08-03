@@ -3,7 +3,7 @@
 Bu dosya, bu repoda çalışan Claude Code oturumları için bağlayıcıdır. Her oturum başında sırayla oku: `SINYAL-SPEC.md` → `docs/change-requests/` (numara sırasıyla; CR'lar SPEC'i değiştirir) → son ADR'ler → `git log --oneline -10`.
 
 ## Proje kimliği
-BTC ve ETH için intraday (15m/1h) sinyal + gerekçe üreten, freqtrade dry-run tabanlı, **asla emir göndermeyen** karar-destek sistemi. Kardeş proje: `btc-radar` (rejim beyni; ayrı repo, HTTP ile entegre edilecek). Üç ilke: determinizm, test edilebilirlik, açıklanabilirlik. LLM'ler yalnız geliştirme zamanında; canlı döngüde asla.
+BTC ve ETH için intraday (15m/1h) sinyal + gerekçe üreten, freqtrade dry-run tabanlı, **asla emir göndermeyen** karar-destek sistemi. Kardeş servis: monorepodaki `services/btc-radar-mcp` (rejim beyni; HTTP ile entegre edilecek). Üç ilke: determinizm, test edilebilirlik, açıklanabilirlik. LLM'ler yalnız geliştirme zamanında; canlı döngüde asla.
 
 ## Teknoloji seti
 - Python ≥3.11, freqtrade (güncel stable; futures modu, dry-run). Kurulum freqtrade'in resmî yöntemiyle (venv); ek araçlarımız için uv kullanılabilir.

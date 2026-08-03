@@ -19,11 +19,13 @@ korur. Servise özel geliştirme kuralları ilgili klasördeki `CLAUDE.md` dosya
 ```powershell
 # MCP
 Set-Location services/btc-radar-mcp
-uv sync
+uv sync --locked
 uv run pytest
 
-# Sinyal motoru (Freqtrade sanal ortamı servis içinde kurulur)
+# Sinyal motoru
 Set-Location ../radar-signal
+py -3.12 -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.lock
 .venv/Scripts/python -m pytest -q
 ```
 
@@ -38,7 +40,7 @@ Kökten `make test` ve `make lint`, iki servisin kendi komutlarını sırayla ç
       "command": "uvx",
       "args": [
         "--from",
-        "C:/Users/TKA/projeler/radar-platform/services/btc-radar-mcp",
+        "C:/ABSOLUTE/PATH/radar-platform/services/btc-radar-mcp",
         "btc-radar"
       ]
     }
@@ -46,9 +48,10 @@ Kökten `make test` ve `make lint`, iki servisin kendi komutlarını sırayla ç
 }
 ```
 
+`--from` değeri makinenizdeki monorepo konumuna giden mutlak yol olmalıdır.
+
 ## Veri ve secret politikası
 
 Ham piyasa verisi, backtest çıktıları, SQLite defterleri, sanal ortamlar ve `.env`
 dosyaları Git'e girmez. Veri manifestleri ile Experiment Registry ise araştırma kanıt
 zincirinin parçası olarak sürüm kontrolünde tutulur.
-

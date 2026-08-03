@@ -17,7 +17,6 @@ DSR'a giren N buradan gelir: `trials_for_dsr(hypothesis_id)`. Elle sayı girmek 
 
 import hashlib
 import json
-import subprocess
 import sys
 import uuid
 from datetime import UTC, datetime
@@ -35,14 +34,11 @@ REQUIRED_FIELDS = ("hypothesis_id", "strategy", "scenario", "effective_fee", "ex
 
 
 def git_commit_hash() -> str:
-    out = subprocess.run(
-        ["git", "rev-parse", "--short=12", "HEAD"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
+    """Signal servis ağacını en son değiştiren commit'in kısa SHA'sı."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    from provenance import git_commit
+
+    return git_commit()
 
 
 def latest_manifest_hash() -> str:

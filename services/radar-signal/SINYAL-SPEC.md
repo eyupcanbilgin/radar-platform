@@ -7,7 +7,7 @@
 |---|---|
 | Proje sahibi | Eyüpcan |
 | Tarih | 3 Ağustos 2026 |
-| Çalışma adı | `radar-signal` (btc-radar'ın kardeş projesi; ayrı repo) |
+| Çalışma adı | `radar-signal` (aynı monorepodaki btc-radar servisinin kardeş bileşeni) |
 | Karar seti | Intraday (15m ana + 1h teyit) · freqtrade motoru · sadece sinyal + gerekçe (emir YOK) |
 | İlişkili proje | `btc-radar-mcp` — Faz D'de rejim filtresi olarak entegre edilir |
 
