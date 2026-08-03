@@ -72,6 +72,47 @@ def test_invalid_exit_state_rejected(client):
     assert "geçersiz çıkış durumu" in r.json()["detail"]
 
 
+def test_exit_before_fill_is_409_not_500(client):
+    """Yaşam döngüsü ihlali istemci hatasıdır; canlı duman testinde 500 dönüyordu."""
+    client.post("/webhook/signal", json=PAYLOAD)
+    r = client.post(
+        "/webhook/exit",
+        json={
+            "signal_id": "BTC-S0001-20260803-1200-L-01",
+            "exit_state": "STOP_EXIT",
+            "reason_code": "atr_stop_touched",
+        },
+    )
+    assert r.status_code == 409
+    assert "geçişi tanımsız" in r.json()["detail"]
+
+
+def test_fill_then_exit_succeeds(client):
+    client.post("/webhook/signal", json=PAYLOAD)
+    sid = "BTC-S0001-20260803-1200-L-01"
+    # APPROVED → SIGNAL_SENT (teslimat), sonra fill
+    from enricher.ledger import SignalLedger
+    from enricher.lifecycle import State as S
+
+    with SignalLedger(app_module.DB_DIR / "signals.sqlite") as led:
+        led.apply(signal_id=sid, target=S.SIGNAL_SENT, reason_code="outbox_delivered")
+
+    assert (
+        client.post("/webhook/fill", json={"signal_id": sid, "fill_price": 61300.0}).json()["state"]
+        == "REFERENCE_OPEN"
+    )
+    r = client.post(
+        "/webhook/exit",
+        json={
+            "signal_id": sid,
+            "exit_state": "STOP_EXIT",
+            "reason_code": "atr_stop_touched",
+            "reference_price": 60100.0,
+        },
+    )
+    assert r.status_code == 200 and r.json()["state"] == "STOP_EXIT"
+
+
 def test_exit_for_unknown_signal_is_404(client):
     r = client.post(
         "/webhook/exit",

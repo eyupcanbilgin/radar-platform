@@ -16,8 +16,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from enricher.fill import mark_reference_open
 from enricher.ledger import SignalLedger
-from enricher.lifecycle import EXIT_STATES, State
+from enricher.lifecycle import EXIT_STATES, IllegalTransition, State
 from enricher.outbox import Outbox
 from enricher.pipeline import SignalEvent, SignalPipeline
 from enricher.policy import load_lifecycle
@@ -70,6 +71,29 @@ class ExitIn(BaseModel):
     reference_price: float | None = None
 
 
+class FillIn(BaseModel):
+    signal_id: str
+    fill_price: float | None = None
+
+
+@app.post("/webhook/fill")
+def webhook_fill(payload: FillIn) -> dict:
+    """Referans pozisyon açıldı: SIGNAL_SENT → REFERENCE_OPEN."""
+    pipe = _pipeline()
+    try:
+        state = mark_reference_open(
+            pipe.ledger, signal_id=payload.signal_id, fill_price=payload.fill_price
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IllegalTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    finally:
+        pipe.ledger.close()
+        pipe.outbox.close()
+    return {"signal_id": payload.signal_id, "state": state.value}
+
+
 @app.post("/webhook/signal")
 def webhook_signal(payload: SignalIn) -> dict:
     pipe = _pipeline()
@@ -105,6 +129,10 @@ def webhook_exit(payload: ExitIn) -> dict:
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IllegalTransition as exc:
+        # Yaşam döngüsü ihlali istemci hatasıdır, sunucu arızası değil: 409 ile
+        # geri bildirilir ki çağıran (freqtrade/operatör) sırayı düzeltebilsin.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     finally:
         pipe.ledger.close()
         pipe.outbox.close()
