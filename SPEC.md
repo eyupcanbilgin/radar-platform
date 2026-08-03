@@ -131,10 +131,27 @@ MVP ile metodolojinin **~%80 ağırlığı** ücretsiz kaynaklarla ölçülebili
 ### 3.3 Veri sözleşmesi — RawObservation (metodoloji §10.1)
 Her provider çıkışı şu Pydantic modeline uyar:
 ```
-timestamp_utc, retrieved_at_utc, asset, venue, metric, raw_value, unit,
-window, source_group, source_url, quality(q: 0-1), notes
+timestamp_utc, retrieved_at_utc, available_at_utc, asset, venue, metric, raw_value,
+unit, window, source_group, source_url, quality(q: 0-1), notes
 ```
-`freshness (f)` ve `independence (u)` katsayıları scoring aşamasında hesaplanır (f: veri yaşı / beklenen periyot; u: §5.5 çift sayım grupları).
+`available_at_utc` = verinin sistemce **ilk bilinebildiği** an (CR-002 P0-1). Provider yayın gecikmesini biliyorsa doldurur; boşsa `retrieved_at_utc` kullanılır (muhafazakâr taraf). `freshness (f)` ve `independence (u)` katsayıları scoring aşamasında hesaplanır (f: veri yaşı / beklenen periyot, eğim `weights.yaml → freshness`; u: §5.5 çift sayım grupları).
+
+### 3.4 Point-in-time depo ve değişmez snapshot (CR-002 P0-1 — UYGULANDI)
+```
+[ core/store.py ]     append-only PIT deposu (SQLite)
+   satır alanları: event_time, available_at, ingested_at, provider,
+                   schema_version, payload_hash + gözlem alanları
+   read_as_of(as_of) → YALNIZ available_at ≤ as_of satırları; revizyonlar
+                       ayrı satır olarak korunur (revision_history)
+[ core/snapshot.py ]  compute_snapshot() + SnapshotStore (değişmez)
+   snapshot alanları: snapshot_id, as_of, data_cutoff_at, computed_at, skorlar,
+                      feature_version, scoring_version, weights_hash, input_digest,
+                      content_hash, stale_sources, missing_layers, breakdown
+```
+- `snapshot_id` girdilerin deterministik türevidir; `computed_at` içerik hash'ine girmez.
+- Depo, kaydın taşıdığı `content_hash`'e güvenmez — gövdeden yeniden hesaplayıp doğrular.
+- **`get_as_of` vardır, `get_latest` YOKTUR:** radar-signal `as_of=<mum kapanışı>` sormak zorundadır ve ürettiği sinyale `snapshot_id` yazar.
+- Kabul testi karşılandı: 100 replay → bit-bit özdeş skor/gerekçe (`tests/test_snapshot.py`). Ayrıntı: ADR-0003.
 
 ---
 

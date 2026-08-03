@@ -14,3 +14,10 @@ layers:
 confidence:
   # compute_scores: güven bu eşiğin altındaysa rejim etiketi "veri yetersiz" (SPEC §4, araç 7)
   insufficient_below: 55
+
+freshness:
+  # f katsayısı (SPEC §3.3): beklenen periyot içinde 1.0, sonra doğrusal azalarak
+  # stale_multiple × periyot'ta 0. Beklenen periyot kaynak başına provider'dan gelir.
+  stale_multiple: 3.0
+  # f bu değerin altındaysa kaynak snapshot'ta stale_sources listesine yazılır.
+  stale_below_f: 0.5

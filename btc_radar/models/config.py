@@ -15,12 +15,24 @@ class ConfidenceConfig(BaseModel):
     insufficient_below: int = Field(ge=0, le=100)
 
 
+class FreshnessConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # f: beklenen periyot içinde 1.0, stale_multiple × periyot'ta 0 (core/snapshot.freshness)
+    stale_multiple: float = Field(gt=1.0)
+    stale_below_f: float = Field(ge=0.0, le=1.0)
+
+
 class WeightsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str
     layers: dict[str, float]
+    # SPEC §5.1'de kırılganlık ağırlığı (v) yön ağırlığından (w) ayrıdır. Tanımlanmazsa
+    # layers kullanılır; Faz 1'de ayrışma gerekirse config'e eklenir, koda gömülmez.
+    fragility_layers: dict[str, float] | None = None
     confidence: ConfidenceConfig
+    freshness: FreshnessConfig
 
     @field_validator("layers")
     @classmethod
@@ -33,6 +45,16 @@ class WeightsConfig(BaseModel):
         total = sum(v.values())
         if abs(total - 1.0) > 1e-9:
             raise ValueError(f"katman ağırlıkları toplamı 1.0 olmalı; bulunan: {total}")
+        return v
+
+    @field_validator("fragility_layers")
+    @classmethod
+    def _fragility_valid(cls, v: dict[str, float] | None) -> dict[str, float] | None:
+        if v is None:
+            return None
+        for name, w in v.items():
+            if not 0.0 <= w <= 1.0:
+                raise ValueError(f"fragility_layers['{name}'] [0,1] dışında: {w}")
         return v
 
 

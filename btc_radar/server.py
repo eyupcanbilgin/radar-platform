@@ -14,6 +14,8 @@ from fastmcp.exceptions import ToolError
 
 from btc_radar import __version__
 from btc_radar.core.config import load_signal_rules, load_weights, weights_hash
+from btc_radar.core.snapshot import FEATURE_VERSION, SCORING_VERSION
+from btc_radar.core.store import SCHEMA_VERSION as STORE_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +137,12 @@ async def get_health() -> dict[str, Any]:
             },
             "providers": [],
             "cache": {"initialized": False},
-            "phase": "0-iskelet",
+            "store": {
+                "pit_schema_version": STORE_SCHEMA_VERSION,
+                "feature_version": FEATURE_VERSION,
+                "scoring_version": SCORING_VERSION,
+            },
+            "phase": "0-iskelet + P0-1 (snapshot/PIT)",
             "retrieved_at_utc": datetime.now(UTC).isoformat(),
         }
         return shape(payload)
