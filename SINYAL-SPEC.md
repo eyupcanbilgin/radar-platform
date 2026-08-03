@@ -1,5 +1,7 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.0**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.1**
+
+> v1.1 (3 Ağu 2026): CR-001 maddeleri (CR-1…CR-8) ve CR-002 onaylı çelişki çözümleri işlendi. v1.0 → git geçmişi.
 
 | Alan | Değer |
 |---|---|
@@ -152,13 +154,15 @@ Araştırmanın ana bulgusu tasarımı doğrular: funding/OI/seans verileri yön
 
 ## 6. Yol Haritası
 
-| Faz | İçerik | Bitti kriteri |
+**Sıralama otoritesi CR-002 "Yol haritası yeniden sıralaması"dır** (Değ-1 önerisi kabul): 1) S-0001 ayakta · 2) sinyal→snapshot→ledger→Telegram yaşam döngüsü uçtan uca · 3) replay testi · 4) gerçekçi giriş/çıkış simülatörü · 5) Experiment Registry · 6) S-0002 · 7) rejim filtresi önce gözlem modunda · 8) yeterli örnekle çıplak/+rejim kıyası · 9) S-0004a seans · 10) S-0005 FOMC ayrı pipeline · 11) jump-reversal tick verisi olmadan asla.
+
+| Faz | İçerik (CR-002 sırasıyla) | Bitti kriteri |
 |---|---|---|
-| **A — Kurulum** | freqtrade + repo iskeleti + Telegram botu + veri indirme (BTC/ETH 15m-1h tüm tarihçe) | S-0001 backtest'i maliyet dahil koşuyor; Telegram'a test mesajı düşüyor |
-| **B — Fabrika** | Backtest protokolü otomasyonu (make hedefleri), walk-forward scripti, hipotez kartı şablonu, enricher v1 (enter_tag → gerekçeli mesaj) | S-0002 protokolün tamamından geçti (kabul veya gerekçeli ret) |
-| **C — Karantina** | Kabul edilen strateji(ler) dry-run'da; günlük özet raporu (sinyal sayısı, hipotetik PnL, backtest sapması) | 4 hafta kesintisiz dry-run verisi ve sapma raporu |
-| **D — Rejim entegrasyonu** | btc-radar'a HTTP transport (kendi Faz 3'ü öne çekilir); enricher rejim skorunu çeker; S-0003 geliştirilir | Sinyal mesajlarında rejim satırı canlı; kırılganlık filtresi A/B olarak backtest'lendi |
-| **E — Değerlendirme** | 3 aylık dry-run verisiyle karar: devam / revizyon / (istersen ve veri desteklerse) otomasyon tartışması | Veriye dayalı yazılı değerlendirme raporu |
+| **A — Kurulum + kanıt zinciri** (adım 1-5) | freqtrade + veri (bütünlük manifestli) + costs.yaml + Registry v0 + S-0001 + yaşam döngüsü uçtan uca (state machine, outbox, Telegram) + replay determinizmi + muhafazakâr simülatör + Registry tam şema | S-0001 maliyet dahil koşuyor; 100 replay bit-bit özdeş; 10dk Telegram kesintisi kayıpsız |
+| **B — Fabrika** (adım 6) | Walk-forward otomasyonu, hipotez kartı şablonu, S-0002 protokol koşusu | S-0002 protokolün tamamından geçti (kabul veya gerekçeli ret) |
+| **C — Karantina** (adım 7-8) | Dry-run izleme; rejim filtresi GÖZLEM modunda; çıplak/+rejim kıyası | 4 hafta kesintisiz dry-run verisi ve sapma raporu |
+| **D — Rejim entegrasyonu** (adım 7+) | btc-radar HTTP; enricher rejim satırı canlı; S-0003 meta-labeling | Kırılganlık filtresi A/B olarak backtest'lendi |
+| **E — Değerlendirme** (adım 9-10 dahil) | S-0004a/S-0005; 3 aylık dry-run verisiyle karar | Veriye dayalı yazılı değerlendirme raporu |
 
 ---
 
