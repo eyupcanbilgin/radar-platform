@@ -221,16 +221,20 @@ def test_snapshot_excludes_data_published_after_as_of():
 
 def test_freshness_curve():
     now = AS_OF
-    assert freshness(
-        as_of=now, event_time=now, expected_period_seconds=3600, stale_multiple=3.0
-    ) == 1.0
+    assert (
+        freshness(as_of=now, event_time=now, expected_period_seconds=3600, stale_multiple=3.0)
+        == 1.0
+    )
     # tam periyot sınırında hâlâ taze
-    assert freshness(
-        as_of=now,
-        event_time=now - timedelta(seconds=3600),
-        expected_period_seconds=3600,
-        stale_multiple=3.0,
-    ) == 1.0
+    assert (
+        freshness(
+            as_of=now,
+            event_time=now - timedelta(seconds=3600),
+            expected_period_seconds=3600,
+            stale_multiple=3.0,
+        )
+        == 1.0
+    )
     # periyodun 2 katı yaş → yarı yol (3600..7200 arası doğrusal 1→0)
     assert freshness(
         as_of=now,
@@ -239,12 +243,15 @@ def test_freshness_curve():
         stale_multiple=3.0,
     ) == pytest.approx(0.5)
     # stale_multiple × periyot ve ötesi → 0
-    assert freshness(
-        as_of=now,
-        event_time=now - timedelta(seconds=99999),
-        expected_period_seconds=3600,
-        stale_multiple=3.0,
-    ) == 0.0
+    assert (
+        freshness(
+            as_of=now,
+            event_time=now - timedelta(seconds=99999),
+            expected_period_seconds=3600,
+            stale_multiple=3.0,
+        )
+        == 0.0
+    )
 
 
 def test_future_data_fails_loud():

@@ -174,8 +174,9 @@ class PointInTimeStore:
         sql += " ORDER BY o.metric ASC, o.asset ASC, o.venue ASC"
         return [dict(r) for r in self._conn.execute(sql, params).fetchall()]
 
-    def revision_history(self, *, metric: str, asset: str, venue: str, event_time: datetime
-                         ) -> list[dict]:
+    def revision_history(
+        self, *, metric: str, asset: str, venue: str, event_time: datetime
+    ) -> list[dict]:
         """Aynı olay anı için kaydedilmiş tüm sürümler (Historical Revision Delta girdisi)."""
         rows = self._conn.execute(
             """

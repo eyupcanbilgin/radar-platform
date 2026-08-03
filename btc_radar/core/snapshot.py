@@ -55,9 +55,7 @@ def input_digest(rows: list[dict]) -> str:
     `ingested_at` ve `id` HARİÇ tutulur: aynı veriyi farklı zamanda yeniden yazan bir
     depo kopyası aynı digest'i üretmelidir (veri aynıysa skor da aynıdır).
     """
-    trimmed = [
-        {k: v for k, v in sorted(r.items()) if k not in ("id", "ingested_at")} for r in rows
-    ]
+    trimmed = [{k: v for k, v in sorted(r.items()) if k not in ("id", "ingested_at")} for r in rows]
     return _sha(trimmed)
 
 
