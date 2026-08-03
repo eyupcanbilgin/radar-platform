@@ -38,22 +38,22 @@ Metodoloji v1.0'daki çok katmanlı Bitcoin analiz çerçevesini, Claude'un (Des
 Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama durumu:** ✅ = ücretsiz/anahtar gerektirmeyen public endpoint bilinen ve yaygın kullanımda; 🔑 = ücretsiz ama kayıt/anahtar gerekli; 💰 = paralı, MVP dışı; ⚠️ = implementasyon sırasında canlı doğrulama zorunlu (endpoint sözleşmesi değişmiş olabilir — Collector geliştirilirken ilk iş smoke test).
 
 ### 2.1 Türevler ve likidasyonlar (%25)
-| Metrik | Kaynak | Endpoint (⚠️ canlı doğrula) | Erişim |
+| Metrik | Kaynak | Endpoint (canlı doğrulandı: 3 Ağu 2026, `scripts/verify_endpoints.py`) | Erişim |
 |---|---|---|---|
 | Open Interest (anlık + tarihsel) | Binance Futures | `GET /fapi/v1/openInterest`, `GET /futures/data/openInterestHist` | ✅ |
 | Funding rate (anlık + geçmiş) | Binance Futures | `GET /fapi/v1/premiumIndex`, `GET /fapi/v1/fundingRate` | ✅ |
 | Long/Short hesap ve pozisyon oranları | Binance Futures | `GET /futures/data/globalLongShortAccountRatio`, `topLongShortPositionRatio` | ✅ |
 | Taker buy/sell hacim oranı | Binance Futures | `GET /futures/data/takerlongshortRatio` | ✅ |
-| Gerçekleşen likidasyonlar | Binance WS | `!forceOrder@arr` stream — **REST endpoint'i kaldırıldı**; MVP'de WS toplayıcı + yerel birikim VEYA bitcoin-data.com liquidation serisi | ⚠️ |
+| Gerçekleşen likidasyonlar | bitcoin-data.com | `GET /v1/btc-liquidations` (+`-1h`, `-1d` varyantları; alanlar: `totalLiquidationsUsd`, `longLiquidationsUsd`, `shortLiquidationsUsd`) — **MVP kararı bu seri**. Binance REST'in kaldırıldığı doğrulandı (`/fapi/v1/allForceOrders` → 404, 3 Ağu 2026); WS `!forceOrder@arr` toplayıcı ihtiyacı düştü (Risk 6 çözüldü) | ✅ anahtarsız doğrulandı |
 | Çapraz doğrulama (OI/funding) | Bybit v5 | `GET /v5/market/open-interest`, `/v5/market/funding/history` | ✅ |
 | Liquidation map/heatmap | CoinGlass | — | 💰 MVP dışı. Skill "harita yok; gerçekleşen likidasyon + OI asimetrisiyle sınırlı analiz" diyecek. Güven katsayısı buna göre. |
 
 ### 2.2 On-chain (%25)
 | Metrik | Kaynak | Not | Erişim |
 |---|---|---|---|
-| STH-SOPR, SOPR, MVRV, NUPL | bitcoin-data.com (BGeometrics) | Ücretsiz tier: ~8 istek/saat, 15/gün → **agresif önbellek zorunlu** (veri günlük; TTL ≥ 6 saat) | 🔑 |
-| CDD / Exchange netflow-reserve | bitcoin-data.com | Aynı kaynak, aynı limit | 🔑 |
-| 1.000+ BTC adres kohortu | bitcoin-data.com balance-address serileri; yoksa Faz 2'de blockchain.com charts API | ⚠️ metrik adı implementasyonda doğrulanacak | 🔑 |
+| STH-SOPR, SOPR, MVRV, NUPL | bitcoin-data.com (BGeometrics) | `GET /v1/sth-sopr`, `/v1/sopr`, `/v1/mvrv`, `/v1/nupl` (+`/last` son gözlem; sözleşme: `{d, unixTs, <metrik>}`). Ücretsiz tier: ~8 istek/saat, 15/gün → **agresif önbellek zorunlu** (veri günlük; TTL ≥ 6 saat). Üretim host: `api.bitcoin-data.com` (`bitcoin-data.com/v1` de çalışır); OpenAPI: `api.bgeometrics.com/v3/api-docs` | ✅ anahtarsız doğrulandı (3 Ağu 2026); **opsiyonel API key tasarımı:** `BTC_RADAR_BITCOIN_DATA_API_KEY` env tanımlıysa provider header'a ekler (limit artırımı için), yoksa anahtarsız devam |
+| CDD / Exchange netflow-reserve | bitcoin-data.com | `GET /v1/cdd`, `/v1/exchange-netflow-btc`, `/v1/exchange-reserve-btc` — aynı kaynak, aynı limit | ✅ |
+| 1.000+ BTC adres kohortu | bitcoin-data.com | Tek "1000+" serisi YOK; **bant-bazlı saklama**: `/v1/balance-addr-10K-1K-BTC` ve `/v1/balance-addr-10K-BTC` bantları ayrı ayrı kaydedilir, "1K+" toplaması scoring anında yapılır (ham bant verisi korunur, toplama kuralı config'de). Alternatif kesitler: `/v1/address-cohorts`, `/v1/wallet-bands`. blockchain.com yedeğine gerek kalmadı | ✅ metrik adları doğrulandı |
 | Whale accumulation heatmap | ChainExposed | API yok (HTML). MVP dışı; Faz 2'de scrape değerlendirilir | ⚠️ |
 | CryptoQuant (CDD, SOPR birincil kaynağı) | — | 💰 MVP dışı. bitcoin-data.com ikamesi kullanılır; `source` alanında açıkça belirtilir, q katsayısı 0.75–0.9 bandında |
 
@@ -61,13 +61,13 @@ Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama
 | Metrik | Hesap | Kaynaklar | Erişim |
 |---|---|---|---|
 | Coinbase Premium | `(Coinbase BTC-USD − Binance BTCUSDT) / Binance × 100` — **kendimiz hesaplarız** | Coinbase Exchange `GET /products/BTC-USD/ticker` + Binance spot `GET /api/v3/ticker/price` | ✅ |
-| Korea Premium | `(Upbit BTC-KRW / USDKRW − Binance BTCUSDT) / Binance × 100` | Upbit `GET /v1/ticker`, kur için açık FX kaynağı (implementasyonda seçilecek; ⚠️) | ✅/⚠️ |
+| Korea Premium | `(Upbit BTC-KRW / USDKRW − Binance BTCUSDT) / Binance × 100` | Upbit `GET /v1/ticker` ✅ · USDKRW kaynağı SEÇİLDİ (ADR-0002): birincil `open.er-api.com/v6/latest/USD`, yedek `api.frankfurter.dev/v1/latest` (ECB); üçü de 3 Ağu 2026'da canlı doğrulandı | ✅ |
 | Spot taker CVD | Binance spot `GET /api/v3/trades` agregasyonu — Faz 2 | ✅ |
 
 ### 2.4 Genişlik ve rotasyon (%10)
 | Metrik | Kaynak | Endpoint | Erişim |
 |---|---|---|---|
-| BTC dominance, toplam mcap | CoinGecko | `GET /api/v3/global` (ücretsiz tier ~30 çağrı/dk, demo key önerilir) | ✅/🔑 |
+| BTC dominance, toplam mcap | CoinGecko | `GET /api/v3/global` (ücretsiz tier ~30 çağrı/dk, demo key önerilir; anahtarsız doğrulandı 3 Ağu 2026). **Kesinti yedeği: CoinPaprika fallback provider** (`GET /v1/global`; CoinGecko 429/5xx'te devreye girer, `source` alanında belirtilir, q katsayısı düşürülür) | ✅/🔑 |
 | Yükselen/düşen oranı (top 100) | CoinGecko | `GET /api/v3/coins/markets` üzerinden hesap | ✅ |
 | ETH/BTC | Binance spot `ETHBTC` | ✅ |
 
@@ -75,7 +75,7 @@ Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama
 | Metrik | Kaynak | Endpoint | Erişim |
 |---|---|---|---|
 | Fear & Greed | Alternative.me | `GET https://api.alternative.me/fng/?limit=N` | ✅ |
-| CBBI | ColinTalksCrypto | `GET https://colintalkscrypto.com/cbbi/data/latest.json` (tüm alt metrikler + composite; günlük) | ✅ |
+| CBBI | ColinTalksCrypto | `GET https://colintalkscrypto.com/cbbi/data/latest.json` (tüm alt metrikler + composite; günlük). Canlı ölçüm: ~3,5 sn gecikme (en yavaş kaynak) → provider timeout ≥10 sn, TTL ≥6 saat | ✅ |
 | Bitcoin Magazine Pro F&G | — | Çift sayım grubu: Alternative.me ile TEK oy (metodoloji §5.5). Ayrı kaynak eklenmez. | — |
 
 ### 2.6 Haber ve katalizör (%10)
@@ -83,6 +83,7 @@ Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama
 |---|---|---|
 | CryptoPanic API | 🔑 ücretsiz tier | Faz 2. MVP'de haber katmanı MCP'ye girmez; skill LLM'e "haberi web_search ile doğrula, birincil kaynak iste" talimatı verir. Güven skoru haber kapsamı eksikliğini yansıtır. |
 | CoinMarketCal API | 🔑 | Faz 2 |
+| sharpe.ai ücretsiz katmanı | 🔑 | Fizibilite doğrulama kuyruğunda (CR-002 küçük maddesi): kapsam/limit/sözleşme incelenmeden karar verilmez |
 | Rekt / Messari | scrape / 💰 | Faz 3 |
 
 ### 2.7 Yürütme/teknik bağlam (%5)
@@ -206,12 +207,12 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 
 | # | Risk/Soru | Plan |
 |---|---|---|
-| 1 | Endpoint sözleşmeleri değişmiş olabilir (özellikle Binance likidasyon, bitcoin-data.com metrik adları) | Faz 0'da ilk iş: canlı doğrulama scripti; SPEC ⚠️ işaretli satırlar güncellenir |
+| 1 | ~~Endpoint sözleşmeleri değişmiş olabilir~~ **YAPILDI (3 Ağu 2026):** doğrulama scripti yazıldı, 24 kontrol koşuldu, ⚠️ satırlar güncellendi (bkz. §2 tabloları + ADR-0002) | Günlük smoke CI'da sürer (`.github/workflows/smoke.yml`) |
 | 2 | bitcoin-data.com limiti (15/gün) on-chain kapsamı daraltabilir | Metrik önceliklendirme: STH-SOPR + CDD + netflow ilk üç; kalanlar günde 1 çekim |
-| 3 | Türkiye'den bazı borsa API'lerine erişim kısıtı ihtimali | Provider'lara opsiyonel proxy config; Bybit yedeği |
+| 3 | Türkiye'den bazı borsa API'lerine erişim kısıtı ihtimali — **3 Ağu 2026 itibarıyla gözlenmedi** (Binance spot+futures, Bybit, Upbit, Coinbase erişilebilir); madde açık kalır | Provider'lara opsiyonel proxy config; Bybit yedeği |
 | 4 | Skorun aşırı güven yaratması (kullanıcı psikolojisi) | Her `compute_scores` yanıtında invalidasyon + "araştırma aracı" notu; §11.3 dil kuralları skill'e gömülür |
-| 5 | Korea premium için USDKRW kaynağı | İmplementasyonda seçilecek (açık FX API); seçim ADR olarak kaydedilir |
-| 6 | WS likidasyon toplayıcısı MCP yaşam döngüsüne sığmayabilir (sunucu istek-bazlı) | MVP'de bitcoin-data.com serisiyle başla; WS toplayıcı ayrı süreç olarak Faz 2'de |
+| 5 | ~~Korea premium için USDKRW kaynağı~~ **YAPILDI:** open.er-api.com birincil, frankfurter.dev yedek — ADR-0002 | Smoke scripti üç adayı izlemeye devam eder |
+| 6 | ~~WS likidasyon toplayıcısı~~ **ÇÖZÜLDÜ (3 Ağu 2026):** bitcoin-data.com hazır likidasyon serisi doğrulandı; WS toplayıcıya MVP'de gerek yok | İhtiyaç doğarsa Faz 2'de ayrı süreç olarak yeniden değerlendirilir |
 
 ---
 
