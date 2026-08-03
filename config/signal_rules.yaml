@@ -1,0 +1,5 @@
+# Metrik → d/r dönüşüm kuralları (SPEC §5.1). Faz 1'de doldurulacak.
+# Kurallar rolling percentile / robust z-score temelli GÖRELİ eşik kullanır;
+# sabit mutlak sayı kullanılmaz (metodoloji §5.2). Interaction kuralları desteklenir.
+version: "0.1.0"
+rules: []

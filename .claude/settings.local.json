@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv --version)",
+      "Bash(git --version)",
+      "PowerShell(uv --version)",
+      "PowerShell(python --version)",
+      "PowerShell(python -m uv sync)"
+    ]
+  }
+}
