@@ -23,3 +23,9 @@ stress_scenarios:
   taker_heavy_bps: 8
   stressed_bps: 18
   cascade_bps: 60
+
+# Rejime bağlı kayma (CR-002 P0-5): kırılganlık eşiği aşıldığında sabit kayma yerine
+# stres senaryosunun bps'i uygulanır. Kırılgan piyasada 4 bps varsaymak iyimserliktir.
+dynamic_slippage:
+  fragility_threshold: 60
+  stressed_scenario: stressed
