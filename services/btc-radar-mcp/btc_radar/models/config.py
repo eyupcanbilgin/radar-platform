@@ -97,6 +97,16 @@ class FeatureSpec(BaseModel):
         return self
 
 
+class CollectionMetricSpec(BaseModel):
+    """Operational cadence for a collected metric, without making it a scoring feature."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_period_seconds: float = Field(gt=0.0)
+    max_gap_seconds: float = Field(gt=0.0)
+    history_mode: Literal["backfill_and_live", "live_only"]
+
+
 class RuleSpec(BaseModel):
     """Feature → kırılganlık katkısı kuralı (SPEC §5.1 metrik→r dönüşümü)."""
 
@@ -132,6 +142,9 @@ class SignalRulesConfig(BaseModel):
     # tam saatte damgalanmış bir değerin aynı saatin kararına girmesini bu engeller.
     publication_lag_seconds: float = Field(default=0.0, ge=0.0)
     features: dict[str, FeatureSpec] = Field(default_factory=dict)
+    # Collection health is not a feature declaration. A metric may be monitored here while
+    # remaining completely absent from scoring and direction (ADR-0008).
+    collection_metrics: dict[str, CollectionMetricSpec] = Field(default_factory=dict)
     rules: list[RuleSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")

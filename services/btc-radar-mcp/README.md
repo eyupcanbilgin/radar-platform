@@ -55,9 +55,9 @@ Toplama ile yayın bilinçli olarak ayrıdır: kapanıştan sonra çekilen değe
 backdate edilmez.
 
 ```bash
-# Bir kereye mahsus geçmiş: settled funding + saatlik OI (API key yok)
+# Bir kereye mahsus geçmiş: settled funding + saatlik OI + spot 1h OHLCV (API key yok)
 uv run btc-radar-producer backfill \
-  --pit-db ./var/pit.sqlite --funding-days 120 --open-interest-days 30
+  --pit-db ./var/pit.sqlite --funding-days 120 --open-interest-days 30 --spot-days 120
 
 # Saat boyunca düzenli çalıştırılacak public collector; en yeni geçmiş sayfasını da yazar
 uv run btc-radar-producer collect --pit-db ./var/pit.sqlite
@@ -72,6 +72,10 @@ uv run btc-radar-producer publish \
 
 `collect` komutunun geçmiş sayfasını da yazması gereklidir: Binance saatlik OI geçmişini
 yalnız ~30 gün saklar, ondan eskisi ancak kendi PIT depomuzda bulunabilir.
+
+Spot OHLCV backfill edilebilir; basis ve order-book uçları yalnız güncel snapshot verir.
+Bu yüzden basis/depth geçmişi OHLCV'den tahmin edilmez: `status` bunları `live_only` olarak
+raporlar ve yalnız collector çalışırken biriken gerçek satırları ölçer (ADR-0008).
 
 ## Sürekli çalıştırma ve işletim kanıtı (ADR-0006)
 
@@ -113,6 +117,6 @@ yön kapısı `unavailable` olur (`direction_rules_unavailable`). Geçmiş yeter
 feature `feature_unavailable:<feature>:<neden>` blocker'ı yazar. `radar-signal` her iki
 durumda da deterministik `WAIT` verir. Scheduler/supervisor bu dilimde yoktur.
 
-Faz durumu: **1c — sürekli toplama + işletim kanıtı** (ADR-0006). `get_health`,
+Faz durumu: **1e — spot geçmişi + collector coverage** (ADR-0008). `get_health`,
 `get_derivatives`, backfill/collect/publish/run/status çalışır; yön kuralı, rejim
 sınıflandırması, alarm/bildirim ve çok-kaynak kapsamı Faz 1'in devamıdır (SPEC §4, §7).

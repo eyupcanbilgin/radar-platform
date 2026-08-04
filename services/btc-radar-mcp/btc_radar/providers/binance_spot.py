@@ -123,15 +123,25 @@ class BinanceSpotProvider(BinancePublicClient, BaseProvider):
             self._KLINES_URL, {"symbol": "BTCUSDT", "interval": "1h", "limit": 2}, expect=list
         )
         row = self._latest_closed_candle(payload, retrieved_at=retrieved_at)
+        return self._parse_ohlcv_row(row, retrieved_at=retrieved_at)
+
+    def _parse_ohlcv_row(
+        self,
+        row: dict[str, Any],
+        *,
+        retrieved_at: datetime,
+        available_at: datetime | None = None,
+    ) -> list[RawObservation]:
+        """Normalize one validated kline row with explicit availability semantics."""
         open_time = self._millis(row, "open_time")
         close_time = self._millis(row, "close_time")
-        available_at = max(retrieved_at, close_time)
+        effective_available_at = available_at or max(retrieved_at, close_time)
         notes = f"candle_open_at={open_time.isoformat()}; candle_close_at={close_time.isoformat()}"
         return [
             RawObservation(
                 timestamp_utc=open_time,
                 retrieved_at_utc=retrieved_at,
-                available_at_utc=available_at,
+                available_at_utc=effective_available_at,
                 asset="BTC",
                 venue="binance_spot",
                 metric=metric,

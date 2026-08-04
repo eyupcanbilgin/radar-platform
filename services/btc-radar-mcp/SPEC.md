@@ -1,6 +1,8 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.4**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.5**
 
+> v1.5 (5 Ağu 2026): Saatlik spot OHLCV backfill'i ve scoring'den ayrı spot/basis/depth
+> collection coverage sözleşmesi (ADR-0008).
 > v1.4 (5 Ağu 2026): Spot OHLCV, spot/perp basis ve order-book spread/depth toplayıcıları
 > (ADR-0007).
 > v1.3 (4 Ağu 2026): Tarihsel funding/OI birikimi, yeterli-geçmiş kapısı ve kırılganlık
@@ -55,6 +57,12 @@ depth toplayıcıları `_collect()`'e eklendi. Faz 1a paritesinde: yalnız canl�
 toplama; tarihsel backfill, yeni fragility feature'ı ve yeni MCP aracı yok. `direction` hâlâ
 null.
 
+**Mevcut Faz 1e dilimi (ADR-0008):** Kapanmış spot 1h OHLCV, ileri sayfalı ayrı history
+provider ile PIT'e backfill edilir. Spot close, canlı spot/perp basis ve order-book spread
+serileri feature ilan edilmeden collection coverage raporuna alınır. Basis/depth uçları
+tarihsel snapshot sunmadığından geçmişleri uydurulmaz; `history_mode=live_only` ile yalnız
+canlı birikim kanıtlanır. Yeni skor/yön kuralı yoktur; `direction` hâlâ null.
+
 ### 1.3 Kapsam dışı (tüm fazlar için)
 - Emir iletimi, borsa API key'i ile private endpoint kullanımı, bakiye erişimi.
 - Fiyat/tarih tahmini iddiası.
@@ -77,8 +85,8 @@ Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama
 | Gerçekleşen likidasyonlar | bitcoin-data.com | `GET /v1/btc-liquidations` (+`-1h`, `-1d` varyantları; alanlar: `totalLiquidationsUsd`, `longLiquidationsUsd`, `shortLiquidationsUsd`) — **MVP kararı bu seri**. Binance REST'in kaldırıldığı doğrulandı (`/fapi/v1/allForceOrders` → 404, 3 Ağu 2026); WS `!forceOrder@arr` toplayıcı ihtiyacı düştü (Risk 6 çözüldü) | ✅ anahtarsız doğrulandı |
 | Çapraz doğrulama (OI/funding) | Bybit v5 | `GET /v5/market/open-interest`, `/v5/market/funding/history` | ✅ |
 | Liquidation map/heatmap | CoinGlass | — | 💰 MVP dışı. Skill "harita yok; gerçekleşen likidasyon + OI asimetrisiyle sınırlı analiz" diyecek. Güven katsayısı buna göre. |
-| Spot-perpetual basis | `(Binance spot − Binance perp mark) / mark × 100` — **kendimiz hesaplarız**, iki bacak da Binance (cross-exchange bağımsız değil) | `GET /api/v3/ticker/price` (spot) + `GET /fapi/v1/premiumIndex` (mark) | ✅ toplanıyor (ADR-0007) |
-| Order book spread + sınırlı depth | Binance USD-M perp defteri, `limit=20` sabit sayfa | `GET /fapi/v1/depth` | ✅ toplanıyor (ADR-0007) |
+| Spot-perpetual basis | `(Binance spot − Binance perp mark) / mark × 100` — **kendimiz hesaplarız**, iki bacak da Binance (cross-exchange bağımsız değil) | `GET /api/v3/ticker/price` (spot) + `GET /fapi/v1/premiumIndex` (mark) | ✅ canlı toplanıyor; tarihsel uç yok (ADR-0007/0008) |
+| Order book spread + sınırlı depth | Binance USD-M perp defteri, `limit=20` sabit sayfa | `GET /fapi/v1/depth` | ✅ canlı toplanıyor; tarihsel snapshot yok (ADR-0007/0008) |
 
 ### 2.2 On-chain (%25)
 | Metrik | Kaynak | Not | Erişim |
@@ -94,7 +102,7 @@ Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama
 |---|---|---|---|
 | Coinbase Premium | `(Coinbase BTC-USD − Binance BTCUSDT) / Binance × 100` — **kendimiz hesaplarız** | Coinbase Exchange `GET /products/BTC-USD/ticker` + Binance spot `GET /api/v3/ticker/price` | ✅ |
 | Korea Premium | `(Upbit BTC-KRW / USDKRW − Binance BTCUSDT) / Binance × 100` | Upbit `GET /v1/ticker` ✅ · USDKRW kaynağı SEÇİLDİ (ADR-0002): birincil `open.er-api.com/v6/latest/USD`, yedek `api.frankfurter.dev/v1/latest` (ECB); üçü de 3 Ağu 2026'da canlı doğrulandı | ✅ |
-| Binance spot BTCUSDT hourly OHLCV | Binance spot | `GET /api/v3/klines?interval=1h` — yalnız kapanmış mum kullanılır (ADR-0007); basis hesabının ve gelecekteki bir spot-demand feature'ının temel serisi | ✅ toplanıyor (ADR-0007) |
+| Binance spot BTCUSDT hourly OHLCV | Binance spot | `GET /api/v3/klines?interval=1h` — yalnız kapanmış mum; `startTime/endTime` ile ileri sayfalı backfill (ADR-0007/0008) | ✅ canlı + backfill |
 | Spot taker CVD | Binance spot `GET /api/v3/trades` agregasyonu — Faz 2 | ✅ |
 
 ### 2.4 Genişlik ve rotasyon (%10)
@@ -148,7 +156,7 @@ MVP ile metodolojinin **~%80 ağırlığı** ücretsiz kaynaklarla ölçülebili
 [ core/validator.py ]   şema, tazelik, duplicate, outlier (metodoloji §10.2)
 [ core/features.py ]    rolling percentile + yeterli-geçmiş kapısı (UYGULANDI, ADR-0005)
 [ core/components.py ]  feature → d/r dönüşümü; d şu an daima None (yön kuralı yok)
-[ core/backfill.py ]    sayfalı geçmiş toplama (funding ileri, OI geriye)
+[ core/backfill.py ]    sayfalı geçmiş toplama (funding/spot ileri, OI geriye)
 [ core/scheduler.py ]   iki ritimli tick: saat içi toplama + kapanan saat yayını
 [ core/heartbeat.py ]   append-only koşu kütüğü — sürecin koştuğunun kanıtı
 [ core/coverage.py ]    seri boşluk/kapsama analizi — verinin tam olduğunun kanıtı
@@ -278,6 +286,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 | **1b — Geçmiş ve kırılganlık (tamamlandı)** | Settled funding + saatlik OI backfill, PIT seri okuma, yeterli-geçmiş kapısı, `funding_stress`/`oi_buildup` | Gerçek veriyle fragility üretiliyor; yetersiz geçmiş blocker yazıyor; digest kullanılan geçmişi kapsıyor; direction hâlâ null (ADR-0005) |
 | **1c — Sürekli işletim (tamamlandı)** | Scheduler, heartbeat, kapsama raporu, tek örnek kilidi, `status` | Daemon canlı koştu; aynı saati iki kez yayınlamıyor; hata döngüyü durdurmuyor; kapsama 7 günde %100 raporlandı; yakalama sınırı sessiz değil (ADR-0006) |
 | **1d — Spot/basis/spread toplama (tamamlandı)** | Spot BTCUSDT hourly OHLCV, spot/perp basis, USD-M order book spread/limited depth `_collect()`'e eklendi | Gerçek veriyle canlı toplandı (12 satır: 3 derivatives + 3 order_book + 6 spot); açık mum kullanılmadı; backfill/feature/MCP aracı yok, direction hâlâ null (ADR-0007) |
+| **1e — Spot geçmişi ve coverage (tamamlandı)** | Spot 1h OHLCV ileri sayfalı backfill; spot close/basis/order-book collection coverage | Backfill yalnız kapanmış mum ve PIT yayın zamanı kullanır; basis/depth `live_only` raporlanır, geçmiş uydurulmaz; yeni feature/yön yok (ADR-0008) |
 | **1 — MVP** | 8 araç, 9 provider, cache, scoring, testler | `compute_scores` gerçek veriyle üç skor + rejim üretir; test coverage çekirdek modüllerde ≥%80; smoke yeşil |
 | **2 — Derinlik** | Haber katmanı (CryptoPanic/CoinMarketCal), spot CVD, whale kohort iyileştirme, SKILL.md (analiz beyni) yazımı | Skill + MCP birlikte günlük tek-sayfa raporu (metodoloji §11.1) üretebiliyor |
 | **3 — Yayın** | HTTP transport + /health, Docker, opsiyonel paralı kaynak adaptörleri, ay-fazı backtest modülü (ayrı, skor dışı) | Uzak sunucuda çalışır; README ile üçüncü kişi kurabilir |

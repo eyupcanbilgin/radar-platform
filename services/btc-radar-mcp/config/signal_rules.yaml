@@ -11,11 +11,28 @@
 #
 # Buradaki sayılar tuning sonucu DEĞİLDİR; "ölçüm yapmaya yetecek veri var mı" tabanlarıdır.
 # Bir feature şartı sağlamazsa skor üretilmez, blocker yazılır (fail-closed).
-version: "0.2.0"
+version: "0.3.0"
 
 # Geçmişten toplanan satırın yayın anı = event_time + bu gecikme (ADR-0005).
 # Tam saatte damgalanmış bir değerin aynı saatin kararına girmesini bu engeller.
 publication_lag_seconds: 60
+
+# Operasyonel toplama kapsamı. Bunlar feature veya skor kuralı DEĞİLDİR; yalnız beklenen
+# cadence ve boşluk toleransını tanımlar. 300 sn canlı cadence producer scheduler'ın
+# varsayılanıdır; 900 sn tolerans üç ardışık örneğin kaçmasını görünür kılar.
+collection_metrics:
+  spot_close:
+    expected_period_seconds: 3600
+    max_gap_seconds: 10800
+    history_mode: backfill_and_live
+  spot_perp_basis:
+    expected_period_seconds: 300
+    max_gap_seconds: 900
+    history_mode: live_only
+  order_book_spread_bps:
+    expected_period_seconds: 300
+    max_gap_seconds: 900
+    history_mode: live_only
 
 features:
   funding_stress:

@@ -126,6 +126,9 @@ def test_collect_cli_stores_both_the_snapshot_and_the_newest_history(tmp_path, c
     respx.get("https://fapi.binance.com/futures/data/openInterestHist").mock(
         return_value=httpx.Response(200, json=_fixture("open_interest_hist_1h_btcusdt.json"))
     )
+    respx.get("https://api.binance.com/api/v3/klines").mock(
+        return_value=httpx.Response(200, json=_closed_hour_klines_payload())
+    )
     _mock_order_book_and_spot()
 
     main(["collect", "--pit-db", str(tmp_path / "pit.sqlite"), "--history-limit", "3"])
@@ -180,6 +183,9 @@ def test_backfill_cli_reports_stored_history_not_requested_history(tmp_path, cap
             400, json={"code": -1130, "msg": "parameter 'startTime' is invalid."}
         )
     )
+    respx.get("https://api.binance.com/api/v3/klines").mock(
+        return_value=httpx.Response(200, json=_closed_hour_klines_payload())
+    )
 
     main(
         [
@@ -190,6 +196,8 @@ def test_backfill_cli_reports_stored_history_not_requested_history(tmp_path, cap
             "4",
             "--open-interest-days",
             "30",
+            "--spot-days",
+            "2",
         ]
     )
 
@@ -200,6 +208,8 @@ def test_backfill_cli_reports_stored_history_not_requested_history(tmp_path, cap
     # Borsa saklama sınırına çarptı: sessiz "veri yok" değil, açık bir kısıtlama raporu.
     assert results["open_interest_1h"]["inserted"] == 0
     assert results["open_interest_1h"]["truncated_reason"] == "exchange_retention"
+    assert results["ohlcv_1h"]["inserted"] == 5
+    assert payload["requested_spot_days"] == 2.0
 
 
 def test_backfill_cli_rejects_non_positive_days(tmp_path):
@@ -334,10 +344,17 @@ def test_status_reports_heartbeat_and_data_coverage(tmp_path, capsys):
     assert tasks["publish"]["consecutive_failures"] == 0
     assert payload["publish"]["hours_behind"] == 0
     coverage = {item["metric"]: item for item in payload["coverage"]}
-    assert set(coverage) == {"funding_rate_settled", "open_interest_value_1h"}
+    assert set(coverage) == {
+        "funding_rate_settled",
+        "open_interest_value_1h",
+        "spot_close",
+        "spot_perp_basis",
+        "order_book_spread_bps",
+    }
     # Tolerans raporda uydurulmaz; feature kapısıyla aynı config'ten gelir.
     assert coverage["funding_rate_settled"]["tolerated_gap_seconds"] == 43200.0
     assert coverage["open_interest_value_1h"]["tolerated_gap_seconds"] == 10800.0
+    assert coverage["spot_perp_basis"]["history_mode"] == "live_only"
     # Sağlık, duvar saatine göre değişen bir gözlemdir; testin sabitlediği şey raporun
     # bunu her metrik için ayrı ayrı ve gerekçeleriyle vermesidir.
     assert payload["healthy"] == all(item["healthy"] for item in payload["coverage"])

@@ -28,7 +28,7 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
 | MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005); spot OHLCV, spot/perp basis ve order-book spread/depth toplayıcıları (ADR-0007) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
 | Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
-| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI + canlı spot OHLCV/basis/spread (ADR-0007, tarihsel geçmişi yok) | Spot/basis/spread'in tarihsel backfill'i ve kesintisiz toplaması sırada |
+| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI + canlı spot OHLCV/basis/spread; spot OHLCV backfill ve yeni ailelerin coverage kanıtı (ADR-0008) | Basis/depth yalnız canlı birikir; kesintiler `live_only` olarak görünür |
 | Operasyonel güven | MCP tarafında scheduler, heartbeat ve kapsama kanıtı var (ADR-0006); expiry, outbox atomikliği, Telegram env, kesinti bildirimi ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
 ## 3. Değişmez Ürün İlkeleri
@@ -274,5 +274,20 @@ Canlı doğrulama (5 Ağustos 2026): `collect` 12 satır yazdı (3 derivatives +
 spot); açık (henüz kapanmamış) mum kullanılmadı; basis ≈%0.04, spread ≈0.016 bps.
 
 Bu paket tarihsel backfill, yeni fragility feature'ı veya yeni MCP aracı açmaz; `direction`
-hâlâ null. Sıradaki işler: bu üç ailenin tarihsel backfill'i, kesintisiz toplama kanıtı
-(ADR-0006 desenini bu ailelere genişletmek) ve kesinti bildirimi.
+hâlâ null. Tarihsel spot ve coverage işi WP-0006'da tamamlanmıştır.
+
+### WP-0006 — Spot OHLCV geçmişi ve yeni collector coverage kanıtı
+
+**Durum:** Kodlama, test ve canlı sınırlı smoke tamamlandı (MCP ADR-0008).
+
+1. Ayrı `binance_spot_history` provider ile kapanmış spot 1h mumları ileri sayfalama
+2. Backfill availability: `closeTime + publication_lag`; gerçek ingest zamanı ayrı korunur
+3. `backfill --spot-days` ile sınırlı, bütçeli ve idempotent PIT yazımı
+4. Spot close, spot/perp basis ve order-book spread için scoring'den ayrı coverage config'i
+5. Basis/depth tarihsel uçları olmadığı için `history_mode=live_only`; sahte geçmiş yok
+
+Canlı doğrulama (5 Ağustos 2026): 1 günlük spot penceresi 23 kapanmış mumdan 115 OHLCV
+gözlemi yazdı; en büyük boşluk 3600 saniye, availability kapanış + 60 saniyeydi.
+
+Bu paket yeni feature, fragility veya direction kuralı açmaz. `direction` her koşulda null
+kalır; coverage sağlığı yönsel karar izni değildir.

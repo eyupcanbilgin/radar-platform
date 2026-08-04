@@ -26,6 +26,8 @@ from btc_radar.core.store import PointInTimeStore
 from btc_radar.models.config import SignalRulesConfig
 from btc_radar.providers.binance_futures import BinanceFuturesProvider
 from btc_radar.providers.binance_futures_history import BinanceFuturesHistoryProvider
+from btc_radar.providers.binance_spot import BinanceSpotProvider
+from btc_radar.providers.binance_spot_history import BinanceSpotHistoryProvider
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +265,18 @@ async def get_health() -> dict[str, Any]:
                     "metrics": sorted(BinanceFuturesHistoryProvider.supported_metrics),
                     "health": "not_polled",
                 },
+                {
+                    "name": BinanceSpotProvider.name,
+                    "mode": "public_current_snapshot",
+                    "metrics": sorted(BinanceSpotProvider.supported_metrics - {"all"}),
+                    "health": "not_polled",
+                },
+                {
+                    "name": BinanceSpotHistoryProvider.name,
+                    "mode": "public_history_backfill",
+                    "metrics": sorted(BinanceSpotHistoryProvider.supported_metrics),
+                    "health": "not_polled",
+                },
             ],
             "cache": {"initialized": False},
             "store": {
@@ -271,7 +285,7 @@ async def get_health() -> dict[str, Any]:
                 "scoring_version": SCORING_VERSION,
             },
             "collection": _collection_health(rules),
-            "phase": "1b-history + fragility gate (direction unavailable)",
+            "phase": "1e-spot-history + collection coverage (direction unavailable)",
             "retrieved_at_utc": datetime.now(UTC).isoformat(),
         }
         return shape(payload)

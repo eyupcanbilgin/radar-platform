@@ -20,6 +20,12 @@ def test_signal_rules_load():
     # Kurallar artık gerçek: her kural tanımlı bir feature'a ve yeterli-geçmiş şartına bağlı.
     assert {rule.id for rule in r.rules} == {"funding_stress", "oi_buildup"}
     assert set(r.features) == {"funding_stress", "oi_buildup"}
+    assert set(r.collection_metrics) == {
+        "spot_close",
+        "spot_perp_basis",
+        "order_book_spread_bps",
+    }
+    assert r.collection_metrics["spot_perp_basis"].history_mode == "live_only"
     assert r.publication_lag_seconds > 0
 
 
