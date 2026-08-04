@@ -21,11 +21,24 @@ def load_lifecycle(path: Path | None = None) -> dict:
     raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{p.name} boş ya da dict değil")
-    for key in ("version", "inputs", "degraded_flags", "validity", "exit_precedence", "outbox"):
+    for key in (
+        "version",
+        "inputs",
+        "degraded_flags",
+        "validity",
+        "exit_precedence",
+        "outbox",
+        "webhook_auth",
+    ):
         if key not in raw:
             raise ValueError(f"lifecycle.yaml eksik alan: {key}")
     if not raw["inputs"].get("required"):
         raise ValueError("inputs.required boş olamaz — fail-closed anlamsızlaşır")
+    auth = raw["webhook_auth"]
+    for key in ("max_clock_skew_seconds", "nonce_retention_seconds"):
+        value = auth.get(key) if isinstance(auth, dict) else None
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise ValueError(f"webhook_auth.{key} pozitif integer olmalı")
     return raw
 
 

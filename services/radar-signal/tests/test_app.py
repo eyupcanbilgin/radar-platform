@@ -1,15 +1,55 @@
 """Webhook adaptörü testleri (FastAPI ince katman)."""
 
+import json
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
 from enricher import app as app_module
+from enricher.webhook_auth import signature_for
+
+SECRET = "test-only-webhook-secret"
+
+
+class AuthClient:
+    def __init__(self, client: TestClient):
+        self.client = client
+        self.counter = 0
+
+    def signed(self, *, body: bytes, nonce: str, timestamp: str) -> dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "X-Radar-Timestamp": timestamp,
+            "X-Radar-Nonce": nonce,
+            "X-Radar-Signature": signature_for(
+                secret=SECRET, timestamp=timestamp, nonce=nonce, body=body
+            ),
+        }
+
+    def post(self, path: str, *, json: dict):
+        self.counter += 1
+        body = json_module.dumps(json, ensure_ascii=False, separators=(",", ":")).encode()
+        timestamp = str(int(datetime.now(UTC).timestamp()))
+        nonce = f"test-request-{self.counter:016d}"
+        return self.client.post(
+            path,
+            content=body,
+            headers=self.signed(body=body, nonce=nonce, timestamp=timestamp),
+        )
+
+    def get(self, path: str):
+        return self.client.get(path)
+
+
+json_module = json
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "DB_DIR", tmp_path)
-    return TestClient(app_module.app)
+    monkeypatch.setenv("RADAR_SIGNAL_WEBHOOK_SECRET", SECRET)
+    return AuthClient(TestClient(app_module.app))
 
 
 PAYLOAD = {
@@ -45,6 +85,55 @@ def test_repeated_webhook_is_idempotent(client):
     second = client.post("/webhook/signal", json=PAYLOAD).json()
     assert first["signal_id"] == second["signal_id"]
     assert second["queued"] is False
+
+
+def test_unsigned_webhook_is_rejected_before_pipeline(client):
+    response = client.client.post("/webhook/signal", json=PAYLOAD)
+    assert response.status_code == 401
+
+
+def test_wrong_signature_is_rejected_without_secret_disclosure(client):
+    body = json.dumps(PAYLOAD, separators=(",", ":")).encode()
+    timestamp = str(int(datetime.now(UTC).timestamp()))
+    headers = client.signed(body=body, nonce="wrong-signature-0001", timestamp=timestamp)
+    headers["X-Radar-Signature"] = "sha256=" + "0" * 64
+    response = client.client.post("/webhook/signal", content=body, headers=headers)
+    assert response.status_code == 401
+    assert SECRET not in response.text
+
+
+def test_same_nonce_is_rejected_as_replay(client):
+    body = json.dumps(PAYLOAD, separators=(",", ":")).encode()
+    timestamp = str(int(datetime.now(UTC).timestamp()))
+    headers = client.signed(body=body, nonce="replayed-request-0001", timestamp=timestamp)
+    assert client.client.post("/webhook/signal", content=body, headers=headers).status_code == 200
+    replay = client.client.post("/webhook/signal", content=body, headers=headers)
+    assert replay.status_code == 409
+    assert replay.json()["detail"] == "webhook replay reddedildi"
+
+
+@pytest.mark.parametrize("offset", [-301, 301])
+def test_stale_or_future_timestamp_is_rejected(client, offset):
+    body = json.dumps(PAYLOAD, separators=(",", ":")).encode()
+    request_time = datetime.now(UTC) + timedelta(seconds=offset)
+    timestamp = str(int(request_time.timestamp()))
+    headers = client.signed(body=body, nonce=f"clock-skew-{offset:+05d}-0001", timestamp=timestamp)
+    assert client.client.post("/webhook/signal", content=body, headers=headers).status_code == 401
+
+
+def test_missing_server_secret_is_fail_closed(client, monkeypatch):
+    monkeypatch.delenv("RADAR_SIGNAL_WEBHOOK_SECRET")
+    response = client.client.post("/webhook/signal", json=PAYLOAD)
+    assert response.status_code == 503
+
+
+def test_invalid_server_auth_config_is_503_not_client_auth_error(client, monkeypatch):
+    def invalid_config():
+        raise ValueError("test config error")
+
+    monkeypatch.setattr(app_module, "load_lifecycle", invalid_config)
+    response = client.post("/webhook/signal", json=PAYLOAD)
+    assert response.status_code == 503
 
 
 def test_missing_required_input_blocks(client):
