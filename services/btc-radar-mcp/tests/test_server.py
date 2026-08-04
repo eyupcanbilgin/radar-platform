@@ -93,3 +93,89 @@ async def test_get_derivatives_roundtrip_without_live_network(monkeypatch):
     assert data["observations"][0]["metric"] == "open_interest"
     assert data["meta"]["scoring_available"] is False
     assert data["meta"]["scoring_blocker"] == "tool_returns_raw_observations_only"
+
+
+async def test_health_says_collection_is_not_configured_when_no_store_is_set(monkeypatch):
+    monkeypatch.delenv("BTC_RADAR_DB_PATH", raising=False)
+    monkeypatch.delenv("BTC_RADAR_HEARTBEAT_DB_PATH", raising=False)
+
+    async with Client(server.app) as client:
+        result = await client.call_tool("get_health", {})
+    data = getattr(result, "data", None) or json.loads(result.content[0].text)
+
+    # Depo yokken "sağlıklı" demek, health aracının yapabileceği en kötü şeydir.
+    assert data["collection"]["status"] == "not_configured"
+    assert "healthy" not in data["collection"]
+
+
+async def test_health_reports_collection_gaps_from_the_local_stores(tmp_path, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from btc_radar.core.heartbeat import HeartbeatStore
+    from btc_radar.core.store import PointInTimeStore
+    from btc_radar.models.observation import RawObservation
+
+    now = datetime.now(UTC)
+    pit_path = tmp_path / "pit.sqlite"
+    heartbeat_path = tmp_path / "heartbeat.sqlite"
+
+    with PointInTimeStore(pit_path) as store:
+        store.append(
+            [
+                RawObservation(
+                    timestamp_utc=now - timedelta(hours=offset),
+                    retrieved_at_utc=now,
+                    available_at_utc=now - timedelta(hours=offset) + timedelta(seconds=60),
+                    asset="BTC",
+                    venue="binance_futures",
+                    metric="open_interest_value_1h",
+                    raw_value=7_000_000_000.0,
+                    unit="USDT",
+                    window="1h",
+                    source_group="derivatives",
+                    source_url="https://fapi.binance.com/futures/data/openInterestHist",
+                    quality=1.0,
+                )
+                for offset in range(1, 25)
+            ],
+            provider="binance_futures_history",
+        )
+    with HeartbeatStore(heartbeat_path) as heartbeat:
+        heartbeat.record(
+            task="collect",
+            status="ok",
+            started_at=now - timedelta(minutes=5),
+            finished_at=now - timedelta(minutes=5),
+        )
+
+    monkeypatch.setenv("BTC_RADAR_DB_PATH", str(pit_path))
+    monkeypatch.setenv("BTC_RADAR_HEARTBEAT_DB_PATH", str(heartbeat_path))
+
+    async with Client(server.app) as client:
+        result = await client.call_tool("get_health", {})
+    data = getattr(result, "data", None) or json.loads(result.content[0].text)
+
+    collection = data["collection"]
+    assert collection["status"] == "ok"
+    tasks = {item["task"]: item for item in collection["tasks"]}
+    assert tasks["collect"]["last_status"] == "ok"
+    assert tasks["publish"]["runs"] == 0
+    coverage = {item["metric"]: item for item in collection["coverage"]}
+    assert coverage["open_interest_value_1h"]["observed_samples"] == 24
+    # Funding hiç toplanmamış: tek bir metrik eksikken sistem sağlıklı sayılmaz.
+    assert coverage["funding_rate_settled"]["observed_samples"] == 0
+    assert collection["healthy"] is False
+
+
+async def test_health_reports_an_unreadable_store_instead_of_failing(tmp_path, monkeypatch):
+    broken = tmp_path / "pit.sqlite"
+    broken.write_text("bu bir sqlite dosyası değil", encoding="utf-8")
+    monkeypatch.setenv("BTC_RADAR_DB_PATH", str(broken))
+    monkeypatch.delenv("BTC_RADAR_HEARTBEAT_DB_PATH", raising=False)
+
+    async with Client(server.app) as client:
+        result = await client.call_tool("get_health", {})
+    data = getattr(result, "data", None) or json.loads(result.content[0].text)
+
+    assert data["status"] == "ok"  # sunucu ayakta
+    assert data["collection"]["status"] == "unreadable"  # ama veri katmanı arızalı

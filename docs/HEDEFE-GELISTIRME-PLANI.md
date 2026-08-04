@@ -29,7 +29,7 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
 | Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
 | Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI | Spot/perp basis, spread/depth ve kesintisiz toplama sırada |
-| Operasyonel güven | Expiry, outbox atomikliği, Telegram env ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
+| Operasyonel güven | MCP tarafında scheduler, heartbeat ve kapsama kanıtı var (ADR-0006); expiry, outbox atomikliği, Telegram env, kesinti bildirimi ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
 ## 3. Değişmez Ürün İlkeleri
 
@@ -93,9 +93,11 @@ alamıyor.
 - [ ] Binance spot OHLCV, basis ve spread/depth collector'larını ekle.
 - [x] Tarihsel settled funding ve saatlik OI'yi PIT'e biriktir; yeterli-geçmiş şartını tanımla
   ve yalnız kırılganlık feature'larını kur (ADR-0005). Yön ve rejim kapalı kalır.
-- [ ] OI collector'ını process supervision ile sürekli çalıştır; geçmiş endpoint'i sınırlıdır.
+- [x] OI collector'ını process supervision ile sürekli çalıştır; geçmiş endpoint'i sınırlıdır.
   - [x] `collect` her koşuda en yeni geçmiş sayfasını da yazıyor; `backfill` sayfalı ve bütçeli.
-  - [ ] Scheduler, heartbeat ve kesintisiz işletim kanıtı.
+  - [x] Scheduler, heartbeat ve kesintisiz işletim kanıtı (ADR-0006): iki ritimli tick,
+    append-only koşu kütüğü, veriden türeyen kapsama raporu, tek örnek kilidi.
+  - [ ] Kesinti bildirimi (alarm/Telegram operasyon kanalı) — Faz 3.
 - [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
   doğrula.
 - [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
@@ -104,7 +106,8 @@ alamıyor.
   - [x] Public Binance kapalı mum adaptörü, exact-hour context inbox consumer'ı ve UTC
     tek-sefer/daemon scheduler kodu.
   - [x] Gerçek Binance -> PIT -> unscored snapshot -> exact-hour MCP context producer.
-  - [ ] Producer scheduler, process supervision/heartbeat ve kesintisiz işletim kanıtı.
+  - [x] Producer scheduler, process supervision/heartbeat ve kesintisiz işletim kanıtı
+    (ADR-0006). Kalan operasyon işi kesinti bildirimi ve uzak izlemedir.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.
 - [ ] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet.
 
@@ -237,5 +240,22 @@ Canlı doğrulama: 360 settlement + 744 saatlik OI kovası toplandı; `2026-08-0
 context'i `fragility=0.0`, `direction=null`, blocker `direction_rules_unavailable` ile
 yayınlandı. Yetersiz geçmişli bir saat için kapı blocker yazarak kapandı.
 
-Bu paket kârlılık veya güvenilir yön sinyali iddiası **değildir**. Sıradaki işler: kesintisiz
-toplama kanıtı (scheduler/heartbeat), spot/perp basis ve spread/depth collector'ları.
+Bu paket kârlılık veya güvenilir yön sinyali iddiası **değildir**.
+
+### WP-0004 — Sürekli toplama ve işletim kanıtı
+
+**Durum:** Kodlama, test ve canlı daemon smoke tamamlandı (MCP ADR-0006).
+
+1. İki ritimli `ProducerScheduler`: saat içi toplama, kapanan saat için tek yayın
+2. Hata döngüyü durdurmaz; tick içinde retry yok, aralık son **denemeden** ölçülür
+3. Append-only heartbeat kütüğü: sürecin koştuğunun kanıtı, hata kaydı silinmez
+4. Veriden türeyen kapsama raporu: serinin tam olduğunun kanıtı; eşikler feature config'inden
+5. Sınırlı ve `catch_up` etiketli yakalama; pencere aşımı `skipped` olarak raporlanır
+6. Tek örnek kilidi (otomatik bayat temizlik yok) ve birinci sınıf tek-tick modu
+7. `status` komutu + `get_health` içinde toplama sağlığı
+
+Canlı doğrulama: daemon 15 sn aralıkla üç toplama yaptı, aynı saati ikinci kez yayınlamadı;
+`status` 7 günlük pencerede iki metrik için de `coverage_ratio=1.0` ve `hours_behind=0`
+raporladı; sert öldürülen süreçten kalan kilit ikinci başlatmayı reddetti.
+
+Sıradaki işler: spot/perp basis ve spread/depth collector'ları, kesinti bildirimi.

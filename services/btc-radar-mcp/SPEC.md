@@ -1,14 +1,15 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.2**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.3**
 
-> v1.2 (4 Ağu 2026): İlk gerçek Binance USD-M provider, PIT collector, fail-closed exact-hour
-> context publisher ve `get_derivatives` dar dilimi uygulandı. v1.1 → git geçmişi.
+> v1.3 (4 Ağu 2026): Tarihsel funding/OI birikimi, yeterli-geçmiş kapısı ve kırılganlık
+> feature'ları (ADR-0005); producer scheduler, heartbeat ve kapsama kanıtı (ADR-0006).
+> v1.2 ve öncesi → git geçmişi.
 
 | Alan | Değer |
 |---|---|
 | Proje sahibi | Eyüpcan |
 | Tarih | 3 Ağustos 2026 |
-| Durum | Uygulamada — Faz 1a veri taşıması tamam, skorlama hazır değil |
+| Durum | Uygulamada — Faz 1c: veri taşıması, kırılganlık kapısı ve sürekli toplama tamam; yön/rejim kapalı |
 | Çalışma adı | `btc-radar-mcp` (değiştirilebilir) |
 | Temel girdiler | Kripto Piyasa Analiz Metodolojisi v1.0 (Eyüpcan), borsa-mcp mimari incelemesi (3 Ağu 2026), veri kaynağı fizibilite envanteri |
 
@@ -40,6 +41,11 @@ PIT-güvenli seri okuma, yeterli-geçmiş kapısı ve iki **kırılganlık** fea
 **direction ve rejim üretimi bilinçli olarak kapalı kalır** — kabul edilmiş yönsel setup ve
 çok katmanlı kapsam yoktur. Context bu nedenle `direction: null` ve
 `direction_rules_unavailable` blocker'ı ile yayınlanır.
+
+**Mevcut Faz 1c dilimi (ADR-0006):** Producer scheduler (saat içi toplama + kapanan saat
+yayını), append-only heartbeat koşu kütüğü, veriden türeyen kapsama raporu, sınırlı ve
+etiketli yakalama, tek örnek kilidi ve `status` komutu eklendi. `get_health` artık yerel
+depolardan toplama sağlığını da döndürür.
 
 ### 1.3 Kapsam dışı (tüm fazlar için)
 - Emir iletimi, borsa API key'i ile private endpoint kullanımı, bakiye erişimi.
@@ -132,6 +138,9 @@ MVP ile metodolojinin **~%80 ağırlığı** ücretsiz kaynaklarla ölçülebili
 [ core/features.py ]    rolling percentile + yeterli-geçmiş kapısı (UYGULANDI, ADR-0005)
 [ core/components.py ]  feature → d/r dönüşümü; d şu an daima None (yön kuralı yok)
 [ core/backfill.py ]    sayfalı geçmiş toplama (funding ileri, OI geriye)
+[ core/scheduler.py ]   iki ritimli tick: saat içi toplama + kapanan saat yayını
+[ core/heartbeat.py ]   append-only koşu kütüğü — sürecin koştuğunun kanıtı
+[ core/coverage.py ]    seri boşluk/kapsama analizi — verinin tam olduğunun kanıtı
 [ core/scoring.py ]     yön/kırılganlık/güven + rejim (metodoloji §5–6)
 [ core/cache.py ]       kaynak bazlı TTL (diskcache)
 [ config/weights.yaml ] katman ağırlıkları + eşikler — KODA GÖMÜLMEZ
@@ -212,7 +221,7 @@ Genel kurallar (hepsi borsa-mcp'den doğrulanmış desenler):
 | 5 | `get_premiums` | `premium: Literal["coinbase","korea","both"]` | Coinbase+Binance, Upbit | Hesaplama formülü yanıt metasında; anlık + kısa trend (son N gözlem) |
 | 6 | `get_sentiment_cycle` | `include_history_days` | Alternative.me, CBBI | İki kaynak tek grupta döner; `independence_group` etiketiyle (çift sayım kuralı araca gömülü) |
 | 7 | `compute_scores` | `horizon: Literal["daily","intraday","macro"]`, `explain: bool` | Tüm önbellek + gerekli taze çekimler | Yön/kırılganlık/güven + rejim + bileşen dökümü + eksik kapsam listesi. Güven<55 ise rejim etiketi "veri yetersiz" (metodoloji §6) |
-| 8 | `get_health` | — | — | Kaynak erişilebilirliği, önbellek yaşları, son hatalar, rate-limit sayaçları. SDET aracı: sistem kendini test eder |
+| 8 | `get_health` | — | Yerel PIT + heartbeat depoları (ağa çıkmaz) | Sunucu/config kimliği, provider yetenekleri ve **toplama sağlığı**: görev özeti (son başarı, üst üste hata) + 7 günlük kapsama raporu. Depo tanımsızsa `not_configured`, bozuksa `unreadable` (ADR-0006). Önbellek yaşları ve rate-limit sayaçları hâlâ eksik |
 
 **Bilinçli sınır:** Araç sayısı 8'de tutulur (borsa-mcp'nin 81→28 konsolidasyon dersinin bir adım ötesi). Yeni ihtiyaç → önce mevcut araca parametre eklemek değerlendirilir, yeni araç son çare.
 
@@ -256,6 +265,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 | **0 — İskelet** | Repo yapısı, uv, FastMCP hello-world, CI, config yükleme | `uvx --from . btc-radar` Claude Desktop'ta görünür, `get_health` çalışır |
 | **1a — Veri taşıması (tamamlandı)** | Binance mark/funding/OI provider, PIT collector, immutable exact-hour context | Gerçek public fixture'lar, no-look-ahead, hash/ID doğrulama, atomik no-overwrite ve fail-closed consumer sözleşmesi testli |
 | **1b — Geçmiş ve kırılganlık (tamamlandı)** | Settled funding + saatlik OI backfill, PIT seri okuma, yeterli-geçmiş kapısı, `funding_stress`/`oi_buildup` | Gerçek veriyle fragility üretiliyor; yetersiz geçmiş blocker yazıyor; digest kullanılan geçmişi kapsıyor; direction hâlâ null (ADR-0005) |
+| **1c — Sürekli işletim (tamamlandı)** | Scheduler, heartbeat, kapsama raporu, tek örnek kilidi, `status` | Daemon canlı koştu; aynı saati iki kez yayınlamıyor; hata döngüyü durdurmuyor; kapsama 7 günde %100 raporlandı; yakalama sınırı sessiz değil (ADR-0006) |
 | **1 — MVP** | 8 araç, 9 provider, cache, scoring, testler | `compute_scores` gerçek veriyle üç skor + rejim üretir; test coverage çekirdek modüllerde ≥%80; smoke yeşil |
 | **2 — Derinlik** | Haber katmanı (CryptoPanic/CoinMarketCal), spot CVD, whale kohort iyileştirme, SKILL.md (analiz beyni) yazımı | Skill + MCP birlikte günlük tek-sayfa raporu (metodoloji §11.1) üretebiliyor |
 | **3 — Yayın** | HTTP transport + /health, Docker, opsiyonel paralı kaynak adaptörleri, ay-fazı backtest modülü (ayrı, skor dışı) | Uzak sunucuda çalışır; README ile üçüncü kişi kurabilir |

@@ -73,12 +73,46 @@ uv run btc-radar-producer publish \
 `collect` komutunun geçmiş sayfasını da yazması gereklidir: Binance saatlik OI geçmişini
 yalnız ~30 gün saklar, ondan eskisi ancak kendi PIT depomuzda bulunabilir.
 
+## Sürekli çalıştırma ve işletim kanıtı (ADR-0006)
+
+`run` iki ritmi tek döngüde yürütür: saat içinde toplama, saat kapanınca yayın.
+
+```bash
+# Tek geçiş — Windows Task Scheduler / cron için önerilen biçim
+uv run btc-radar-producer run \
+  --pit-db ./var/pit.sqlite --snapshot-db ./var/snapshots.sqlite \
+  --heartbeat-db ./var/heartbeat.sqlite \
+  --context-root ../radar-signal/var/decision-context
+
+# Servis yöneticisi olan ortamlarda sürekli mod
+uv run btc-radar-producer run --daemon --lock-file ./var/producer.lock ...
+
+# İşletim kanıtı: koşu kütüğü + toplanan serinin kapsaması
+uv run btc-radar-producer status --window-days 7
+```
+
+**Windows'ta süpervizör olarak Task Scheduler önerilir:** görevi her dakika `run` (tek geçiş)
+çalıştıracak şekilde tanımlayın. Çöken bir süreç bir sonraki dakikada kendiliğinden geri
+gelir; daemon modunda bunu yapan bir dış süpervizöre ihtiyaç duyarsınız.
+
+`status` iki ayrı soruyu ayrı ayrı yanıtlar ve ikisi birlikte "kesintisiz çalıştı" iddiasının
+kanıtıdır:
+
+- `tasks` — süreç gerçekten koştu mu, en son ne zaman başarılı oldu, üst üste kaç hata var
+- `coverage` — serinin kendisi tam mı; beklenen/gözlenen örneklem, en uzun boşluk ve **o
+  boşluğun nerede olduğu**
+
+Uptime kapsama değildir: uç kısa sayfa döndürdüğünde heartbeat "ok", kapsama "delik var" der.
+
+`--lock-file` ikinci bir toplayıcının aynı anda başlamasını engeller. Bayat kilit otomatik
+silinmez; süreç gerçekten ölüyse dosyayı elle kaldırın.
+
 Publisher yalnız exact-hour yolu oluşturur ve mevcut saat dosyasını overwrite etmez. Yeterli
 geçmiş varsa `fragility` gerçek veriden üretilir; `direction` **her koşulda** null kalır ve
 yön kapısı `unavailable` olur (`direction_rules_unavailable`). Geçmiş yetersizse ilgili
 feature `feature_unavailable:<feature>:<neden>` blocker'ı yazar. `radar-signal` her iki
 durumda da deterministik `WAIT` verir. Scheduler/supervisor bu dilimde yoktur.
 
-Faz durumu: **1b — geçmiş birikimi + kırılganlık kapısı** (ADR-0005). `get_health`,
-`get_derivatives`, backfill/collect/publish çalışır; yön kuralı, rejim sınıflandırması ve
-çok-kaynak kapsamı Faz 1'in devamıdır (SPEC §4, §7).
+Faz durumu: **1c — sürekli toplama + işletim kanıtı** (ADR-0006). `get_health`,
+`get_derivatives`, backfill/collect/publish/run/status çalışır; yön kuralı, rejim
+sınıflandırması, alarm/bildirim ve çok-kaynak kapsamı Faz 1'in devamıdır (SPEC §4, §7).

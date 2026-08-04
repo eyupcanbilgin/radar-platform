@@ -5,7 +5,9 @@ bulunur. Veri toplama/normalizasyon/skorlama core/ ve providers/ altındadır (F
 """
 
 import logging
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import httpx
@@ -15,8 +17,13 @@ from pydantic import Field
 
 from btc_radar import __version__
 from btc_radar.core.config import load_signal_rules, load_weights, weights_hash
+from btc_radar.core.coverage import collection_coverage
+from btc_radar.core.heartbeat import HeartbeatStore
+from btc_radar.core.scheduler import TASK_COLLECT, TASK_PUBLISH
 from btc_radar.core.snapshot import FEATURE_VERSION, SCORING_VERSION
 from btc_radar.core.store import SCHEMA_VERSION as STORE_SCHEMA_VERSION
+from btc_radar.core.store import PointInTimeStore
+from btc_radar.models.config import SignalRulesConfig
 from btc_radar.providers.binance_futures import BinanceFuturesProvider
 from btc_radar.providers.binance_futures_history import BinanceFuturesHistoryProvider
 
@@ -112,6 +119,10 @@ def classify_tool_error(exc: Exception, source: str) -> ToolError:
 
 DerivativeMetric = Literal["mark_price", "funding_rate", "open_interest", "all"]
 
+#: get_health kapsama penceresi: son 7 gün, operatörün "toplayıcı bu hafta delik verdi mi"
+#: sorusunun karşılığı. Feature'ların kendi lookback'i bundan bağımsızdır.
+HEALTH_COVERAGE_WINDOW_SECONDS = 7 * 86400.0
+
 
 @app.tool(annotations={"readOnlyHint": True})
 async def get_derivatives(
@@ -164,6 +175,52 @@ async def get_derivatives(
         raise classify_tool_error(exc, BinanceFuturesProvider.name) from exc
 
 
+def _store_path(env_name: str) -> Path | None:
+    value = os.environ.get(env_name)
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.is_file() else None
+
+
+def _collection_health(rules: SignalRulesConfig) -> dict[str, Any]:
+    """Toplayıcının gerçekten koştuğuna ve serinin tam olduğuna dair yerel kanıt.
+
+    Ağ çağrısı yapılmaz; yalnız yerel PIT ve heartbeat depoları okunur. Depolar
+    tanımlı değilse bu açıkça söylenir — sessizce "sağlıklı" dönmek, health aracının
+    yapabileceği en kötü şey olurdu.
+    """
+    pit_path = _store_path("BTC_RADAR_DB_PATH")
+    heartbeat_path = _store_path("BTC_RADAR_HEARTBEAT_DB_PATH")
+    if pit_path is None and heartbeat_path is None:
+        return {
+            "status": "not_configured",
+            "detail": "BTC_RADAR_DB_PATH / BTC_RADAR_HEARTBEAT_DB_PATH tanımlı değil",
+        }
+
+    now = datetime.now(UTC)
+    report: dict[str, Any] = {"status": "ok"}
+    try:
+        if heartbeat_path is not None:
+            with HeartbeatStore(heartbeat_path) as heartbeat:
+                report["tasks"] = heartbeat.summary(now=now, tasks=(TASK_COLLECT, TASK_PUBLISH))
+        if pit_path is not None:
+            with PointInTimeStore(pit_path) as pit:
+                coverage = collection_coverage(
+                    pit, rules=rules, as_of=now, window_seconds=HEALTH_COVERAGE_WINDOW_SECONDS
+                )
+            report["coverage"] = [item.as_payload() for item in coverage]
+            report["healthy"] = bool(coverage) and all(item.healthy for item in coverage)
+    except Exception as error:  # sağlık aracı patlamaz, arızayı raporlar
+        logger.exception("toplama sağlığı okunamadı")
+        return {
+            "status": "unreadable",
+            "error_type": type(error).__name__,
+            "detail": " ".join(str(error).split())[:300],
+        }
+    return report
+
+
 @app.tool(annotations={"readOnlyHint": True})
 async def get_health() -> dict[str, Any]:
     """Sunucu, config ve kaynak sağlık durumu (SDET aracı; SPEC §4 araç 8).
@@ -213,7 +270,8 @@ async def get_health() -> dict[str, Any]:
                 "feature_version": FEATURE_VERSION,
                 "scoring_version": SCORING_VERSION,
             },
-            "phase": "1a-provider + PIT/context transport (scoring unavailable)",
+            "collection": _collection_health(rules),
+            "phase": "1b-history + fragility gate (direction unavailable)",
             "retrieved_at_utc": datetime.now(UTC).isoformat(),
         }
         return shape(payload)

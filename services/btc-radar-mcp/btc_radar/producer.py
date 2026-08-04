@@ -13,7 +13,11 @@ import argparse
 import asyncio
 import json
 import os
+import signal
+import sys
+import threading
 from collections.abc import Sequence
+from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -21,6 +25,17 @@ from btc_radar.core.backfill import backfill_funding, backfill_open_interest
 from btc_radar.core.config import load_signal_rules
 from btc_radar.core.context_producer import collect_derivatives, produce_context
 from btc_radar.core.context_publisher import ExactHourContextPublisher, require_utc_hour
+from btc_radar.core.coverage import collection_coverage
+from btc_radar.core.heartbeat import HeartbeatStore
+from btc_radar.core.runlock import exclusive_run_lock
+from btc_radar.core.scheduler import (
+    DEFAULT_COLLECT_INTERVAL_SECONDS,
+    DEFAULT_PUBLISH_GRACE_SECONDS,
+    TASK_COLLECT,
+    TASK_PUBLISH,
+    ProducerScheduler,
+    latest_due_hour,
+)
 from btc_radar.core.snapshot import SnapshotStore
 from btc_radar.core.store import PointInTimeStore
 from btc_radar.providers.binance_futures import BinanceFuturesProvider
@@ -97,22 +112,73 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Binance ~{OPEN_INTEREST_HISTORY_RETENTION_DAYS} günden eskisini saklamaz",
     )
 
+    def add_snapshot_db(target: argparse.ArgumentParser) -> None:
+        target.add_argument(
+            "--snapshot-db",
+            type=Path,
+            default=_path_env("BTC_RADAR_SNAPSHOT_DB_PATH", SERVICE_ROOT / "var/snapshots.sqlite"),
+        )
+
+    def add_context_root(target: argparse.ArgumentParser) -> None:
+        target.add_argument(
+            "--context-root",
+            type=Path,
+            default=_path_env("BTC_RADAR_CONTEXT_ROOT"),
+            help="signal servisinin decision-context inbox kökü (veya BTC_RADAR_CONTEXT_ROOT)",
+        )
+
+    def add_heartbeat_db(target: argparse.ArgumentParser) -> None:
+        target.add_argument(
+            "--heartbeat-db",
+            type=Path,
+            default=_path_env("BTC_RADAR_HEARTBEAT_DB_PATH", SERVICE_ROOT / "var/heartbeat.sqlite"),
+            help="toplama/yayın koşu kütüğü (kesintisiz işletim kanıtı)",
+        )
+
     publish = subparsers.add_parser(
         "publish", help="tam bir UTC saat için değişmez decision-context/v1 yayınla"
     )
     publish.add_argument("--as-of", type=_parse_as_of, required=True)
     add_pit_db(publish)
-    publish.add_argument(
-        "--snapshot-db",
-        type=Path,
-        default=_path_env("BTC_RADAR_SNAPSHOT_DB_PATH", SERVICE_ROOT / "var/snapshots.sqlite"),
+    add_snapshot_db(publish)
+    add_context_root(publish)
+
+    run = subparsers.add_parser(
+        "run", help="saat içi toplama + kapanan saat yayınını zamanlayıcıyla yürüt"
     )
-    publish.add_argument(
-        "--context-root",
-        type=Path,
-        default=_path_env("BTC_RADAR_CONTEXT_ROOT"),
-        help="signal servisinin decision-context inbox kökü (veya BTC_RADAR_CONTEXT_ROOT)",
+    add_pit_db(run)
+    add_snapshot_db(run)
+    add_context_root(run)
+    add_heartbeat_db(run)
+    run.add_argument(
+        "--daemon",
+        action="store_true",
+        help="sürekli çalış; varsayılan tek geçişlik (cron/Task Scheduler için) tick'tir",
     )
+    run.add_argument(
+        "--collect-interval-seconds", type=int, default=DEFAULT_COLLECT_INTERVAL_SECONDS
+    )
+    run.add_argument("--publish-grace-seconds", type=int, default=DEFAULT_PUBLISH_GRACE_SECONDS)
+    run.add_argument("--history-limit", type=int, default=3)
+    run.add_argument(
+        "--catch-up-hours",
+        type=int,
+        default=0,
+        help="kesintiden sonra en fazla kaç kaçırılmış saat yayınlansın (0 = yalnız güncel saat)",
+    )
+    run.add_argument(
+        "--lock-file",
+        type=Path,
+        default=None,
+        help="tek örnek koruması; ikinci daemon aynı kilitle başlatılamaz",
+    )
+
+    status = subparsers.add_parser(
+        "status", help="koşu kütüğü özeti ve toplanan serinin kapsama raporu"
+    )
+    add_pit_db(status)
+    add_heartbeat_db(status)
+    status.add_argument("--window-days", type=_positive_days, default=7.0)
     return parser
 
 
@@ -207,7 +273,116 @@ def _publish(
     }
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def _scheduler(args: argparse.Namespace, heartbeat: HeartbeatStore) -> ProducerScheduler:
+    return ProducerScheduler(
+        collect=lambda: asyncio.run(_collect(args.pit_db, history_limit=args.history_limit)),
+        publish=lambda as_of: _publish(
+            as_of=as_of,
+            pit_path=args.pit_db,
+            snapshot_path=args.snapshot_db,
+            context_root=args.context_root,
+        ),
+        heartbeat=heartbeat,
+        collect_interval_seconds=args.collect_interval_seconds,
+        publish_grace_seconds=args.publish_grace_seconds,
+        catch_up_hours=args.catch_up_hours,
+    )
+
+
+def _emit(payload: dict) -> None:
+    print(json.dumps(payload, sort_keys=True, ensure_ascii=False, allow_nan=False), flush=True)
+
+
+def _run(args: argparse.Namespace) -> None:
+    """One deterministic tick, or the same tick repeated until a stop signal."""
+    with ExitStack() as stack:
+        if args.lock_file is not None:
+            stack.enter_context(exclusive_run_lock(args.lock_file))
+        heartbeat = stack.enter_context(HeartbeatStore(args.heartbeat_db))
+        scheduler = _scheduler(args, heartbeat)
+
+        if not args.daemon:
+            for run in scheduler.tick():
+                _emit({"invocation": "single_tick", **run.as_payload()})
+            return
+
+        stop_event = threading.Event()
+
+        def request_stop(_signum, _frame) -> None:
+            stop_event.set()
+
+        signal.signal(signal.SIGINT, request_stop)
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, request_stop)
+
+        _emit(
+            {
+                "invocation": "daemon_start",
+                "collect_interval_seconds": scheduler.collect_interval_seconds,
+                "publish_grace_seconds": scheduler.publish_grace_seconds,
+                "catch_up_hours": scheduler.catch_up_hours,
+                "heartbeat_db": str(args.heartbeat_db),
+            }
+        )
+        scheduler.serve_forever(
+            stop_event=stop_event,
+            on_run=lambda run: _emit({"invocation": "daemon", **run.as_payload()}),
+        )
+        _emit({"invocation": "daemon_stop"})
+
+
+def _status(args: argparse.Namespace) -> dict:
+    now = datetime.now(UTC)
+    rules = load_signal_rules()
+    window_seconds = args.window_days * 86400.0
+    with (
+        HeartbeatStore(args.heartbeat_db) as heartbeat,
+        PointInTimeStore(args.pit_db) as pit,
+    ):
+        published = heartbeat.latest_success_as_of(TASK_PUBLISH)
+        due = latest_due_hour(now, grace_seconds=DEFAULT_PUBLISH_GRACE_SECONDS)
+        coverage = collection_coverage(pit, rules=rules, as_of=now, window_seconds=window_seconds)
+        return {
+            "command": "status",
+            "now_utc": now.isoformat(),
+            "window_days": args.window_days,
+            "tasks": heartbeat.summary(now=now, tasks=(TASK_COLLECT, TASK_PUBLISH)),
+            "publish": {
+                "latest_published_as_of": None if published is None else published.isoformat(),
+                "latest_due_as_of": due.isoformat(),
+                "hours_behind": (
+                    None if published is None else int((due - published).total_seconds() // 3600)
+                ),
+            },
+            "coverage": [item.as_payload() for item in coverage],
+            "healthy": all(item.healthy for item in coverage) and coverage != [],
+        }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI girişi. Operasyonel hata ham traceback değil, makine-okunur bir kayıt olmalı."""
+    try:
+        return _dispatch(argv)
+    except SystemExit:
+        raise
+    except Exception as error:
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": type(error).__name__,
+                    "error": " ".join(str(error).split())[:500],
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+        return 2
+
+
+def _dispatch(argv: Sequence[str] | None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "collect":
@@ -222,6 +397,25 @@ def main(argv: Sequence[str] | None = None) -> None:
                 open_interest_days=args.open_interest_days,
             )
         )
+    elif args.command == "status":
+        payload = _status(args)
+    elif args.command == "run":
+        if args.context_root is None:
+            parser.error("run için --context-root veya BTC_RADAR_CONTEXT_ROOT zorunlu")
+        if args.history_limit < 0:
+            parser.error("--history-limit negatif olamaz")
+        for check, message in (
+            (args.collect_interval_seconds <= 0, "--collect-interval-seconds > 0 olmalı"),
+            (
+                not 0 <= args.publish_grace_seconds < 3600,
+                "--publish-grace-seconds 0..3599 aralığında olmalı",
+            ),
+            (args.catch_up_hours < 0, "--catch-up-hours negatif olamaz"),
+        ):
+            if check:
+                parser.error(message)
+        _run(args)
+        return 0
     else:
         if args.context_root is None:
             parser.error("publish için --context-root veya BTC_RADAR_CONTEXT_ROOT zorunlu")
@@ -231,8 +425,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             snapshot_path=args.snapshot_db,
             context_root=args.context_root,
         )
-    print(json.dumps(payload, sort_keys=True, ensure_ascii=False, allow_nan=False))
+    _emit(payload)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
