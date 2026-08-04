@@ -108,6 +108,32 @@ Daemon kodu hazırdır; MCP context producer, process supervision ve kesintisiz 
 henüz tamamlanmamıştır. Kabul edilmiş yönsel setup olmadığı için sağlıklı runtime çıktısı da
 şimdilik `WAIT/no_directional_setup`tır.
 
+### 2.2 Karar Sonuc Değerlendiricisi (Outcome Evaluator)
+
+`decision_engine/outcomes.py` ve `evaluator.py`, her kaydedilmiş `DecisionCardV1` için
+`+1h`, `+4h` ve `+24h` ufuklarında karar sonuçlarını ölçer.
+
+1. **Ayrı ve Değişmez Defter (`decision_outcomes`):** Mevcut `hourly_decisions` ve
+   `feature_snapshots` satırları asla değiştirilmez (ADR-0008). Outcome kayıtları ayrı
+   `decision_outcomes` tablosunda append-only tutulur; UPDATE/DELETE ve çakışan INSERT
+   SQLite trigger'larıyla engellenir.
+2. **Kullanılabilir Mum ve Look-ahead Koruması:** Yalnız kapanmış ve
+   `available_at_utc <= horizon_close_utc` olan public mumlar kullanılır. Açık mum,
+   eksik mum veya gap ileriye doldurulmaz. Süresi dolmamış gelecek ufuklar `pending`,
+   eksik/bozuk veriler `unavailable` olarak dürüstçe kaydedilir; sıfır/nötr getiri uydurulmaz.
+3. **Semantik Idempotency ve Conflict Koruması:** Outcome kimliği `OUT-` ön eki ile
+   `decision_id`, `horizon` ve `evaluator_version` alanlarından türetilir. Aynı veriyle
+   tekrar çalıştırma idempotenttir (`recorded=False`). Farklı içerikle çakışan kayıt
+   `ImmutableDecisionError` üretir.
+4. **WAIT Semantiği:** `WAIT` birinci sınıf karardır. `WAIT` kararlarında yönsel `raw_return`,
+   `net_return`, `MFE` ve `MAE` üretilmez (`None`). Piyasa hareketi açık semantikle
+   `opportunity_return` $= (P_{end} - P_{ref}) / P_{ref}$ olarak kaydedilir.
+5. **Maliyet Modeli Entegrasyonu:** LONG/SHORT net getirileri `config/costs.yaml` sözleşmesine
+   göre komisyon ve kayma düşülerek hesaplanır; koda sabit eşik/maliyet gömülmez. Maliyet
+   verisi eksikse net getiri hesaplanmaz (`None`).
+6. **CLI Araçları:** `scripts/evaluate_decision_outcomes.py` script'i süresi dolmuş
+   ufukları güvenli biçimde toplu olarak değerlendirir.
+
 ---
 
 ## 3. Strateji Fabrikası Protokolü
