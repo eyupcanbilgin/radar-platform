@@ -6,10 +6,14 @@ Kullanım:
     uv run python scripts/verify_endpoints.py
     uv run python scripts/verify_endpoints.py --skip-bitcoin-data
     uv run python scripts/verify_endpoints.py --json-out sonuc.json
+    uv run python scripts/verify_endpoints.py --fail-on-blocked
 
 bitcoin-data.com bütçesi: script başına en fazla 5 istek (API limiti 8/saat, 15/gün —
 CLAUDE.md kural 8). Önce OpenAPI dokümanı üzerinden metrik adları keşfedilir; veri
 endpoint'lerine en fazla 3 çağrı yapılır.
+
+Çıkış kodları: 0 = zorunlu sözleşme kırılması yok; 1 = en az bir zorunlu kontrol düştü;
+2 = yalnızca ortam engeli var ve `--fail-on-blocked` verildi (bkz. ADR-0007).
 """
 
 import argparse
@@ -25,6 +29,36 @@ import httpx
 
 TIMEOUT = 20.0
 HEADERS = {"User-Agent": "btc-radar-verify/0.1 (Faz 0 smoke; read-only)"}
+
+# ── Ortam engeli (coğrafi kısıt) sözleşme ihlali DEĞİLDİR.
+# Bir uç, sözleşmesi değiştiği için değil, isteğin geldiği ülke yüzünden de reddedilebilir.
+# GitHub-hosted runner bölgeleri Binance/CloudFront tarafında engellidir (koşu 30894903581).
+# İki durum aynı kovaya konursa günlük smoke kalıcı kırmızıya döner ve gerçek bir sözleşme
+# kırılması bu gürültünün içinde kaybolur.
+# Ayrıntı: docs/adr/0007-cografi-engel-siniflandirmasi.md
+GEO_BLOCK_STATUSES = frozenset({403, 451})
+GEO_BLOCK_MARKERS = (
+    # CloudFront'un ülke engeli sayfası (HTML gövde)
+    "cloudfront distribution is configured to block access from your country",
+    # Binance'in kendi kısıtlı-bölge yanıtı (HTTP 451, JSON gövde)
+    "service unavailable from a restricted location",
+)
+
+
+def geo_block_reason(status_code: int, body: str) -> str | None:
+    """Ortam engelini sözleşme ihlalinden ayırır; engel değilse None.
+
+    Hem statü hem gövde işareti eşleşmelidir. Tek başına 403, kaldırılmış bir uç veya
+    değişmiş bir imza da olabilir — onları "engellendi" diye yutmak, tam olarak
+    kaçırmak istemediğimiz sözleşme kırılmasını gizler.
+    """
+    if status_code not in GEO_BLOCK_STATUSES:
+        return None
+    lowered = body.lower()
+    for marker in GEO_BLOCK_MARKERS:
+        if marker in lowered:
+            return f"HTTP {status_code}, gövde işareti: '{marker}'"
+    return None
 
 
 @dataclass
@@ -49,10 +83,23 @@ class Result:
     url: str
     ok: bool
     required: bool
+    blocked: bool = False  # ortam engeli: sözleşme ne doğrulandı ne de ihlal edildi
     status: int | None = None
     latency_ms: int | None = None
     detail: str = ""
     sample: Any = field(default=None)
+
+    @property
+    def state(self) -> str:
+        """Üç değil dört durum: ok / fail (zorunlu) / warn (bilgilendirici) / blocked."""
+        if self.blocked:
+            return "blocked"
+        if self.ok:
+            return "ok"
+        return "fail" if self.required else "warn"
+
+
+STATE_MARKS = {"ok": "OK", "fail": "FAIL", "warn": "warn", "blocked": "BLOCKED"}
 
 
 def _need(data: Any, *keys: str) -> str | None:
@@ -400,6 +447,25 @@ async def run_check(client: httpx.AsyncClient, chk: Check) -> Result:
         )
     ms = int((time.perf_counter() - t0) * 1000)
 
+    # Engel kontrolü expect_failure'dan ÖNCE gelir: aksi hâlde coğrafi 403, "bu uç
+    # kaldırılmış" varsayımını doğrulamış gibi görünür ve yanlış sebeple yeşil yanar.
+    if reason := geo_block_reason(resp.status_code, resp.text):
+        return Result(
+            chk.check_id,
+            chk.layer,
+            chk.spec_ref,
+            chk.url,
+            ok=False,
+            required=chk.required,
+            blocked=True,
+            status=resp.status_code,
+            latency_ms=ms,
+            detail=(
+                f"ortam engeli ({reason}) — bu koşu sözleşmeyi doğrulamadı; "
+                "ihlal edildiğini de göstermiyor"
+            ),
+        )
+
     if chk.expect_failure:
         ok = resp.status_code >= 400
         detail = (
@@ -580,10 +646,13 @@ async def verify_bitcoin_data(client: httpx.AsyncClient) -> list[Result]:
             )
             continue
         ms = int((time.perf_counter() - t0) * 1000)
+        blocked_reason = geo_block_reason(resp.status_code, resp.text)
         ok = resp.status_code == 200
         detail = f"HTTP {resp.status_code}"
         sample = None
-        if ok:
+        if blocked_reason:
+            detail = f"ortam engeli ({blocked_reason}) — doğrulanmadı"
+        elif ok:
             try:
                 data = resp.json()
                 sample = str(data[0] if isinstance(data, list) and data else data)[:200]
@@ -600,6 +669,7 @@ async def verify_bitcoin_data(client: httpx.AsyncClient) -> list[Result]:
                 url,
                 ok=ok,
                 required=False,
+                blocked=blocked_reason is not None,
                 status=resp.status_code,
                 latency_ms=ms,
                 detail=detail,
@@ -628,20 +698,43 @@ async def main_async(skip_bitcoin_data: bool) -> list[Result]:
     return results
 
 
-def render(results: list[Result]) -> tuple[str, int]:
+def render(results: list[Result]) -> tuple[str, int, int]:
+    """Rapor metni + (zorunlu FAIL sayısı, ortam engeli sayısı)."""
     lines = ["| durum | check | HTTP | ms | SPEC | detay |", "|---|---|---|---|---|---|"]
-    fails_required = 0
     for r in results:
-        mark = "OK" if r.ok else ("FAIL" if r.required else "warn")
-        if not r.ok and r.required:
-            fails_required += 1
         lines.append(
-            f"| {mark} | {r.check_id} | {r.status or '-'} | {r.latency_ms or '-'} "
+            f"| {STATE_MARKS[r.state]} | {r.check_id} | {r.status or '-'} | {r.latency_ms or '-'} "
             f"| {r.spec_ref} | {r.detail[:220]} |"
         )
-    ok_count = sum(1 for r in results if r.ok)
-    lines.append(f"\nToplam: {len(results)} kontrol, {ok_count} OK, {fails_required} zorunlu FAIL")
-    return "\n".join(lines), fails_required
+    ok_count = sum(1 for r in results if r.state == "ok")
+    fails_required = sum(1 for r in results if r.state == "fail")
+    blocked = [r for r in results if r.state == "blocked"]
+    lines.append(
+        f"\nToplam: {len(results)} kontrol, {ok_count} OK, {fails_required} zorunlu FAIL, "
+        f"{len(blocked)} blocked_in_environment"
+    )
+    if blocked:
+        # Engeli sessizce yutmak "hepsini doğruladık" gibi okunur; ne doğrulanmadığını yaz.
+        lines.append(
+            "\nblocked_in_environment — bu koşuda DOĞRULANMAYAN kontroller: "
+            + ", ".join(f"{r.check_id} ({r.status})" for r in blocked)
+            + "\nBu uçlar isteğin geldiği ülke/ağ nedeniyle reddedildi. Sözleşmeleri kırık "
+            "değil, yalnızca doğrulanmamıştır — bu koşu onlar için kanıt üretmemiştir. "
+            "Kanıt gerekiyorsa script'i engellenmemiş bir ağdan (yerel makine veya "
+            "self-hosted runner) --fail-on-blocked ile çalıştırın."
+        )
+    return "\n".join(lines), fails_required, len(blocked)
+
+
+def exit_code(fails_required: int, blocked: int, fail_on_blocked: bool) -> int:
+    """0 = engellenmiş-ama-erişilebilir dâhil temiz; 1 = sözleşme kırılması; 2 = engel.
+
+    Sözleşme kırılması engeli ezer: her ikisi de varsa çıkış kodu 1'dir, çünkü asıl
+    haber sözleşmenin kırılmış olmasıdır.
+    """
+    if fails_required:
+        return 1
+    return 2 if (blocked and fail_on_blocked) else 0
 
 
 def main() -> None:
@@ -654,16 +747,25 @@ def main() -> None:
         help="bitcoin-data.com bütçesini koru (CI cron için önerilir)",
     )
     ap.add_argument("--json-out", type=str, default=None)
+    ap.add_argument(
+        "--fail-on-blocked",
+        action="store_true",
+        help=(
+            "ortam engelini de başarısızlık say (çıkış kodu 2). Engellenmemiş bir ağdan "
+            "koşarken kullanın; GitHub-hosted runner'da engel beklenen durumdur."
+        ),
+    )
     args = ap.parse_args()
 
     results = asyncio.run(main_async(args.skip_bitcoin_data))
-    report, fails = render(results)
+    report, fails, blocked = render(results)
     print(report)
     if args.json_out:
         with open(args.json_out, "w", encoding="utf-8") as f:
-            json.dump([asdict(r) for r in results], f, ensure_ascii=False, indent=2)
+            payload = [{**asdict(r), "state": r.state} for r in results]
+            json.dump(payload, f, ensure_ascii=False, indent=2)
         print(f"\nJSON: {args.json_out}")
-    sys.exit(1 if fails else 0)
+    sys.exit(exit_code(fails, blocked, args.fail_on_blocked))
 
 
 if __name__ == "__main__":

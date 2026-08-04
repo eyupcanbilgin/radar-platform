@@ -49,6 +49,14 @@ uv run ruff check --fix && uv run ruff format  # lint + format
 uv run python scripts/verify_endpoints.py      # canlı endpoint doğrulaması (smoke)
 ```
 
+Smoke raporu üç durumu ayırır: `OK`, `FAIL` (zorunlu sözleşme kırılması, çıkış kodu 1) ve
+`blocked_in_environment` — uç, isteğin geldiği ülke/ağ yüzünden reddetti; sözleşme ne
+doğrulandı ne de ihlal edildi, çıkış kodu bozulmaz. GitHub-hosted runner'da Binance uçları
+bu durumdadır, dolayısıyla **günlük CI koşusu Binance zinciri için kanıt üretmez**; kanıt
+engellenmemiş bir ağdan üretilir. `--fail-on-blocked` engeli de başarısızlık sayar (çıkış
+kodu 2) — engellenmemiş bir ağdan koşarken kullanın. Gerekçe:
+[ADR-0007](docs/adr/0007-cografi-engel-siniflandirmasi.md).
+
 ## PIT toplama ve signal context yayını
 
 Toplama ile yayın bilinçli olarak ayrıdır: kapanıştan sonra çekilen değer geçmiş saate

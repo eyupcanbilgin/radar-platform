@@ -24,4 +24,21 @@ jobs:
           python-version: "3.12"
       - run: uv sync --locked
       # bitcoin-data.com günlük istek bütçesi CI'da harcanmaz.
-      - run: uv run python scripts/verify_endpoints.py --skip-bitcoin-data
+      #
+      # GitHub-hosted runner bölgesi Binance/CloudFront tarafında coğrafi olarak engellidir.
+      # Script bunları "blocked_in_environment" olarak raporlar ve çıkış kodunu bozmaz; bu
+      # koşu Binance zincirini DOĞRULAMAZ. Kanıt, engellenmemiş bir ağdan `make smoke`
+      # (gerekirse --fail-on-blocked) ile üretilir. Gerekçe:
+      # services/btc-radar-mcp/docs/adr/0007-cografi-engel-siniflandirmasi.md
+      - name: Verify endpoints
+        shell: bash
+        run: |
+          uv run python scripts/verify_endpoints.py --skip-bitcoin-data \
+            --json-out verify-endpoints.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-endpoints
+          path: services/btc-radar-mcp/verify-endpoints.json
+          if-no-files-found: warn
