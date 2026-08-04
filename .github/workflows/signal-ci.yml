@@ -32,3 +32,11 @@ jobs:
       - run: python -m ruff check
       - run: python -m ruff format --check
       - run: python -m pytest -q
+      # Registry encoding bütünlüğü: 4 Ağu 2026'da 7 satır cp1254 ile yazılmış ve
+      # read_all() çökmüştü. Ayrı adım olarak koşar ki hata mesajı CI'da net görünsün.
+      - run: python scripts/repair_registry_encoding.py --check
+      # Manifest ↔ veri eşleşmesi. CI runner'ında ham veri git dışı olduğu için
+      # "hiç veri yok" hata sayılmaz; ama veri KISMEN varsa veya bir dosyanın hash'i
+      # tutmuyorsa CI kırmızıya düşer — asıl yakalanmak istenen sınıf budur.
+      - name: Veri manifesti doğrulaması
+        run: python scripts/data_manifest.py --verify --allow-missing-data

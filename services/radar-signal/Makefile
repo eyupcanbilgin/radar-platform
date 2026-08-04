@@ -1,4 +1,4 @@
-.PHONY: test lint download-data manifest backtest lookahead
+.PHONY: test lint download-data manifest verify backtest lookahead
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -15,6 +15,11 @@ download-data:
 
 manifest:
 	$(PY) scripts/data_manifest.py
+
+# Ortam sağlığı: registry encoding + manifest↔veri eşleşmesi (CI ile aynı kontroller)
+verify:
+	$(PY) scripts/repair_registry_encoding.py --check
+	$(PY) scripts/data_manifest.py --verify
 
 # Backtest YALNIZ bt.py sarmalayıcısıyla koşulur (maliyet + registry zorunlu; CLAUDE.md kural 6/8)
 backtest:
