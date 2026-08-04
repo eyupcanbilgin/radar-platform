@@ -110,8 +110,7 @@ def record_run(*, registry_path: Path | None = None, **fields) -> dict:
     }
     path = registry_path or REGISTRY_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
+    _append_line(path, json.dumps(entry, ensure_ascii=False, sort_keys=True))
     return entry
 
 
@@ -133,16 +132,66 @@ def update_verdict(
             updated = True
         new_rows.append(r)
     if updated:
-        with path.open("w", encoding="utf-8") as f:
-            for r in new_rows:
-                f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
+        _rewrite(path, [json.dumps(r, ensure_ascii=False, sort_keys=True) for r in new_rows])
     return updated
 
 
-def read_all(registry_path: Path | None = None) -> list[dict]:
+# --- Encoding savunma katmanı -----------------------------------------------------------
+# 4 Ağu 2026: registry'nin 7 satırı repo dışı bir araç tarafından Windows ANSI kod
+# sayfasıyla (cp1254) yeniden yazıldı; read_all() UnicodeDecodeError ile çöktü ve DSR
+# dahil tüm çoklu-deneme düzeltmesi devre dışı kaldı. Yazan araç bilinmiyor (repodaki
+# tüm Python yazımları utf-8 belirtiyordu), bu yüzden savunma iki taraflı kuruldu:
+# yazarken encoding+newline açıkça sabitlenir, okurken bozuk bayt fail-loud raporlanır.
+
+
+def _append_line(path: Path, line: str) -> None:
+    # newline="\n": Windows'ta CRLF'e çevrilmeyi engeller (JSONL satır bütünlüğü)
+    with path.open("a", encoding="utf-8", newline="\n") as f:
+        f.write(line + "\n")
+
+
+def _rewrite(path: Path, lines: list[str]) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+
+def verify_encoding(registry_path: Path | None = None) -> list[int]:
+    """UTF-8 olarak çözülemeyen satır numaralarını döndürür (1-tabanlı). Boş liste = temiz."""
     path = registry_path or REGISTRY_PATH
     if not path.exists():
         return []
+    bad = []
+    for i, raw in enumerate(path.read_bytes().splitlines(), 1):
+        if not raw.strip():
+            continue
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError:
+            bad.append(i)
+    return bad
+
+
+class RegistryEncodingError(Exception):
+    """Registry dosyası UTF-8 değil — okuma reddedildi (sessiz fallback yapılmaz)."""
+
+
+def read_all(registry_path: Path | None = None) -> list[dict]:
+    """Tüm kayıtları oku.
+
+    Bozuk baytta SESSİZCE başka bir kod sayfasına düşülmez: yanlış çözülen bir kayıt
+    kanıt zincirini görünmez biçimde bozardı. Bunun yerine hangi satırların bozuk
+    olduğu ve nasıl onarılacağı söylenir (fail-loud, CLAUDE.md kural 2).
+    """
+    path = registry_path or REGISTRY_PATH
+    if not path.exists():
+        return []
+    bad = verify_encoding(path)
+    if bad:
+        raise RegistryEncodingError(
+            f"{path.name}: {len(bad)} satır UTF-8 değil (satırlar: {bad}). "
+            "Onarım: python scripts/repair_registry_encoding.py --apply"
+        )
     return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
 
