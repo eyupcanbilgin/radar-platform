@@ -1,4 +1,4 @@
-# ADR 0007 — Coğrafi engel, sözleşme kırılmasından ayrı bir durumdur
+# ADR 0009 — Coğrafi engel, sözleşme kırılmasından ayrı bir durumdur
 
 - **Tarih:** 4 Ağustos 2026
 - **Durum:** Kabul edildi

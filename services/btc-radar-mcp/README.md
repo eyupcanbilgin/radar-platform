@@ -55,7 +55,7 @@ doğrulandı ne de ihlal edildi, çıkış kodu bozulmaz. GitHub-hosted runner'd
 bu durumdadır, dolayısıyla **günlük CI koşusu Binance zinciri için kanıt üretmez**; kanıt
 engellenmemiş bir ağdan üretilir. `--fail-on-blocked` engeli de başarısızlık sayar (çıkış
 kodu 2) — engellenmemiş bir ağdan koşarken kullanın. Gerekçe:
-[ADR-0007](docs/adr/0007-cografi-engel-siniflandirmasi.md).
+[ADR-0009](docs/adr/0009-cografi-engel-siniflandirmasi.md).
 
 ## PIT toplama ve signal context yayını
 

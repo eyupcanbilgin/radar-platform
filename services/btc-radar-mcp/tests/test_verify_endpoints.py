@@ -1,4 +1,4 @@
-"""Smoke script: coğrafi engel ile sözleşme kırılması ayrı durumlardır (ADR-0007).
+"""Smoke script: coğrafi engel ile sözleşme kırılması ayrı durumlardır (ADR-0009).
 
 Ağa çıkılmaz; `httpx.MockTransport` ile yanıtlar sahnelenir (CLAUDE.md: canlı API'ye
 giden test yazma).

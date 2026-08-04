@@ -13,7 +13,7 @@ CLAUDE.md kural 8). Önce OpenAPI dokümanı üzerinden metrik adları keşfedil
 endpoint'lerine en fazla 3 çağrı yapılır.
 
 Çıkış kodları: 0 = zorunlu sözleşme kırılması yok; 1 = en az bir zorunlu kontrol düştü;
-2 = yalnızca ortam engeli var ve `--fail-on-blocked` verildi (bkz. ADR-0007).
+2 = yalnızca ortam engeli var ve `--fail-on-blocked` verildi (bkz. ADR-0009).
 """
 
 import argparse
@@ -35,7 +35,7 @@ HEADERS = {"User-Agent": "btc-radar-verify/0.1 (Faz 0 smoke; read-only)"}
 # GitHub-hosted runner bölgeleri Binance/CloudFront tarafında engellidir (koşu 30894903581).
 # İki durum aynı kovaya konursa günlük smoke kalıcı kırmızıya döner ve gerçek bir sözleşme
 # kırılması bu gürültünün içinde kaybolur.
-# Ayrıntı: docs/adr/0007-cografi-engel-siniflandirmasi.md
+# Ayrıntı: docs/adr/0009-cografi-engel-siniflandirmasi.md
 GEO_BLOCK_STATUSES = frozenset({403, 451})
 GEO_BLOCK_MARKERS = (
     # CloudFront'un ülke engeli sayfası (HTML gövde)

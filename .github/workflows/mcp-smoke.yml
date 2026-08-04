@@ -29,7 +29,7 @@ jobs:
       # Script bunları "blocked_in_environment" olarak raporlar ve çıkış kodunu bozmaz; bu
       # koşu Binance zincirini DOĞRULAMAZ. Kanıt, engellenmemiş bir ağdan `make smoke`
       # (gerekirse --fail-on-blocked) ile üretilir. Gerekçe:
-      # services/btc-radar-mcp/docs/adr/0007-cografi-engel-siniflandirmasi.md
+      # services/btc-radar-mcp/docs/adr/0009-cografi-engel-siniflandirmasi.md
       - name: Verify endpoints
         shell: bash
         run: |
