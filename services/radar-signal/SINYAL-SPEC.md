@@ -1,5 +1,8 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.4**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.5**
+
+> v1.5 (4 Ağu 2026): Public Binance USD-M kapalı mum adaptörü, exact-hour context JSON
+> inbox ve UTC tek-sefer/daemon paper runtime eklendi. v1.4 → git geçmişi.
 
 > v1.4 (4 Ağu 2026): BTCUSDT 1h teknik FeatureSnapshot, birinci sınıf WAIT karar kartı ve
 > atomik append-only DecisionLedger eklendi. v1.3 → git geçmişi.
@@ -68,7 +71,11 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 [ Telegram kanalı ]  — insan-okur formatı; her mesajda gerekçe + invalidasyon + yasal not
 ```
 
-**Veri sorumluluğu ayrımı:** Mum verisini freqtrade kendisi çeker (ccxt) — btc-radar provider'ları burada KULLANILMAZ (tekrar yazım yok). btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı) ve Faz D'de HTTP endpoint'i üzerinden sorgulanır.
+**Veri sorumluluğu ayrımı:** Strateji/backtest mumunu freqtrade kendi CCXT katmanıyla çeker.
+İlk BTC 1h standalone karar defteri de yeni bir HTTP provider yazmadan aynı sabitlenmiş CCXT
+bağımlılığının `binanceusdm` public OHLCV yüzeyini kullanır. btc-radar provider'ları mum için
+KULLANILMAZ. btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı); çalışan
+provider/HTTP context endpoint'i oluşana kadar taşıma exact-hour JSON inbox üzerinden yapılır.
 
 **İlk ürün dilimi:** Platformun ilk uçtan uca paper döngüsü yalnız
 `BTCUSDT · Binance USDT perpetual · kapanmış 1h mum · LONG/SHORT/WAIT` kapsamındadır.
@@ -89,8 +96,17 @@ yönsel setup yoksa sonuç `WAIT`tir. MCP direction skoru doğrudan LONG/SHORT y
 Setup exact karar saati ve feature snapshot ID/hash'ine bağlıdır. Feature+context+karar
 payload'ları `DecisionLedger` içinde tek transaction'la append-only saklanır; aynı saat
 farklı içerikle UPDATE/DELETE/REPLACE edilemez. Ledger kartı girdilerden yeniden üretir ve
-okumada kolon-payload tutarlılığını doğrular. Scheduler ve canlı veri bağlantısı henüz kapsam
-dışıdır; bu nedenle motor hazır olsa da otomatik saatlik işletim tamamlanmamıştır.
+okumada kolon-payload tutarlılığını doğrular.
+
+`scripts/run_hourly_decision.py`, public/anahtarsız Binance USD-M mumlarını exact 200 saatlik
+pencerede alır ve Binance `serverTime` doğrulamalı, varsayılan 90 saniye kapanış gecikmesiyle
+UTC slotunu işler. Borsa saati doğrulanmadan immutable slot dondurulmaz. Context yalnız
+`var/decision-context/v1/BTCUSDT/1h/YYYY/MM/DD/HH.json` exact yolundan okunur; latest/önceki
+saat fallback'i yoktur. Eksik/bozuk context veya mum erişim hatası saati atlamaz, değişmez
+`WAIT` üretir. Açık `--as-of` replay/backfill'dir ve varsayılan ayrı replay ledger'ına yazar.
+Daemon kodu hazırdır; MCP context producer, process supervision ve kesintisiz işletim kanıtı
+henüz tamamlanmamıştır. Kabul edilmiş yönsel setup olmadığı için sağlıklı runtime çıktısı da
+şimdilik `WAIT/no_directional_setup`tır.
 
 ---
 

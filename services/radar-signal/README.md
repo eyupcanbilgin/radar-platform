@@ -50,6 +50,26 @@ Telegram bildirimleri için `TELEGRAM_BOT_TOKEN` ve `TELEGRAM_CHAT_ID` değerler
 
 ---
 
+## BTCUSDT 1h Paper Karar Runtime'ı
+
+İlk dar ürün dilimi public Binance USD-M kapanmış mumlarıyla tek-sefer çalıştırılabilir:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_hourly_decision.py
+```
+
+Sürekli UTC scheduler modu açıkça seçilir:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_hourly_decision.py --daemon
+```
+
+Runtime emir göndermez ve API anahtarı kullanmaz. MCP context producer ve kabul edilmiş
+yönsel setup henüz olmadığı için bugünkü dürüst çıktı `WAIT`tir. Exact-hour context inbox,
+retry/grace, replay ayrımı ve işletim sınırları için `decision_engine/README.md` dosyasına bakın.
+
+---
+
 ## 🧪 Testler ve Doğrulama
 
 ### Birim Testlerini Çalıştırma (pytest)
@@ -92,6 +112,7 @@ python scripts/bt.py --strategy S0001EmaCross --hypothesis S-0001 --scenario tak
 
 ```text
 radar-signal/
+  ├── decision_engine/        # BTC 1h feature/karar/ledger/runtime çekirdeği
   ├── user_data/strategies/   # S-XXXX Strateji sınıfları ve konfigürasyonları
   ├── enricher/               # Webhook alıcısı: gerekçe + rejim satırı + state machine (FastAPI)
   ├── registry/               # Experiment Registry (experiments.jsonl)

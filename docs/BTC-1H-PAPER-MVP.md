@@ -11,9 +11,11 @@ portföy optimizasyonu ve kullanıcıya pozisyon talimatı yoktur.
 
 ## Saatlik karar akışı
 
-1. Kapanmış 1h mumun `as_of` anı belirlenir.
-2. MCP/PIT katmanı yalnız `available_at <= as_of` gözlemlerinden rejim snapshot'ı üretir.
-3. Snapshot, `decision-context/v1` sözleşmesiyle signal servisine aktarılır.
+1. UTC scheduler kapanmış 1h mumun `as_of` anını, varsayılan 90 saniye grace ile belirler.
+2. Signal runtime public Binance USD-M mumunu CCXT ile tam 200 saatlik kapalı pencereden alır.
+3. MCP/PIT katmanı hazır olduğunda yalnız `available_at <= as_of` gözlemlerinden rejim
+   snapshot'ı üretir ve `decision-context/v1` gövdesini exact-hour JSON inbox'a atomik taşır.
+   Bugün bu producer yoktur; context eksikliği görünür `WAIT` nedenidir.
 4. Signal servisi teknik setup'ı ve veri/risk kapılarını deterministik değerlendirir.
 5. Sonuç mutlaka `LONG`, `SHORT` veya `WAIT` olur. Setup yokluğu ve blocker'lar açıkça yazılır.
 6. Karar; snapshot, sürüm, gerekçe ve veri sağlığıyla decision ledger'a eklenir.
@@ -26,3 +28,5 @@ tek izinli ürün çıktısı `WAIT`tir. Opsiyonel kapsam eksikliği görünür 
 hangi girdilerin zorunlu olduğu config ile sürümlenir.
 
 MCP bağlam sağlar; tek başına `LONG` veya `SHORT` üretmez. LLM canlı döngüde yer almaz.
+Kabul edilmiş setup motoru olmadığı sürece sağlıklı mum/context de
+`WAIT/no_directional_setup` üretir. Daemon kodunun varlığı kesintisiz işletim kanıtı değildir.

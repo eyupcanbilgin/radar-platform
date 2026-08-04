@@ -96,7 +96,9 @@ alamıyor.
 - [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
 - [ ] Her saat karar üret; setup yoksa açık gerekçeli `WAIT` kartı yaz.
   - [x] Deterministik karar motoru, context-missing WAIT ve append-only ledger.
-  - [ ] Gerçek mum/context adaptörü, scheduler ve kesintisiz işletim.
+  - [x] Public Binance kapalı mum adaptörü, exact-hour context inbox consumer'ı ve UTC
+    tek-sefer/daemon scheduler kodu.
+  - [ ] Gerçek MCP context producer, process supervision/heartbeat ve kesintisiz işletim kanıtı.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.
 - [ ] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet.
 

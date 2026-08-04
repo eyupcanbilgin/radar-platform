@@ -1,4 +1,4 @@
-.PHONY: test lint download-data manifest verify backtest lookahead pulse-smoke pulse-reanalysis
+.PHONY: test lint download-data manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -35,3 +35,9 @@ pulse-smoke:
 
 pulse-reanalysis:
 	$(PY) scripts/run_pulse_reanalysis.py
+
+hourly-once:
+	$(PY) scripts/run_hourly_decision.py
+
+hourly-daemon:
+	$(PY) scripts/run_hourly_decision.py --daemon

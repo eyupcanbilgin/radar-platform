@@ -6,9 +6,9 @@ btc-radar-mcp
                                       |
                                       v
 radar-signal
-  kapanmış 1h mum -> FeatureSnapshot --+
+  ccxt binanceusdm -> UTC runtime -> kapanmış 1h mum -> FeatureSnapshot --+
                                          +-> LONG / SHORT / WAIT -> DecisionLedger
-  decision-context/v1 ------------------+
+  exact-hour decision-context/v1 inbox -------------------------------+
                                          +-> yönsel aday varsa SignalLedger/outbox
 ```
 
@@ -18,3 +18,5 @@ yaşam döngüsünden sorumludur.
 
 Platform seviyesindeki entegrasyon sürümlü bir sözleşme üzerinden yapılır; bir
 servisin diğerinin iç Python modüllerini doğrudan import etmesi hedeflenmez.
+MCP henüz context üretmediği için inbox eksikliği fail-closed `WAIT`tir; daemon ve mum
+adaptörünün bulunması uçtan uca sürekli işletimin tamamlandığı anlamına gelmez.
