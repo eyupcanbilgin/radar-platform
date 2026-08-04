@@ -46,7 +46,10 @@ pip install -r requirements.lock
 ```bash
 cp .env.example .env
 ```
-Telegram bildirimleri için `TELEGRAM_BOT_TOKEN` ve `TELEGRAM_CHAT_ID` değerlerini doldurun.
+Telegram bildirimleri için `RADAR_SIGNAL_DELIVERY_MODE=telegram` seçin ve
+`TELEGRAM_BOT_TOKEN` ile `TELEGRAM_CHAT_ID` değerlerini doldurun. Yalnız yerel geliştirmede
+`RADAR_SIGNAL_DELIVERY_MODE=console` kullanılabilir; eksik Telegram secret'ı otomatik olarak
+console'a düşmez.
 
 ---
 

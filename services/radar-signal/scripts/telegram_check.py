@@ -4,32 +4,23 @@ Token/chat id YALNIZ ortamdan okunur (.env). Hata durumunda ne yapılacağını 
 Kullanım: .venv/Scripts/python scripts/telegram_check.py
 """
 
-import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from enricher.telegram import NotConfigured, TelegramSender  # noqa: E402
-
-
-def load_dotenv(path: Path) -> None:
-    """Küçük .env okuyucu — ek bağımlılık eklememek için (python-dotenv gerekmez)."""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
+from enricher.telegram import (  # noqa: E402
+    NotConfigured,
+    TelegramSender,
+    load_env_file,
+)
 
 
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    load_dotenv(REPO / ".env")
+    load_env_file(REPO / ".env")
     sender = TelegramSender()
     if not sender.configured:
         sys.exit(

@@ -1,6 +1,6 @@
 """Outbox teslimat pompası — ayrı süreç olarak çalışır.
 
-Telegram yapılandırılmışsa oraya, değilse konsola teslim eder. Kesintide mesaj
+Teslimat modu açıkça telegram veya console seçilir. Kesintide mesaj
 kaybolmaz: outbox kuyrukta tutar, bu döngü backoff'la yeniden dener.
 
 Çalıştırma:
@@ -23,7 +23,7 @@ from enricher.ledger import SignalLedger  # noqa: E402
 from enricher.outbox import Outbox  # noqa: E402
 from enricher.pipeline import SignalPipeline  # noqa: E402
 from enricher.policy import load_lifecycle  # noqa: E402
-from enricher.telegram import ConsoleSender, TelegramSender  # noqa: E402
+from enricher.telegram import load_env_file, sender_from_environment  # noqa: E402
 
 logger = logging.getLogger("pump")
 
@@ -37,17 +37,12 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
 
+    load_env_file(REPO / ".env")
     lifecycle = load_lifecycle()
     ob_cfg = lifecycle["outbox"]
     db_dir = Path(os.environ.get("RADAR_SIGNAL_DB_DIR", REPO / "var"))
 
-    telegram = TelegramSender()
-    sender = telegram if telegram.configured else ConsoleSender()
-    if not telegram.configured:
-        logger.warning(
-            "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID yok — bildirimler konsola yazılıyor. "
-            "Kurulum: docs/TELEGRAM-KURULUM.md"
-        )
+    sender = sender_from_environment()
 
     with (
         SignalLedger(db_dir / "signals.sqlite") as led,

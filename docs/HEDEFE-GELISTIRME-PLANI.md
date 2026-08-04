@@ -154,7 +154,8 @@ locked OOS başarısı değildir, yalnız forward karantina adaylığıdır.
 
 - [ ] Minimum 4 hafta AND 100 bağımsız karar/sinyal AND 2 rejim koşulunu uygula.
 - [ ] Tercih edilen gözlem süresi 8-12 haftadır; fırsat koşulu dolmadan süre tek başına yetmez.
-- [ ] Telegram `.env` yükleme ve console fallback davranışını fail-closed yap.
+- [x] Telegram `.env` yükleme ve console fallback davranışını fail-closed yap
+  (Signal ADR-0013; açık `telegram|console` modu).
 - [x] Ledger/outbox crash boşluğunu gider veya onarım/reconciliation worker'ı ekle
   (Signal ADR-0011; saatlik DecisionCard hattı).
 - [ ] `valid_until`, `max_entry_deviation` ve aktif expiry'yi teslimden önce uygula.

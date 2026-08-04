@@ -22,9 +22,10 @@ Telegram'da **@BotFather** ile konuş:
 
 ## 3. `.env` dosyasını oluştur
 
-Repo kökünde `.env` adında bir dosya aç ve iki satır yaz:
+Servis kökünde (`services/radar-signal`) `.env` adında bir dosya aç ve üç satır yaz:
 
 ```
+RADAR_SIGNAL_DELIVERY_MODE=telegram
 TELEGRAM_BOT_TOKEN=buraya_botfather_token
 TELEGRAM_CHAT_ID=buraya_chat_id
 ```
@@ -46,9 +47,17 @@ nedenini söyler (token yanlış, chat id yanlış, ya da bota hiç yazılmamı�
 .venv/Scripts/python scripts/pump.py
 ```
 
-Token tanımlı değilse sistem çökmez: bildirimler konsola yazılır ve uyarı verir.
-Kuyruk kaybolmaz — token'ı sonradan tanımlayıp pompayı yeniden başlattığında
-bekleyen bildirimler "[GEÇ TESLİM]" notuyla iletilir.
+`telegram` modunda token veya chat id eksikse pompa fail-closed durur ve kuyruk PENDING
+kalır. Secret'ları tamamlayıp pompayı yeniden başlattığında bekleyen bildirimler
+"[GEÇ TESLİM]" notuyla iletilir; eksik Telegram ayarı sessizce console'a düşmez.
+
+Yalnız yerel geliştirmede Telegram yerine console teslimatı istiyorsan bunu açıkça seç:
+
+```
+RADAR_SIGNAL_DELIVERY_MODE=console
+```
+
+Console modu üretim fallback'i değildir.
 
 ## Sık sorulanlar
 
