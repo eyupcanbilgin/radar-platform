@@ -1,18 +1,20 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.1**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.2**
 
-> v1.1 (4 Ağu 2026): Monorepo `decision-context/v1` üretici sözleşmesi ve BTCUSDT 1h
-> paper kapsamı eklendi. v1.0 → git geçmişi.
+> v1.2 (4 Ağu 2026): İlk gerçek Binance USD-M provider, PIT collector, fail-closed exact-hour
+> context publisher ve `get_derivatives` dar dilimi uygulandı. v1.1 → git geçmişi.
 
 | Alan | Değer |
 |---|---|
 | Proje sahibi | Eyüpcan |
 | Tarih | 3 Ağustos 2026 |
-| Durum | Taslak — Claude Code'a girdi olarak hazır |
+| Durum | Uygulamada — Faz 1a veri taşıması tamam, skorlama hazır değil |
 | Çalışma adı | `btc-radar-mcp` (değiştirilebilir) |
 | Temel girdiler | Kripto Piyasa Analiz Metodolojisi v1.0 (Eyüpcan), borsa-mcp mimari incelemesi (3 Ağu 2026), veri kaynağı fizibilite envanteri |
 
-> **Yasal not:** Bu araç bir araştırma/karar-destek sistemidir. Yatırım tavsiyesi üretmez, emir göndermez, borsa hesabına bağlanmaz. Tüm çıktılar "yön/kırılganlık/güven skoru + gerekçe" formatındadır ve invalidasyon koşullarıyla birlikte sunulur.
+> **Yasal not:** Bu araç bir araştırma/karar-destek sistemidir. Yatırım tavsiyesi üretmez,
+> emir göndermez, borsa hesabına bağlanmaz. Skor üretilemediğinde bunu null skorlar ve açık
+> blocker'larla bildirir; eksik veriyi nötr sinyal gibi göstermez.
 
 ---
 
@@ -27,6 +29,11 @@ Metodoloji v1.0'daki çok katmanlı Bitcoin analiz çerçevesini, Claude'un (Des
 - Deterministik skorlama motoru: yön (−100..+100), kırılganlık (0..100), güven (0..100), rejim etiketi (Bölüm 5).
 - Kaynak bazlı TTL önbelleği ve rate-limit koruması.
 - stdio transport (uvx ile lokal çalıştırma). HTTP transport Faz 3.
+
+**Mevcut Faz 1a dilimi:** Binance BTCUSDT anlık mark/funding/OI provider'ı,
+`get_derivatives`, append-only PIT toplama ve `decision-context/v1` exact-hour publisher
+uygulanmıştır. `signal_rules.yaml` boş olduğu için direction/fragility/rejim üretimi bilinçli
+olarak kapalıdır.
 
 ### 1.3 Kapsam dışı (tüm fazlar için)
 - Emir iletimi, borsa API key'i ile private endpoint kullanımı, bakiye erişimi.
@@ -153,7 +160,12 @@ unit, window, source_group, source_url, quality(q: 0-1), notes
 ```
 - `snapshot_id` girdilerin deterministik türevidir; `computed_at` içerik hash'ine girmez.
 - Depo, kaydın taşıdığı `content_hash`'e güvenmez — gövdeden yeniden hesaplayıp doğrular.
-- **`get_as_of` vardır, `get_latest` YOKTUR:** radar-signal `as_of=<mum kapanışı>` sormak zorundadır ve ürettiği sinyale `snapshot_id` yazar.
+- Tam aynı bilgi-zamanı retry'ı idempotenttir; farklı `available_at` ayrı kanıt satırıdır.
+  Böylece out-of-order ingest ve A→B→A revizyon dizisi yazma sırasından bağımsız korunur.
+- Snapshot ID/hash yalnız yazmada değil okumada da doğrulanır; `data_cutoff_at` v0.2'den
+  itibaren içerik hash'ine dahildir, v0.1 geçmişi legacy doğrulamayla okunabilir kalır.
+- **`get_as_of` vardır, `get_latest` YOKTUR:** aynı saatte birden fazla snapshot varsa örtük
+  seçim yapılmaz; `snapshot_id` açıkça seçilmelidir.
 - Kabul testi karşılandı: 100 replay → bit-bit özdeş skor/gerekçe (`tests/test_snapshot.py`). Ayrıntı: ADR-0003.
 
 ### 3.5 Signal servis sınırı — `decision-context/v1`
@@ -164,6 +176,12 @@ dar kapsam `BTCUSDT · Binance USDT perpetual · 1h · paper`dır. MCP yalnız b
 `LONG/SHORT/WAIT` seçmez. Zorunlu veri eksiği `directional_decision_allowed=false` ve
 blocker listesiyle fail-closed taşınır. Ortak fixture iki servisin testinde doğrulanır;
 HTTP transport bu sözleşmenin dışındadır ve daha sonraki fazda uygulanır.
+
+Faz 1a publisher yolu
+`var/decision-context/v1/BTCUSDT/1h/YYYY/MM/DD/HH.json` biçimindedir. Yayın same-filesystem
+temp + `fsync` + atomik no-overwrite hard-link ile yapılır. Mevcut exact-hour artifact hiçbir
+zaman değiştirilmez. Kurallar boşken snapshot gerçek PIT girdilerinin digest'ini taşır ama
+skorları null, confidence'ı 0 ve yön kapısı kapalıdır (ADR-0004).
 
 ---
 
@@ -180,7 +198,7 @@ Genel kurallar (hepsi borsa-mcp'den doğrulanmış desenler):
 | # | Araç | Ana parametreler | Kaynaklar | Not |
 |---|---|---|---|---|
 | 1 | `get_market_snapshot` | `detail: Literal["summary","full"]` | CoinGecko, Binance spot | Fiyat, 24s değişim, dominance, ETH/BTC, mcap, breadth özeti |
-| 2 | `get_derivatives` | `venue: Literal["binance","bybit","all"]`, `metric: Literal["oi","funding","long_short","taker_ratio","all"]`, `window` | Binance/Bybit futures | Fiyat–OI–funding matrisinin (metodoloji §4.1) ham girdileri + tarihsel yüzdelik konumları |
+| 2 | `get_derivatives` | **Faz 1a:** `metric: Literal["mark_price","funding_rate","open_interest","all"]`; gelecekte venue/window genişler | Binance USD-M futures | **Dar dilim uygulandı:** PIT zamanlı anlık ham gözlemler. Tarihsel yüzdelikler ve Bybit henüz yok |
 | 3 | `get_liquidations` | `window: Literal["1h","6h","12h","24h"]` | WS birikimi veya bitcoin-data.com | Gerçekleşen long/short tasfiyeleri; "tahmini harita DEĞİL" notu yanıt metasında sabit |
 | 4 | `get_onchain` | `metric: Literal["sth_sopr","sopr","cdd","netflow","reserve","mvrv","nupl","whale_cohort"]`, `lookback_days` | bitcoin-data.com | Önbellek zorunlu; yanıtta `retrieved_at` ve veri yaşı her zaman görünür |
 | 5 | `get_premiums` | `premium: Literal["coinbase","korea","both"]` | Coinbase+Binance, Upbit | Hesaplama formülü yanıt metasında; anlık + kısa trend (son N gözlem) |
@@ -226,6 +244,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 | Faz | İçerik | Bitti sayılma kriteri |
 |---|---|---|
 | **0 — İskelet** | Repo yapısı, uv, FastMCP hello-world, CI, config yükleme | `uvx --from . btc-radar` Claude Desktop'ta görünür, `get_health` çalışır |
+| **1a — Veri taşıması (tamamlandı)** | Binance mark/funding/OI provider, PIT collector, immutable exact-hour context | Gerçek public fixture'lar, no-look-ahead, hash/ID doğrulama, atomik no-overwrite ve fail-closed consumer sözleşmesi testli |
 | **1 — MVP** | 8 araç, 9 provider, cache, scoring, testler | `compute_scores` gerçek veriyle üç skor + rejim üretir; test coverage çekirdek modüllerde ≥%80; smoke yeşil |
 | **2 — Derinlik** | Haber katmanı (CryptoPanic/CoinMarketCal), spot CVD, whale kohort iyileştirme, SKILL.md (analiz beyni) yazımı | Skill + MCP birlikte günlük tek-sayfa raporu (metodoloji §11.1) üretebiliyor |
 | **3 — Yayın** | HTTP transport + /health, Docker, opsiyonel paralı kaynak adaptörleri, ay-fazı backtest modülü (ayrı, skor dışı) | Uzak sunucuda çalışır; README ile üçüncü kişi kurabilir |

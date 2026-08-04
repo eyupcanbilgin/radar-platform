@@ -58,3 +58,11 @@ Karar çekirdeği artık gerçek public mumlarla tek-sefer veya saatlik daemon o
 yönsel setup, process supervision, alarm/heartbeat ve kesintisiz işletim kanıtı hâlâ yoktur.
 Dolayısıyla bu karar “çalışan sinyal botu” değil, canlı verili değişmez paper karar defteri
 runtime'ı sağlar.
+
+## Sonraki uygulama notu — 4 Ağustos 2026
+
+MCP ADR-0004 ile Binance USD-M mark/funding/OI provider'ı, PIT collector ve exact-hour
+publisher sonradan uygulanmıştır. Publisher bu ADR'deki no-overwrite sınırını temp + `fsync` +
+atomik hard-link ile karşılar. `signal_rules.yaml` boş olduğundan yayın geçerli ama
+`unavailable/scoring_rules_unavailable` durumundadır; yönsel setup hâlâ yoktur ve karar
+`WAIT` kalır. Producer scheduler/process supervision bu notla eklenmiş sayılmaz.

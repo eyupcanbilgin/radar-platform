@@ -18,5 +18,7 @@ yaşam döngüsünden sorumludur.
 
 Platform seviyesindeki entegrasyon sürümlü bir sözleşme üzerinden yapılır; bir
 servisin diğerinin iç Python modüllerini doğrudan import etmesi hedeflenmez.
-MCP henüz context üretmediği için inbox eksikliği fail-closed `WAIT`tir; daemon ve mum
-adaptörünün bulunması uçtan uca sürekli işletimin tamamlandığı anlamına gelmez.
+MCP gerçek Binance mark/funding/OI gözlemlerini PIT'e alıp exact-hour context üretebilir.
+Skorlama kuralları boş olduğundan bu context `unavailable/scoring_rules_unavailable` taşır ve
+signal fail-closed `WAIT` verir. Producer henüz ayrı one-shot CLI'dır; scheduler, supervisor
+ve mum adaptörünün bulunması uçtan uca sürekli işletimin tamamlandığı anlamına gelmez.

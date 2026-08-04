@@ -1,6 +1,6 @@
 [project]
 name = "btc-radar-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Bitcoin merkezli kripto piyasa analizi için salt-okunur FastMCP sunucusu"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 btc-radar = "btc_radar.server:main"
+btc-radar-producer = "btc_radar.producer:main"
 
 [dependency-groups]
 dev = [

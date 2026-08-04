@@ -116,11 +116,14 @@ def build_decision_context(
     *,
     required_layers: frozenset[str] = frozenset(),
     required_sources: frozenset[str] = frozenset(),
+    additional_blockers: frozenset[str] = frozenset(),
 ) -> DecisionContextV1:
     """Adapt an immutable snapshot; only configured required gaps block direction."""
     stale_sources = sorted(set(snapshot.stale_sources))
     missing_layers = sorted(set(snapshot.missing_layers))
-    blockers: list[str] = []
+    if any(not blocker for blocker in additional_blockers):
+        raise ValueError("additional_blockers boş etiket içeremez")
+    blockers: list[str] = list(additional_blockers)
 
     if snapshot.direction is None or snapshot.fragility is None:
         blockers.append("scores_unavailable")

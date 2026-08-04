@@ -13,9 +13,10 @@ portföy optimizasyonu ve kullanıcıya pozisyon talimatı yoktur.
 
 1. UTC scheduler kapanmış 1h mumun `as_of` anını, varsayılan 90 saniye grace ile belirler.
 2. Signal runtime public Binance USD-M mumunu CCXT ile tam 200 saatlik kapalı pencereden alır.
-3. MCP/PIT katmanı hazır olduğunda yalnız `available_at <= as_of` gözlemlerinden rejim
-   snapshot'ı üretir ve `decision-context/v1` gövdesini exact-hour JSON inbox'a atomik taşır.
-   Bugün bu producer yoktur; context eksikliği görünür `WAIT` nedenidir.
+3. MCP/PIT katmanı yalnız `available_at <= as_of` gözlemlerinden snapshot üretir ve
+   `decision-context/v1` gövdesini exact-hour JSON inbox'a atomik/no-overwrite taşır. Bugünkü
+   producer gerçek mark/funding/OI toplar fakat scoring kuralları boş olduğu için geçerli
+   `unavailable` context ve görünür `WAIT` blocker'ları üretir.
 4. Signal servisi teknik setup'ı ve veri/risk kapılarını deterministik değerlendirir.
 5. Sonuç mutlaka `LONG`, `SHORT` veya `WAIT` olur. Setup yokluğu ve blocker'lar açıkça yazılır.
 6. Karar; snapshot, sürüm, gerekçe ve veri sağlığıyla decision ledger'a eklenir.

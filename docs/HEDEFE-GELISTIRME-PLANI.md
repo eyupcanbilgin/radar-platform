@@ -26,9 +26,9 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | Araştırma altyapısı | Manifest, Registry, maliyet modeli, replay ve test temeli var | Korunacak |
 | Yönsel avantaj | Kabul edilmiş strateji yok | Yeni stratejiden önce güvenilir nabız kapısı gerekir |
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
-| MCP | Faz 0 iskeleti; yalnız `get_health`, gerçek provider yok | Önce dar veri zinciri tamamlanacak |
-| Signal ürünü | Backtest ve bildirim parçaları var, birbirine bağlı değil | Tek dikey paper akışı kurulacak |
-| Veri kapsamı | BTC/ETH futures OHLCV, funding ve FOMC ağırlıklı | OI, spot/perp basis ve veri sağlığı öncelikli |
+| MCP | İlk gerçek Binance mark/funding/OI provider'ı, PIT collector ve fail-closed context publisher var; scoring yok | Dar veri taşıması tamam, gerçek feature/rejim katmanı sırada |
+| Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
+| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI | Historical OI/funding, spot/perp basis ve veri sağlığı öncelikli |
 | Operasyonel güven | Expiry, outbox atomikliği, Telegram env ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
 ## 3. Değişmez Ürün İlkeleri
@@ -89,8 +89,9 @@ alamıyor.
 **Amaç:** Platform genişletmeden çalışan ürün döngüsünü görmek.
 
 - [x] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
-- [ ] Binance spot/futures OHLCV, funding, OI, basis ve spread/depth collector'larını ekle.
-- [ ] OI verisini append-only PIT olarak hemen toplamaya başla; geçmiş endpoint'i sınırlıdır.
+- [x] İlk Binance public mark/funding/OI collector'ını ve PIT yazımını ekle.
+- [ ] Binance spot OHLCV, basis ve spread/depth collector'larını ekle.
+- [ ] OI collector'ını process supervision ile sürekli çalıştır; geçmiş endpoint'i sınırlıdır.
 - [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
   doğrula.
 - [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
@@ -98,7 +99,8 @@ alamıyor.
   - [x] Deterministik karar motoru, context-missing WAIT ve append-only ledger.
   - [x] Public Binance kapalı mum adaptörü, exact-hour context inbox consumer'ı ve UTC
     tek-sefer/daemon scheduler kodu.
-  - [ ] Gerçek MCP context producer, process supervision/heartbeat ve kesintisiz işletim kanıtı.
+  - [x] Gerçek Binance -> PIT -> unscored snapshot -> exact-hour MCP context producer.
+  - [ ] Producer scheduler, process supervision/heartbeat ve kesintisiz işletim kanıtı.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.
 - [ ] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet.
 
@@ -180,7 +182,7 @@ Win-rate tek başına kabul ölçütü değildir.
 - Geliştirme verisindeki en iyi sonucu “final” diye seçmek
 - Kabul edilmiş setup olmadan rejim skorunu doğrudan pozisyona çevirmek
 
-## 8. İlk Aktif Çalışma Paketi
+## 8. Aktif çalışma paketleri
 
 `WP-0001 — Araştırma Kapısı Onarımı`
 
@@ -195,4 +197,20 @@ temiz-repo/manifest/locked-OOS/commit'e bağlı bağımsız onay korumalı reana
 eklendi. Kalan kapı bu commit'in bağımsız incelenmesi, onay kaydının ayrı commit'lenmesi ve
 Development reanalysis koşusudur.
 
-Bu paket bitmeden yeni strateji veya provider eklenmez.
+WP-0001'in bağımsız araştırma onay kapısı yeni yönsel strateji kabulünden önce hâlâ
+geçerlidir. Aşağıdaki WP-0002 tek onaylı BTC veri taşıma dilimidir; yeni alpha/strateji veya
+geniş provider ailesi iddiası değildir.
+
+### WP-0002 — İlk gerçek veri ve context taşıması
+
+**Durum:** Kodlama, test ve canlı smoke tamamlandı.
+
+1. Binance USD-M public mark/funding/OI provider ve `get_derivatives`
+2. A→B→A revizyonunu ve farklı bilgi-zamanlarını koruyan append-only PIT
+3. Snapshot ID/hash/cutoff okuma-yazma bütünlük doğrulaması
+4. Unscored/fail-closed exact-hour context producer
+5. Atomik no-overwrite publisher ve iki-servis consumer smoke
+
+Bu paket yön/rejim skoru açmaz. Bir sonraki ürün işi historical OI/funding serisini PIT'e
+toplamak, yeterli geçmiş şartını tanımlamak ve yalnız kanıtlı **fragility** feature'larını
+kurmaktır. Direction, kabul edilmiş signal setup'ı olmadan null kalır.

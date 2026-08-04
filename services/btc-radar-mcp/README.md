@@ -12,6 +12,16 @@ uv sync            # bağımlılıklar + venv
 uv run btc-radar   # stdio üzerinde MCP sunucusu
 ```
 
+MCP'de bugün çalışan piyasa aracı:
+
+```text
+get_derivatives(metric="all")
+```
+
+Bu araç Binance public BTCUSDT USD-M `mark_price`, `funding_rate` ve `open_interest`
+gözlemlerini döndürür. Henüz yön/rejim skoru üretmez; yanıtta
+`scoring_blocker=signal_rules_unavailable` görünür.
+
 Claude Desktop yapılandırması:
 
 ```json
@@ -39,5 +49,26 @@ uv run ruff check --fix && uv run ruff format  # lint + format
 uv run python scripts/verify_endpoints.py      # canlı endpoint doğrulaması (smoke)
 ```
 
-Faz durumu: **0 — iskelet** (`get_health` aracı + config yükleme). Araç seti ve provider'lar
-Faz 1'de eklenecek (SPEC §4, §7).
+## PIT toplama ve signal context yayını
+
+Toplama ile yayın bilinçli olarak ayrıdır: kapanıştan sonra çekilen değer geçmiş saate
+backdate edilmez.
+
+```bash
+# Saat boyunca düzenli çalıştırılacak public collector (API key yok)
+uv run btc-radar-producer collect --pit-db ./var/pit.sqlite
+
+# Kapanmış tam UTC saat için immutable context yayınla
+uv run btc-radar-producer publish \
+  --as-of 2026-08-04T12:00:00Z \
+  --pit-db ./var/pit.sqlite \
+  --snapshot-db ./var/snapshots.sqlite \
+  --context-root ../radar-signal/var/decision-context
+```
+
+Publisher yalnız exact-hour yolu oluşturur ve mevcut saat dosyasını overwrite etmez. Skor
+kuralları boş olduğu sürece geçerli artifact üretir ama yön kapısı `unavailable` kalır;
+`radar-signal` bununla deterministik `WAIT` verir. Scheduler/supervisor bu dilimde yoktur.
+
+Faz durumu: **1a — ilk gerçek provider + PIT/context taşıması**. `get_health` ve dar kapsamlı
+`get_derivatives` çalışır; çok-kaynak scoring/rejim Faz 1'in devamıdır (SPEC §4, §7).

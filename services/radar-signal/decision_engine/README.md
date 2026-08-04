@@ -2,8 +2,9 @@
 
 Bu paket, kapanmış BTCUSDT 1h mumunu sürümlü bir teknik feature snapshot'a dönüştürür ve
 her değerlendirilen saat için deterministik `LONG`, `SHORT` veya `WAIT` karar kartı üretir.
-Gerçek emir göndermez. Public Binance mum adaptörü ve UTC scheduler içerir; çalışan MCP
-context producer'ı ve kabul edilmiş yönsel strateji içermez.
+Gerçek emir göndermez. Public Binance mum adaptörü ve UTC scheduler içerir. MCP tarafında
+exact-hour context producer vardır; fakat producer henüz unscored/fail-closed'dur ve kendi
+scheduler'ı yoktur. Kabul edilmiş yönsel strateji de henüz yoktur.
 
 ## FeatureSnapshot v1
 
@@ -64,9 +65,10 @@ var/decision-context/v1/BTCUSDT/1h/YYYY/MM/DD/HH.json
 ```
 
 Önceki/en yeni saate fallback yoktur. Dosya yoksa veya sözleşme doğrulamasından geçmezse
-runtime bunu görünür kaynak durumuyla raporlar ve karar `WAIT/context:missing` olur. Gelecekteki
-producer geçici dosyadan aynı-filesystem atomik rename yapmalı ve mevcut saat dosyasını asla
-overwrite etmemelidir.
+runtime bunu görünür kaynak durumuyla raporlar ve karar `WAIT/context:missing` olur. MCP
+producer aynı dizinde tamamlanmış temp dosya + `fsync` + atomik no-overwrite hard-link ile
+yayın yapar; mevcut saat dosyasını asla değiştirmez. Bugünkü unscored context geldiğinde
+dosya `ready` okunur ama veri kapısı `scoring_rules_unavailable` nedeniyle `WAIT`e kapanır.
 
 Tek-sefer çalıştırma:
 

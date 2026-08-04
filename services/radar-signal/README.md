@@ -64,9 +64,11 @@ Sürekli UTC scheduler modu açıkça seçilir:
 .venv\Scripts\python.exe scripts\run_hourly_decision.py --daemon
 ```
 
-Runtime emir göndermez ve API anahtarı kullanmaz. MCP context producer ve kabul edilmiş
-yönsel setup henüz olmadığı için bugünkü dürüst çıktı `WAIT`tir. Exact-hour context inbox,
-retry/grace, replay ayrımı ve işletim sınırları için `decision_engine/README.md` dosyasına bakın.
+Runtime emir göndermez ve API anahtarı kullanmaz. MCP artık gerçek Binance türev gözlemlerinden
+fail-closed exact-hour context yayınlayabilir; ancak skorlama kuralları ve kabul edilmiş yönsel
+setup henüz olmadığı için bugünkü dürüst çıktı yine `WAIT`tir. Producer şu an ayrı one-shot
+CLI'dır, scheduler/supervision değildir. Exact-hour inbox, retry/grace, replay ayrımı ve
+işletim sınırları için `decision_engine/README.md` dosyasına bakın.
 
 ---
 

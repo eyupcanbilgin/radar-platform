@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class RawObservation(BaseModel):
     """Tek bir ham gözlem. Provider çıkışında bir kez doğrulanır; router ham dict taşır."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
     timestamp_utc: datetime
     retrieved_at_utc: datetime

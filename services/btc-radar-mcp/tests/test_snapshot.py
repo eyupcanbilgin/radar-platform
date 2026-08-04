@@ -8,6 +8,7 @@ kural tablosundan gelir) ve tüm yolu — depo → bileşen → toplama → snap
 uçtan uca zorlar. Faz 1 gerçek builder'ı taktığında bu test yerinde kalır.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -20,6 +21,8 @@ from btc_radar.core.snapshot import (
     content_hash_of,
     freshness,
     input_digest,
+    snapshot_id_of,
+    verify_regime_snapshot,
 )
 from btc_radar.core.store import PointInTimeStore
 from btc_radar.models.observation import RawObservation
@@ -175,6 +178,25 @@ def test_store_put_is_idempotent(store):
         assert snaps.count() == 1
 
 
+def test_concurrent_store_put_is_idempotent_across_connections(store, tmp_path):
+    snap = _make_snapshot(store)
+    database = tmp_path / "snapshots.sqlite"
+    with SnapshotStore(database):
+        pass
+
+    def put_once(_index: int) -> bool:
+        with SnapshotStore(database) as snapshots:
+            return snapshots.put(snap)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(put_once, range(8)))
+
+    assert results.count(True) == 1
+    assert results.count(False) == 7
+    with SnapshotStore(database) as snapshots:
+        assert snapshots.count() == 1
+
+
 def test_tampered_payload_rejected(store):
     """Gövdesi değişmiş ama eski hash'i taşıyan kayıt yazılamaz (depo hash'e güvenmez)."""
     snap = _make_snapshot(store)
@@ -197,6 +219,57 @@ def test_same_id_different_content_is_immutability_violation(store):
         assert snaps.count() == 1
 
 
+def test_rehashed_fake_snapshot_id_is_rejected(store):
+    snap = _make_snapshot(store)
+    forged = snap.model_copy(update={"snapshot_id": "SNAP-0000000000000000"})
+    forged = forged.model_copy(update={"content_hash": content_hash_of(forged)})
+    assert snapshot_id_of(forged) != forged.snapshot_id
+    with pytest.raises(ValueError, match="SNAPSHOT KİMLİK UYUŞMUYOR"):
+        verify_regime_snapshot(forged)
+
+
+def test_cutoff_tampering_is_rejected_even_with_rehashed_content(store):
+    snap = _make_snapshot(store)
+    forged = snap.model_copy(update={"data_cutoff_at": AS_OF - timedelta(hours=1)})
+    forged = forged.model_copy(update={"content_hash": content_hash_of(forged)})
+    with pytest.raises(ValueError, match="data_cutoff_at tam olarak as_of"):
+        verify_regime_snapshot(forged)
+
+
+def test_legacy_v01_content_hash_remains_readable(store):
+    current = _make_snapshot(store)
+    legacy = current.model_copy(update={"feature_version": "0.1.0", "snapshot_id": ""})
+    legacy = legacy.model_copy(update={"snapshot_id": snapshot_id_of(legacy)})
+    legacy = legacy.model_copy(update={"content_hash": content_hash_of(legacy)})
+
+    with SnapshotStore() as snapshots:
+        assert snapshots.put(legacy) is True
+        assert snapshots.get(legacy.snapshot_id) == legacy
+
+
+def test_generic_snapshot_store_accepts_non_hour_boundary(store):
+    as_of = AS_OF + timedelta(minutes=15)
+    snapshot = compute_snapshot(
+        store.read_as_of(as_of),
+        as_of=as_of,
+        weights=load_weights(),
+        weights_hash=weights_hash(),
+        component_builder=build_components,
+        computed_at=as_of + timedelta(seconds=1),
+    )
+    with SnapshotStore() as snapshots:
+        assert snapshots.put(snapshot) is True
+        assert snapshots.get_as_of(as_of) == snapshot
+
+
+def test_breakdown_rejects_non_json_nested_tuple(store):
+    snapshot = _make_snapshot(store)
+    forged = snapshot.model_copy(update={"breakdown": [{"nested": (float("nan"),)}]})
+    forged = forged.model_copy(update={"content_hash": content_hash_of(forged)})
+    with pytest.raises(ValueError, match="JSON-uyumlu tür"):
+        verify_regime_snapshot(forged)
+
+
 def test_snapshot_roundtrip_by_id_and_as_of(store):
     snap = _make_snapshot(store)
     with SnapshotStore() as snaps:
@@ -204,6 +277,25 @@ def test_snapshot_roundtrip_by_id_and_as_of(store):
         assert snaps.get(snap.snapshot_id).content_hash == snap.content_hash
         assert snaps.get_as_of(AS_OF).snapshot_id == snap.snapshot_id
         assert snaps.get_as_of(AS_OF + timedelta(minutes=15)) is None  # "latest" yok
+
+
+def test_snapshot_read_rejects_column_payload_mismatch(store):
+    snap = _make_snapshot(store)
+    with SnapshotStore() as snaps:
+        snaps.put(snap)
+        snaps._conn.execute(
+            "UPDATE snapshots SET data_cutoff_at = ? WHERE snapshot_id = ?",
+            ((AS_OF - timedelta(hours=1)).isoformat(timespec="microseconds"), snap.snapshot_id),
+        )
+        snaps._conn.commit()
+        with pytest.raises(ValueError, match="data_cutoff_at kolonu payload"):
+            snaps.get(snap.snapshot_id)
+
+
+def test_get_as_of_rejects_naive_datetime():
+    with SnapshotStore() as snaps:
+        with pytest.raises(ValueError, match="timezone-aware"):
+            snaps.get_as_of(datetime(2026, 8, 3, 12, 0))
 
 
 def test_snapshot_excludes_data_published_after_as_of():

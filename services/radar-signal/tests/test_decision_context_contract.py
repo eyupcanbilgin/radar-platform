@@ -28,7 +28,7 @@ def test_shared_fixture_matches_normative_json_schema():
 
 def test_signal_consumer_accepts_shared_fixture_for_exact_candle():
     context = parse_decision_context(FIXTURE, expected_as_of=AS_OF)
-    assert context.snapshot.snapshot_id == "SNAP-0123456789abcdef"
+    assert context.snapshot.snapshot_id == "SNAP-3e48c789a5faafc2"
     assert directional_gate(context).allowed is True
 
 

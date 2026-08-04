@@ -22,6 +22,9 @@ döngüde bulunmaz.
 - `schema.json`: normatif JSON Schema (Draft 2020-12)
 - `examples/btc-1h-context.json`: iki servisin sözleşme testinde kullandığı ortak fixture
 
+Örnek fixture'ın `snapshot_id` ve `content_hash` alanları producer'ın gerçek türetme
+algoritmasıyla doğrulanır; temsili placeholder değildir.
+
 ## Sürüm ve uyumluluk
 
 `v1` şeması `additionalProperties: false` kullanır. Alan silmek, alan türünü/davranışını

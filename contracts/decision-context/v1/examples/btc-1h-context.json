@@ -9,18 +9,18 @@
   },
   "as_of_utc": "2026-08-03T12:00:00Z",
   "snapshot": {
-    "snapshot_id": "SNAP-0123456789abcdef",
+    "snapshot_id": "SNAP-3e48c789a5faafc2",
     "data_cutoff_at_utc": "2026-08-03T12:00:00Z",
     "computed_at_utc": "2026-08-03T12:00:05Z",
     "direction": 31.25,
     "fragility": 44.0,
     "confidence": 78.5,
     "regime_label": "siniflandirilmadi_faz1",
-    "feature_version": "features-v0",
+    "feature_version": "0.2.0",
     "scoring_version": "scoring-v0",
     "weights_hash": "0123456789ab",
     "input_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "content_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    "content_hash": "55e168cc2d23295e666a1b2bff232948f64696be59c846fc9bdd377292e63fe6"
   },
   "data_quality": {
     "status": "degraded",

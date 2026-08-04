@@ -99,9 +99,10 @@ class PointInTimeStore:
     def append(self, observations: Iterable[RawObservation], *, provider: str) -> int:
         """Gözlemleri yaz; yazılan satır sayısını döndür.
 
-        Aynı (provider, metrik, varlık, venue, event_time, available_at, payload_hash)
-        beşlisi tekrar gelirse sessizce atlanır — idempotent yeniden çekim. İçerik
-        değişmişse (payload_hash farklı) YENİ satır yazılır: revizyon kaydı.
+        Tam aynı (provider, metrik, varlık, venue, event_time, available_at, payload_hash)
+        tekrar gelirse sessizce atlanır. Farklı ``available_at`` ayrı bilgi-zamanı kanıtıdır;
+        A→B→A revizyon dizisindeki son A kaybedilmez. İçerik değişmişse (payload_hash
+        farklı) yine YENİ satır yazılır.
         """
         ingested_at = _iso(datetime.now(UTC))
         rows = []

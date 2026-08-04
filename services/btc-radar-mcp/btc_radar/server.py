@@ -6,16 +6,18 @@ bulunur. Veri toplama/normalizasyon/skorlama core/ ve providers/ altındadır (F
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from pydantic import Field
 
 from btc_radar import __version__
 from btc_radar.core.config import load_signal_rules, load_weights, weights_hash
 from btc_radar.core.snapshot import FEATURE_VERSION, SCORING_VERSION
 from btc_radar.core.store import SCHEMA_VERSION as STORE_SCHEMA_VERSION
+from btc_radar.providers.binance_futures import BinanceFuturesProvider
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +69,8 @@ def classify_tool_error(exc: Exception, source: str) -> ToolError:
         code = exc.response.status_code
         if code == 429:
             return ToolError(
-                f"{source}: rate limit (429). Önbellekteki son değeri kullan; "
-                "yeniden denemeden önce kaynağın TTL süresi kadar bekle."
+                f"{source}: rate limit (429). Hızlı retry yapma; Retry-After süresini "
+                "bekle veya süre verilmediyse çağrıyı daha sonra yeniden dene."
             )
         if code in (401, 403):
             return ToolError(
@@ -107,12 +109,65 @@ def classify_tool_error(exc: Exception, source: str) -> ToolError:
     )
 
 
+DerivativeMetric = Literal["mark_price", "funding_rate", "open_interest", "all"]
+
+
+@app.tool(annotations={"readOnlyHint": True})
+async def get_derivatives(
+    metric: Annotated[
+        DerivativeMetric,
+        Field(
+            description="BTCUSDT USD-M public türev metriği veya üçlü paket",
+            examples=["all", "funding_rate"],
+        ),
+    ] = "all",
+) -> dict[str, Any]:
+    """Gerçek Binance BTCUSDT mark fiyatı, funding ve açık pozisyon gözlemleri.
+
+    Örnekler:
+        get_derivatives(metric="all")
+        get_derivatives(metric="open_interest")
+
+    Ham gözlemler PIT-uyumlu zaman alanlarıyla döner. Bu araç yön/rejim skoru üretmez;
+    ``signal_rules.yaml`` boş olduğu sürece scoring durumu açıkça unavailable'dır.
+    """
+    logger.info("get_derivatives çağrıldı: metric=%s", metric)
+    try:
+        async with BinanceFuturesProvider() as provider:
+            observations = await provider.fetch(metric, symbol="BTCUSDT")
+        rows = []
+        for observation in observations:
+            row = observation.model_dump(mode="json")
+            row["available_at_utc"] = observation.effective_available_at.isoformat()
+            rows.append(row)
+        return shape(
+            {
+                "instrument": {
+                    "asset": "BTC",
+                    "symbol": "BTCUSDT",
+                    "market": "USDT_PERPETUAL",
+                    "venue": "binance_futures",
+                },
+                "observations": rows,
+                "meta": {
+                    "provider": provider.name,
+                    "observation_count": len(rows),
+                    "scoring_available": False,
+                    "scoring_blocker": "signal_rules_unavailable",
+                },
+            }
+        )
+    except Exception as exc:
+        raise classify_tool_error(exc, BinanceFuturesProvider.name) from exc
+
+
 @app.tool(annotations={"readOnlyHint": True})
 async def get_health() -> dict[str, Any]:
     """Sunucu, config ve kaynak sağlık durumu (SDET aracı; SPEC §4 araç 8).
 
-    Faz 0 kapsamı: sunucu kimliği + config yükleme doğrulaması. Provider erişilebilirliği,
-    önbellek yaşları, son hatalar ve rate-limit sayaçları Faz 1'de eklenecek.
+    Mevcut kapsam: sunucu/config kimliği ve uygulanmış provider yetenekleri. Health çağrısı
+    dış ağa çıkmaz; gerçek erişilebilirlik, cache yaşları ve rate-limit sayaçları sonraki
+    operasyon diliminde eklenecek.
 
     Örnek çağrılar:
         get_health()
@@ -135,14 +190,21 @@ async def get_health() -> dict[str, Any]:
                 "signal_rules_version": rules.version,
                 "signal_rule_count": len(rules.rules),
             },
-            "providers": [],
+            "providers": [
+                {
+                    "name": BinanceFuturesProvider.name,
+                    "mode": "public_current_snapshot",
+                    "metrics": sorted(BinanceFuturesProvider.supported_metrics - {"all"}),
+                    "health": "not_polled",
+                }
+            ],
             "cache": {"initialized": False},
             "store": {
                 "pit_schema_version": STORE_SCHEMA_VERSION,
                 "feature_version": FEATURE_VERSION,
                 "scoring_version": SCORING_VERSION,
             },
-            "phase": "0-iskelet + P0-1 (snapshot/PIT)",
+            "phase": "1a-provider + PIT/context transport (scoring unavailable)",
             "retrieved_at_utc": datetime.now(UTC).isoformat(),
         }
         return shape(payload)

@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from btc_radar.core.snapshot import verify_regime_snapshot
 from btc_radar.models.decision_context import DecisionContextV1, build_decision_context
 from btc_radar.models.snapshot import RegimeSnapshot
 
@@ -43,7 +44,9 @@ def test_shared_fixture_is_accepted_by_mcp_producer_model():
 
 
 def test_snapshot_adapter_matches_shared_fixture_exactly():
-    context = build_decision_context(fixture_snapshot())
+    snapshot = fixture_snapshot()
+    verify_regime_snapshot(snapshot)
+    context = build_decision_context(snapshot)
     assert context.model_dump(mode="json") == fixture_payload()
 
 

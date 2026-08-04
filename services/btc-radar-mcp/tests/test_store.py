@@ -45,6 +45,30 @@ def test_duplicate_append_is_idempotent(store):
     assert store.count() == 1
 
 
+def test_same_payload_at_different_knowledge_times_is_preserved(store):
+    early = _obs(available_at_utc=T0 + timedelta(minutes=1))
+    later = early.model_copy(update={"available_at_utc": T0 + timedelta(minutes=5)})
+
+    assert store.append([later], provider="binance") == 1
+    assert store.append([early], provider="binance") == 1
+    assert store.count() == 2
+    assert store.read_as_of(T0 + timedelta(minutes=2))[0]["raw_value"] == early.raw_value
+
+
+def test_revision_can_return_to_an_earlier_value(store):
+    revisions = [
+        _obs(raw_value=1.0, available_at_utc=T0 + timedelta(minutes=1)),
+        _obs(raw_value=2.0, available_at_utc=T0 + timedelta(minutes=2)),
+        _obs(raw_value=1.0, available_at_utc=T0 + timedelta(minutes=3)),
+    ]
+    assert store.append(revisions, provider="binance") == 3
+    assert store.read_as_of(T0 + timedelta(minutes=4))[0]["raw_value"] == 1.0
+    history = store.revision_history(
+        metric="open_interest", asset="BTC", venue="binance_futures", event_time=T0
+    )
+    assert [row["raw_value"] for row in history] == [1.0, 2.0, 1.0]
+
+
 def test_read_as_of_hides_future_data(store):
     """available_at > as_of olan satır ASLA dönmez — look-ahead koruması."""
     store.append([_obs(available_at_utc=T0 + timedelta(minutes=30))], provider="binance")
