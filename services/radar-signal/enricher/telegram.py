@@ -10,6 +10,9 @@ outbox'ın işidir (enricher/outbox.py).
 
 import logging
 import os
+import re
+from collections.abc import MutableMapping
+from pathlib import Path
 
 import httpx
 
@@ -23,10 +26,33 @@ class NotConfigured(Exception):
     """TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID tanımlı değil."""
 
 
+class DeliveryConfigurationError(ValueError):
+    """Bildirim modu eksik veya güvenli olmayan biçimde yapılandırılmış."""
+
+
+def load_env_file(path: Path, *, environ: MutableMapping[str, str] | None = None) -> None:
+    """Load a local env file without overriding process-level configuration."""
+    target = environ if environ is not None else os.environ
+    if not path.exists():
+        return
+    for number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise DeliveryConfigurationError(f".env satırı geçersiz: line={number}")
+        key, value = (part.strip() for part in line.split("=", 1))
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            raise DeliveryConfigurationError(f".env anahtarı geçersiz: line={number}")
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        target.setdefault(key, value)
+
+
 class TelegramSender:
     def __init__(self, *, token: str | None = None, chat_id: str | None = None):
-        self._token = token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        self._chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
+        self._token = os.environ.get("TELEGRAM_BOT_TOKEN", "") if token is None else token
+        self._chat_id = os.environ.get("TELEGRAM_CHAT_ID", "") if chat_id is None else chat_id
 
     @property
     def configured(self) -> bool:
@@ -57,3 +83,26 @@ class ConsoleSender:
     def __call__(self, body: str) -> None:
         self.sent.append(body)
         logger.info("BİLDİRİM (konsol):\n%s", body)
+
+
+def sender_from_environment(
+    *, environ: MutableMapping[str, str] | None = None
+) -> TelegramSender | ConsoleSender:
+    """Select delivery explicitly; missing credentials never degrade to console."""
+    source = environ if environ is not None else os.environ
+    mode = source.get("RADAR_SIGNAL_DELIVERY_MODE", "").strip().lower()
+    if mode == "console":
+        return ConsoleSender()
+    if mode != "telegram":
+        raise DeliveryConfigurationError(
+            "RADAR_SIGNAL_DELIVERY_MODE açıkça telegram veya console olmalı"
+        )
+    sender = TelegramSender(
+        token=source.get("TELEGRAM_BOT_TOKEN", ""),
+        chat_id=source.get("TELEGRAM_CHAT_ID", ""),
+    )
+    if not sender.configured:
+        raise NotConfigured(
+            "delivery mode telegram ancak TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID eksik"
+        )
+    return sender

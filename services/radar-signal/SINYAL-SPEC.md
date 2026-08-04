@@ -220,6 +220,13 @@ A–Q kartlarının her biri `docs/hypotheses/` altına kanıt düzeyi + kaynak 
 
 ## 4. Sinyal Bildirim Sözleşmesi
 
+Teslimat süreci servis kökündeki `.env` dosyasını yükler; process environment değerleri
+dosya tarafından ezilmez. `RADAR_SIGNAL_DELIVERY_MODE` zorunludur ve yalnız `telegram` veya
+`console` olabilir. `telegram` modunda bot token ile chat id birlikte yoksa süreç outbox'ı
+pompalamadan fail-closed durur; eksik secret hiçbir zaman console teslimatına dönüşmez.
+`console` yalnız açık yerel geliştirme seçimidir. Secret değerleri repoya, config'e veya hata
+mesajına yazılmaz.
+
 Her Telegram mesajı şu alanları içerir (webhook enricher üretir):
 ```
 [SİNYAL] ETHUSDT LONG · 15m · 2026-08-03 14:32 UTC
