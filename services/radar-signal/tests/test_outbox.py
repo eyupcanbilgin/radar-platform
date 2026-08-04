@@ -32,6 +32,14 @@ def test_enqueue_is_idempotent():
         assert ob.counts() == {PENDING: 1}
 
 
+def test_same_idempotency_key_with_different_body_fails_loud():
+    with Outbox() as ob:
+        ob.enqueue(signal_id="S1", kind="signal", body="a", now=T0)
+        with pytest.raises(ValueError, match="farklı gövde"):
+            ob.enqueue(signal_id="S1", kind="signal", body="b", now=T0)
+        assert ob.get(signal_id="S1", kind="signal")["body"] == "a"
+
+
 def test_same_signal_different_kinds_are_separate():
     with Outbox() as ob:
         ob.enqueue(signal_id="S1", kind="signal", body="giriş", now=T0)

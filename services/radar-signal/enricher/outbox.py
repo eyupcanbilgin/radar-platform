@@ -72,15 +72,26 @@ class Outbox:
         self.close()
 
     def enqueue(self, *, signal_id: str, kind: str, body: str, now: datetime) -> bool:
-        """Mesajı kuyruğa al. Aynı (signal_id, kind) ikinci kez → False (idempotent)."""
-        cur = self._conn.execute(
-            """
-            INSERT OR IGNORE INTO outbox
+        """Mesajı kuyruğa al; yalnız bit-identical tekrar idempotent sayılır."""
+        try:
+            cur = self._conn.execute(
+                """
+            INSERT INTO outbox
                 (signal_id, kind, body, state, attempts, created_at_utc, next_attempt_utc)
             VALUES (?,?,?,?,0,?,?)
             """,
-            (signal_id, kind, body, PENDING, _iso(now), _iso(now)),
-        )
+                (signal_id, kind, body, PENDING, _iso(now), _iso(now)),
+            )
+        except sqlite3.IntegrityError:
+            existing = self.get(signal_id=signal_id, kind=kind)
+            if existing is not None and existing["body"] == body:
+                self._conn.rollback()
+                return False
+            self._conn.rollback()
+            raise ValueError(
+                "outbox idempotency anahtarı farklı gövdeyle yeniden kullanılamaz: "
+                f"signal_id={signal_id} kind={kind}"
+            ) from None
         self._conn.commit()
         return cur.rowcount == 1
 
