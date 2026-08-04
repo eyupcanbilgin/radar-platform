@@ -457,6 +457,25 @@ class DecisionLedger:
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) FROM hourly_decisions").fetchone()[0])
 
+    def recent(self, *, limit: int) -> list[dict]:
+        """Return a bounded, newest-first set of fully verified decision bundles."""
+        if limit < 1:
+            raise ValueError("limit en az 1 olmalı")
+        rows = self._conn.execute(
+            """
+            SELECT decision_id FROM hourly_decisions
+            ORDER BY as_of_utc DESC, decision_id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        items = []
+        for row in rows:
+            item = self.get(row["decision_id"])
+            if item is not None:
+                items.append(item)
+        return items
+
     def feature_count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) FROM feature_snapshots").fetchone()[0])
 

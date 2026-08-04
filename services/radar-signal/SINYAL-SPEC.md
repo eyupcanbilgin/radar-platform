@@ -134,6 +134,26 @@ henüz tamamlanmamıştır. Kabul edilmiş yönsel setup olmadığı için sağl
 6. **CLI Araçları:** `scripts/evaluate_decision_outcomes.py` script'i süresi dolmuş
    ufukları güvenli biçimde toplu olarak değerlendirir.
 
+### 2.3 Saatlik Karar Teslimatı
+
+Canlı `scripts/run_hourly_decision.py` her `DecisionCardV1` kaydından sonra değişmez ledger
+payload'ından deterministik, insan-okur bir `hourly_decision` mesajı üretir ve ortak SQLite
+outbox'a yazar. Runtime Telegram'a doğrudan bağlanmaz; mevcut `scripts/pump.py` PENDING
+mesajları Telegram veya console göndericisine taşır. Açık `--as-of` replay tarihsel bildirim
+üretmez ve `--outbox` ile birlikte kullanılamaz.
+
+Teslimat idempotency anahtarı `(decision_id, "hourly_decision")` çiftidir. Aynı anahtar ve
+bit-identical gövde güvenli tekrardır; farklı gövde hata verir. Ledger commit'i ile outbox
+yazımı arasındaki süreç çökmesi iki yolla onarılır: aynı saat runtime tarafından yeniden
+işlendiğinde `already_recorded` kartı tekrar kuyruğa alınır veya
+`scripts/reconcile_hourly_delivery.py --limit N` en yeni, sınırlı karar kümesini tarar.
+Sınırsız geçmiş taraması yoktur.
+
+Mesaj; karar sonucu, gerekçeler, blocker'lar, veri sağlığı, uyarılar, feature/context snapshot
+kimlikleri, `PAPER`, `real_orders=false` ve yasal notu taşır. `WAIT`, yön ya da nötr getiri
+ölçümü iddiası değildir. Eksik veri blocker olarak görünmeye devam eder; teslimat katmanı
+kararı veya yönü değiştiremez.
+
 ---
 
 ## 3. Strateji Fabrikası Protokolü
