@@ -168,6 +168,13 @@ sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
    tekilleştirilir; test alternatifi sonuç görülmeden tanımlanır; NaN/geçersiz test FDR
    evrenine girmez; seanslar DST-aware ve referans giriş sonraki mum açılışıdır.
 
+   **Bağımsız İnceleme Kapısı v2 (ADR-0012):** `run_pulse_reanalysis.py` kapısı
+   schema v2 formatında `pulse-v2-review.json` gerektirir. İnceleme kaydı `reviewed_commit`
+   değerinin git geçmişinde mevcut HEAD'in atası olduğunu ve `review_scope` içindeki tüm
+   dosyaların SHA-256 hash'lerinin korunduğunu doğrular. Onay kaydının ayrı commit
+   edilmesi kapıyı kilitlemez (bootstrap paradoksu çözülmüştür); ancak kapsanan araştırma
+   kodlarının sonradan değiştirilmesi onayı derhal geçersiz kılar.
+
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.

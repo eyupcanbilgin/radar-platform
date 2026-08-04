@@ -1,6 +1,7 @@
 """Run pulse-v2 only behind clean-tree, manifest and locked-OOS safety gates."""
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -38,8 +39,66 @@ def repository_is_dirty() -> bool:
     return bool(out.stdout.strip())
 
 
+def is_git_ancestor(ancestor_commit: str, target_commit: str) -> bool:
+    """Check if ancestor_commit is an ancestor of or equal to target_commit in git history."""
+    if not isinstance(ancestor_commit, str) or not ancestor_commit.strip():
+        return False
+    if not isinstance(target_commit, str) or not target_commit.strip():
+        return False
+    try:
+        res = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor_commit, target_commit],
+            cwd=PLATFORM_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
+def verify_reviewed_files(reviewed_files: object, review_scope: object) -> list[str]:
+    """Verify that all reviewed files exist and match their expected SHA-256 hashes."""
+    if not isinstance(review_scope, list) or not review_scope:
+        return ["inceleme kaydında review_scope boş olamaz ve liste olmalı"]
+    if not isinstance(reviewed_files, dict) or not reviewed_files:
+        return ["inceleme kaydında reviewed_files boş olamaz ve nesne olmalı"]
+
+    scope_set = set(review_scope)
+    files_set = set(reviewed_files.keys())
+    if scope_set != files_set:
+        return ["review_scope ve reviewed_files dosya listeleri uyuşmuyor"]
+
+    errors: list[str] = []
+    for rel_path in sorted(scope_set):
+        expected_hash = reviewed_files[rel_path]
+        if not isinstance(rel_path, str) or not rel_path.strip():
+            errors.append("review_scope içinde geçersiz dosya yolu")
+            continue
+        if not isinstance(expected_hash, str) or not expected_hash.strip():
+            errors.append(f"reviewed_files içinde {rel_path} için hash eksik")
+            continue
+        file_path = PLATFORM_ROOT / rel_path
+        if not file_path.is_file():
+            errors.append(f"incelenen dosya bulunamadı: {rel_path}")
+            continue
+
+        try:
+            current_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+            if current_hash != expected_hash:
+                errors.append(
+                    f"incelenen dosya içeriği değişmiş: {rel_path} "
+                    f"(beklenen={expected_hash[:12]}, mevcut={current_hash[:12]})"
+                )
+        except OSError as exc:
+            errors.append(f"incelenen dosya okunamadı: {rel_path} ({exc})")
+
+    return errors
+
+
 def review_attestation_errors(attestation_path: Path, current_commit: str) -> list[str]:
-    """Validate the independent-review record bound to the signal code commit."""
+    """Validate the independent-review record bound to the signal code commit (schema v2)."""
     if not attestation_path.is_file():
         return [f"bağımsız inceleme kaydı yok: {attestation_path}"]
 
@@ -52,13 +111,25 @@ def review_attestation_errors(attestation_path: Path, current_commit: str) -> li
         return ["bağımsız inceleme kaydı JSON nesnesi olmalı"]
 
     errors: list[str] = []
-    if record.get("schema_version") != "1":
-        errors.append("inceleme schema_version değeri '1' olmalı")
-    if record.get("reviewed_commit") != current_commit:
+    schema_ver = str(record.get("schema_version", ""))
+    if schema_ver != "2":
+        return ["inceleme schema_version değeri '2' olmalı; v1 şeması desteklenmiyor"]
+
+    reviewed_commit = record.get("reviewed_commit")
+    if not isinstance(reviewed_commit, str) or not reviewed_commit.strip():
+        errors.append("inceleme kaydında reviewed_commit zorunlu")
+    elif not is_git_ancestor(reviewed_commit, current_commit):
         errors.append(
-            "inceleme kaydı geçerli signal commit'ine bağlı değil: "
-            f"beklenen={current_commit}, kayıt={record.get('reviewed_commit')}"
+            "inceleme kaydı geçerli signal commit'inin atası değil: "
+            f"current={current_commit}, kayıt={reviewed_commit}"
         )
+
+    file_errors = verify_reviewed_files(
+        reviewed_files=record.get("reviewed_files"),
+        review_scope=record.get("review_scope"),
+    )
+    errors.extend(file_errors)
+
     if record.get("verdict") != "approved":
         errors.append("bağımsız inceleme verdict değeri 'approved' olmalı")
     if record.get("independent") is not True:
