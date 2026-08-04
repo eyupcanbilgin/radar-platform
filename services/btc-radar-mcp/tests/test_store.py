@@ -140,3 +140,105 @@ def test_payload_hash_detects_value_change():
     assert payload_hash(_obs(raw_value=1.0)) != payload_hash(_obs(raw_value=2.0))
     # retrieved_at farkı içerik hash'ini DEĞİŞTİRMEZ (aynı veri, farklı çekim anı)
     assert payload_hash(_obs()) == payload_hash(_obs(retrieved_at_utc=T0 + timedelta(hours=3)))
+
+
+def _series_obs(hour: int, value: float, **over) -> RawObservation:
+    event = T0 + timedelta(hours=hour)
+    base = dict(
+        timestamp_utc=event,
+        retrieved_at_utc=event + timedelta(seconds=60),
+        available_at_utc=event + timedelta(seconds=60),
+        metric="open_interest_1h",
+        raw_value=value,
+        window="1h",
+    )
+    base.update(over)
+    return _obs(**base)
+
+
+def test_read_series_returns_ascending_pit_safe_history(store):
+    store.append([_series_obs(h, 100.0 + h) for h in range(5)], provider="history")
+
+    rows = store.read_series(
+        metric="open_interest_1h", asset="BTC", as_of=T0 + timedelta(hours=3, minutes=1)
+    )
+
+    assert [r["raw_value"] for r in rows] == [100.0, 101.0, 102.0, 103.0]
+    assert [r["event_time"] for r in rows] == sorted(r["event_time"] for r in rows)
+
+
+def test_read_series_never_shows_rows_published_after_the_cutoff(store):
+    store.append([_series_obs(h, 100.0 + h) for h in range(5)], provider="history")
+
+    # The 3h bucket is published 60s after its own timestamp, so it is invisible at 3h sharp.
+    rows = store.read_series(metric="open_interest_1h", asset="BTC", as_of=T0 + timedelta(hours=3))
+
+    assert [r["raw_value"] for r in rows] == [100.0, 101.0, 102.0]
+
+
+def test_read_series_picks_the_revision_known_at_the_cutoff(store):
+    event = T0 + timedelta(hours=1)
+    store.append(
+        [
+            _series_obs(1, 10.0, available_at_utc=event + timedelta(minutes=1)),
+            _series_obs(1, 20.0, available_at_utc=event + timedelta(minutes=5)),
+            _series_obs(1, 30.0, available_at_utc=event + timedelta(minutes=9)),
+        ],
+        provider="history",
+    )
+
+    early = store.read_series(
+        metric="open_interest_1h", asset="BTC", as_of=event + timedelta(minutes=6)
+    )
+    late = store.read_series(
+        metric="open_interest_1h", asset="BTC", as_of=event + timedelta(minutes=30)
+    )
+
+    assert [r["raw_value"] for r in early] == [20.0]
+    assert [r["raw_value"] for r in late] == [30.0]
+
+
+def test_read_series_limit_keeps_the_newest_events(store):
+    store.append([_series_obs(h, 100.0 + h) for h in range(6)], provider="history")
+
+    rows = store.read_series(
+        metric="open_interest_1h",
+        asset="BTC",
+        as_of=T0 + timedelta(hours=6),
+        limit=2,
+    )
+
+    assert [r["raw_value"] for r in rows] == [104.0, 105.0]
+
+
+def test_read_series_filters_metric_venue_and_since(store):
+    store.append(
+        [
+            _series_obs(0, 1.0),
+            _series_obs(1, 2.0),
+            _series_obs(2, 3.0),
+            _series_obs(2, 99.0, metric="funding_rate_settled", window=None),
+            _series_obs(2, 77.0, venue="bybit_futures"),
+        ],
+        provider="history",
+    )
+    as_of = T0 + timedelta(hours=9)
+
+    by_metric = store.read_series(metric="open_interest_1h", asset="BTC", as_of=as_of)
+    by_venue = store.read_series(
+        metric="open_interest_1h", asset="BTC", as_of=as_of, venue="bybit_futures"
+    )
+    since = store.read_series(
+        metric="open_interest_1h", asset="BTC", as_of=as_of, since=T0 + timedelta(hours=2)
+    )
+
+    assert [r["raw_value"] for r in by_metric] == [1.0, 2.0, 3.0, 77.0]
+    assert [r["raw_value"] for r in by_venue] == [77.0]
+    assert [r["raw_value"] for r in since] == [3.0, 77.0]
+
+
+def test_read_series_rejects_naive_cutoff_and_non_positive_limit(store):
+    with pytest.raises(ValueError, match="timezone-aware"):
+        store.read_series(metric="open_interest_1h", asset="BTC", as_of=datetime(2026, 8, 3, 12))
+    with pytest.raises(ValueError, match="limit > 0"):
+        store.read_series(metric="open_interest_1h", asset="BTC", as_of=T0, limit=0)

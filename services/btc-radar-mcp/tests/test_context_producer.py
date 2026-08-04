@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from btc_radar.core.context_producer import collect_derivatives, produce_unscored_context
+from btc_radar.core.context_producer import collect_derivatives, produce_context
 from btc_radar.core.context_publisher import ExactHourContextPublisher
 from btc_radar.core.snapshot import SnapshotStore, input_digest
 from btc_radar.core.store import PointInTimeStore
@@ -12,6 +12,8 @@ from btc_radar.models.observation import RawObservation
 from btc_radar.providers.base import BaseProvider
 
 AS_OF = datetime(2026, 8, 3, 12, 0, tzinfo=UTC)
+# Kural kümesi boşken producer skorsuz yolda kalır; bu testler o yolu doğrular.
+EMPTY_RULES = SignalRulesConfig(version="test-empty")
 
 
 def _observations(*, retrieved_at: datetime) -> list[RawObservation]:
@@ -80,11 +82,12 @@ def test_post_as_of_collection_is_excluded_and_context_fails_closed(tmp_path):
             _observations(retrieved_at=AS_OF + timedelta(seconds=30)),
             provider="fake_binance",
         )
-        result = produce_unscored_context(
+        result = produce_context(
             as_of_utc=AS_OF,
             pit_store=pit,
             snapshot_store=snapshots,
             publisher=ExactHourContextPublisher(tmp_path),
+            rules=EMPTY_RULES,
             computed_at_utc=AS_OF + timedelta(minutes=1),
         )
 
@@ -108,11 +111,12 @@ def test_pre_as_of_rows_enter_digest_but_never_become_fake_scores(tmp_path):
             _observations(retrieved_at=AS_OF - timedelta(minutes=1)),
             provider="fake_binance",
         )
-        result = produce_unscored_context(
+        result = produce_context(
             as_of_utc=AS_OF,
             pit_store=pit,
             snapshot_store=snapshots,
             publisher=ExactHourContextPublisher(tmp_path),
+            rules=EMPTY_RULES,
             computed_at_utc=AS_OF + timedelta(minutes=1),
         )
 
@@ -129,18 +133,20 @@ def test_replay_is_semantically_idempotent(tmp_path):
             provider="fake_binance",
         )
         publisher = ExactHourContextPublisher(tmp_path)
-        first = produce_unscored_context(
+        first = produce_context(
             as_of_utc=AS_OF,
             pit_store=pit,
             snapshot_store=snapshots,
             publisher=publisher,
+            rules=EMPTY_RULES,
             computed_at_utc=AS_OF + timedelta(minutes=1),
         )
-        second = produce_unscored_context(
+        second = produce_context(
             as_of_utc=AS_OF,
             pit_store=pit,
             snapshot_store=snapshots,
             publisher=publisher,
+            rules=EMPTY_RULES,
             computed_at_utc=AS_OF + timedelta(minutes=2),
         )
 
@@ -149,19 +155,3 @@ def test_replay_is_semantically_idempotent(tmp_path):
         assert first.snapshot_created is True
         assert second.snapshot_created is False
         assert second.publication.status == "idempotent"
-
-
-def test_nonempty_rules_fail_loud_instead_of_being_ignored(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "btc_radar.core.context_producer.load_signal_rules",
-        lambda: SignalRulesConfig(version="future", rules=[{"metric": "funding_rate"}]),
-    )
-    with PointInTimeStore() as pit, SnapshotStore() as snapshots:
-        with pytest.raises(RuntimeError, match="component builder"):
-            produce_unscored_context(
-                as_of_utc=AS_OF,
-                pit_store=pit,
-                snapshot_store=snapshots,
-                publisher=ExactHourContextPublisher(tmp_path),
-                computed_at_utc=AS_OF + timedelta(minutes=1),
-            )

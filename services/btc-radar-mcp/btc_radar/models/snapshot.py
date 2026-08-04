@@ -34,6 +34,10 @@ class RegimeSnapshot(BaseModel):
     stale_sources: list[str] = Field(default_factory=list)
     missing_layers: list[str] = Field(default_factory=list)
     breakdown: list[dict] = Field(default_factory=list)
+    # Feature kanıtı: örneklem sayısı, kapsanan süre, en büyük boşluk, tazelik. Skor
+    # değişmez kayda bağlıdır ki "fragility=62" üç ay sonra da yanlışlanabilir olsun
+    # (feature_version 0.3.0'dan itibaren içerik hash'ine dahildir).
+    evidence: list[dict] = Field(default_factory=list)
 
     @field_validator("as_of", "data_cutoff_at", "computed_at")
     @classmethod

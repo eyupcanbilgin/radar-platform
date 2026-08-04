@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS observations (
     UNIQUE (provider, metric, asset, venue, event_time, available_at, payload_hash)
 );
 CREATE INDEX IF NOT EXISTS ix_obs_pit ON observations (metric, asset, venue, available_at);
+CREATE INDEX IF NOT EXISTS ix_obs_series
+    ON observations (metric, asset, venue, event_time, available_at);
 """
 
 
@@ -174,6 +176,70 @@ class PointInTimeStore:
             params["asset"] = asset
         sql += " ORDER BY o.metric ASC, o.asset ASC, o.venue ASC"
         return [dict(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    def read_series(
+        self,
+        *,
+        metric: str,
+        asset: str,
+        as_of: datetime,
+        venue: str | None = None,
+        since: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        """`as_of` anında bilinebilen TARİHSEL seri (olay başına tek, en güncel sürüm).
+
+        `read_as_of` tek bir "şu an ne biliyoruz" satırı döndürür; rolling percentile ve
+        değişim oranı gibi özellikler ise geçmişin tamamına ihtiyaç duyar. Buradaki kural
+        aynıdır: `available_at > as_of` satırı hiç görünmez, dolayısıyla geçmişe dönük bir
+        özellik hesabı da look-ahead üretemez. Aynı `event_time` için birden fazla sürüm
+        varsa `as_of` itibarıyla bilinen EN SON revizyon seçilir (A→B→A'da son A).
+
+        `limit` verilirse EN YENİ `limit` olay döner; sonuç her hâlükârda `event_time`
+        artan sırada gelir. Aynı olay anında birden fazla venue varsa sıra venue adına göre
+        sabitlenir — replay'in bit-bit eşitliği sıralamanın deterministik olmasına bağlıdır.
+        """
+        if as_of.tzinfo is None:
+            raise ValueError("as_of timezone-aware olmalı")
+        if limit is not None and limit <= 0:
+            raise ValueError("limit > 0 olmalı")
+
+        params: dict[str, object] = {"cutoff": _iso(as_of), "metric": metric, "asset": asset}
+        filters = [
+            "metric = :metric",
+            "asset = :asset",
+            "available_at <= :cutoff",
+            # Savunma katmanı: yayın anı olay anından önce olamaz, ama depo bunu varsaymaz.
+            "event_time <= :cutoff",
+        ]
+        if venue is not None:
+            filters.append("venue = :venue")
+            params["venue"] = venue
+        if since is not None:
+            filters.append("event_time >= :since")
+            params["since"] = _iso(since)
+
+        sql = f"""
+            SELECT * FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY metric, asset, venue, event_time
+                    ORDER BY available_at DESC, id DESC
+                ) AS revision_rank
+                FROM observations
+                WHERE {" AND ".join(filters)}
+            )
+            WHERE revision_rank = 1
+            ORDER BY event_time DESC, venue DESC, asset DESC, id DESC
+        """
+        if limit is not None:
+            sql += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = [dict(r) for r in self._conn.execute(sql, params).fetchall()]
+        for row in rows:
+            row.pop("revision_rank", None)
+        rows.reverse()
+        return rows
 
     def revision_history(
         self, *, metric: str, asset: str, venue: str, event_time: datetime

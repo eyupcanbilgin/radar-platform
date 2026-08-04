@@ -55,7 +55,11 @@ Toplama ile yayın bilinçli olarak ayrıdır: kapanıştan sonra çekilen değe
 backdate edilmez.
 
 ```bash
-# Saat boyunca düzenli çalıştırılacak public collector (API key yok)
+# Bir kereye mahsus geçmiş: settled funding + saatlik OI (API key yok)
+uv run btc-radar-producer backfill \
+  --pit-db ./var/pit.sqlite --funding-days 120 --open-interest-days 30
+
+# Saat boyunca düzenli çalıştırılacak public collector; en yeni geçmiş sayfasını da yazar
 uv run btc-radar-producer collect --pit-db ./var/pit.sqlite
 
 # Kapanmış tam UTC saat için immutable context yayınla
@@ -66,9 +70,15 @@ uv run btc-radar-producer publish \
   --context-root ../radar-signal/var/decision-context
 ```
 
-Publisher yalnız exact-hour yolu oluşturur ve mevcut saat dosyasını overwrite etmez. Skor
-kuralları boş olduğu sürece geçerli artifact üretir ama yön kapısı `unavailable` kalır;
-`radar-signal` bununla deterministik `WAIT` verir. Scheduler/supervisor bu dilimde yoktur.
+`collect` komutunun geçmiş sayfasını da yazması gereklidir: Binance saatlik OI geçmişini
+yalnız ~30 gün saklar, ondan eskisi ancak kendi PIT depomuzda bulunabilir.
 
-Faz durumu: **1a — ilk gerçek provider + PIT/context taşıması**. `get_health` ve dar kapsamlı
-`get_derivatives` çalışır; çok-kaynak scoring/rejim Faz 1'in devamıdır (SPEC §4, §7).
+Publisher yalnız exact-hour yolu oluşturur ve mevcut saat dosyasını overwrite etmez. Yeterli
+geçmiş varsa `fragility` gerçek veriden üretilir; `direction` **her koşulda** null kalır ve
+yön kapısı `unavailable` olur (`direction_rules_unavailable`). Geçmiş yetersizse ilgili
+feature `feature_unavailable:<feature>:<neden>` blocker'ı yazar. `radar-signal` her iki
+durumda da deterministik `WAIT` verir. Scheduler/supervisor bu dilimde yoktur.
+
+Faz durumu: **1b — geçmiş birikimi + kırılganlık kapısı** (ADR-0005). `get_health`,
+`get_derivatives`, backfill/collect/publish çalışır; yön kuralı, rejim sınıflandırması ve
+çok-kaynak kapsamı Faz 1'in devamıdır (SPEC §4, §7).

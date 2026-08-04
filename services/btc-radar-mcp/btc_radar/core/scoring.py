@@ -4,12 +4,16 @@
     Kırılganlık = 50 × Σ(vᵢ·rᵢ·qᵢ·fᵢ)     / Σ(vᵢ·qᵢ·fᵢ)          → [0, 100]
     Güven       = 100 × ağırlıklı kapsam×kalite oranı              → [0, 100]
 
-KAPSAM SINIRI (bilinçli): metrik→d/r dönüşümü (signal_rules.yaml) ve §6 rejim
-sınıflandırma tablosu bu modülde YOKTUR — Faz 1 işidir. Burada yalnız toplama
-aritmetiği vardır ve bileşenler (d, r, q, f, u) dışarıdan verilir. Rejim etiketi
-şimdilik iki değer alır: güven eşiğin altındaysa "veri_yetersiz", değilse
-"siniflandirilmadi_faz1". CR-002 P1-1 (shrinkage, iki kademeli toplama, histerezis)
-bu modülü revize edecektir; o iş ayrı kabul kriterleriyle gelir.
+KAPSAM SINIRI (bilinçli): metrik→d/r dönüşümü `core/components.py` + `signal_rules.yaml`
+işidir; §6 rejim sınıflandırma tablosu bu modülde YOKTUR. Burada yalnız toplama aritmetiği
+vardır ve bileşenler (d, r, q, f, u) dışarıdan verilir. Rejim etiketi şimdilik iki değer
+alır: güven eşiğin altındaysa "veri_yetersiz", değilse "siniflandirilmadi_faz1".
+CR-002 P1-1 (shrinkage, iki kademeli toplama, histerezis) bu modülü revize edecektir;
+o iş ayrı kabul kriterleriyle gelir.
+
+YÖN İDDİASI: `d=None` taşıyan bileşen yön paydasına girmez. Hiçbir bileşen yön iddia
+etmiyorsa `direction` None kalır — kırılganlık ölçülmüş olsa bile. Bu, "yönü ölçmedik"
+ile "yön nötr çıktı" arasındaki farkın veri sözleşmesindeki karşılığıdır.
 
 Determinizm: bileşenler katman/metrik adına göre sıralanarak toplanır (float
 toplama sırası sonucu etkiler); çıktı 6 basamağa yuvarlanır — replay bit-bit eşitliği
@@ -25,18 +29,23 @@ ROUND_NDIGITS = 6
 
 @dataclass(frozen=True)
 class ScoreComponent:
-    """Tek metriğin skor katkısı. d/r Faz 1'de signal_rules.yaml'dan üretilecek."""
+    """Tek metriğin skor katkısı; d/r `signal_rules.yaml` kurallarından üretilir.
+
+    `d=None` "bu gözlem yön iddiası taşımıyor" demektir ve yön paydasına HİÇ girmez.
+    Kırılganlık gözlemi bir yön sinyali değildir (Hedefe Geliştirme Planı, ilke 5); yön
+    kuralı olmadığında d'yi 0 yazmak "nötr yön ölçtük" iddiası olurdu ve yanlış olurdu.
+    """
 
     layer: str
     metric: str
-    d: float  # yön katkısı, [−2, +2]
+    d: float | None  # yön katkısı, [−2, +2]; None → yön iddiası yok
     r: float  # kırılganlık katkısı, {0, 1, 2}
     q: float  # kalite [0,1]
     f: float  # tazelik [0,1]
     u: float  # bağımsızlık [0,1] (çift sayım grupları, metodoloji §5.5)
 
     def __post_init__(self) -> None:
-        if not -2.0 <= self.d <= 2.0:
+        if self.d is not None and not -2.0 <= self.d <= 2.0:
             raise ValueError(f"{self.metric}: d aralık dışı ({self.d}); [−2,+2] bekleniyor")
         if not 0.0 <= self.r <= 2.0:
             raise ValueError(f"{self.metric}: r aralık dışı ({self.r}); [0,2] bekleniyor")
@@ -78,8 +87,9 @@ def aggregate(components: list[ScoreComponent], weights: WeightsConfig) -> Score
         v = fragility_layers.get(c.layer, w)
         dir_weight = w * c.q * c.f * c.u
         frag_weight = v * c.q * c.f
-        dir_num += dir_weight * c.d
-        dir_den += dir_weight
+        if c.d is not None:
+            dir_num += dir_weight * c.d
+            dir_den += dir_weight
         frag_num += frag_weight * c.r
         frag_den += frag_weight
         per_layer_quality.setdefault(c.layer, []).append(c.q * c.f * c.u)
@@ -92,7 +102,9 @@ def aggregate(components: list[ScoreComponent], weights: WeightsConfig) -> Score
                 "q": c.q,
                 "f": c.f,
                 "u": c.u,
-                "direction_contribution": round(dir_weight * c.d, ROUND_NDIGITS),
+                "direction_contribution": (
+                    None if c.d is None else round(dir_weight * c.d, ROUND_NDIGITS)
+                ),
                 "fragility_contribution": round(frag_weight * c.r, ROUND_NDIGITS),
             }
         )

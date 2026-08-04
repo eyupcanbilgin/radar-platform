@@ -24,9 +24,12 @@ from btc_radar.core.scoring import ScoreComponent, aggregate
 from btc_radar.models.config import WeightsConfig
 from btc_radar.models.snapshot import RegimeSnapshot
 
-FEATURE_VERSION = "0.2.0"
-SCORING_VERSION = "0.1.0"
+FEATURE_VERSION = "0.3.0"
+SCORING_VERSION = "0.2.0"
 LEGACY_CONTENT_HASH_FEATURE_VERSIONS = frozenset({"0.1.0"})
+#: `evidence` alanı 0.3.0 ile geldi; daha eski kayıtlar kendi hash sözleşmeleriyle
+#: doğrulanmaya devam eder (replay geçmişi bozulmaz).
+PRE_EVIDENCE_FEATURE_VERSIONS = frozenset({"0.1.0", "0.2.0"})
 
 ComponentBuilder = Callable[[list[dict], datetime], list[ScoreComponent]]
 
@@ -127,6 +130,8 @@ def content_hash_of(snap: RegimeSnapshot) -> str:
         body["data_cutoff_at"] = snap.data_cutoff_at.astimezone(UTC).isoformat(
             timespec="microseconds"
         )
+    if snap.feature_version not in PRE_EVIDENCE_FEATURE_VERSIONS:
+        body["evidence"] = snap.evidence
     return _sha(body)
 
 
@@ -194,6 +199,7 @@ def verify_regime_snapshot(snap: RegimeSnapshot) -> None:
     if snap.missing_layers != sorted(set(snap.missing_layers)):
         raise ValueError("SNAPSHOT BÜTÜNLÜK HATASI: missing_layers sıralı ve tekil olmalı")
     _reject_non_finite(snap.breakdown, path="breakdown")
+    _reject_non_finite(snap.evidence, path="evidence")
 
     expected_id = snapshot_id_of(snap)
     if snap.snapshot_id != expected_id:
@@ -218,6 +224,7 @@ def compute_snapshot(
     component_builder: ComponentBuilder,
     stale_sources: list[str] | None = None,
     computed_at: datetime | None = None,
+    evidence: list[dict] | None = None,
 ) -> RegimeSnapshot:
     """PIT satırlarından değişmez snapshot üretir. Saf: I/O yok (computed_at hariç)."""
     if as_of.tzinfo is None:
@@ -252,6 +259,7 @@ def compute_snapshot(
         stale_sources=sorted(stale_sources or []),
         missing_layers=scores.missing_layers,
         breakdown=scores.breakdown,
+        evidence=evidence or [],
     )
     return snap.model_copy(update={"content_hash": content_hash_of(snap)})
 

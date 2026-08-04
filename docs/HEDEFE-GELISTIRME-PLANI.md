@@ -26,9 +26,9 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | Araştırma altyapısı | Manifest, Registry, maliyet modeli, replay ve test temeli var | Korunacak |
 | Yönsel avantaj | Kabul edilmiş strateji yok | Yeni stratejiden önce güvenilir nabız kapısı gerekir |
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
-| MCP | İlk gerçek Binance mark/funding/OI provider'ı, PIT collector ve fail-closed context publisher var; scoring yok | Dar veri taşıması tamam, gerçek feature/rejim katmanı sırada |
+| MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
 | Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
-| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI | Historical OI/funding, spot/perp basis ve veri sağlığı öncelikli |
+| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI | Spot/perp basis, spread/depth ve kesintisiz toplama sırada |
 | Operasyonel güven | Expiry, outbox atomikliği, Telegram env ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
 ## 3. Değişmez Ürün İlkeleri
@@ -91,7 +91,11 @@ alamıyor.
 - [x] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
 - [x] İlk Binance public mark/funding/OI collector'ını ve PIT yazımını ekle.
 - [ ] Binance spot OHLCV, basis ve spread/depth collector'larını ekle.
+- [x] Tarihsel settled funding ve saatlik OI'yi PIT'e biriktir; yeterli-geçmiş şartını tanımla
+  ve yalnız kırılganlık feature'larını kur (ADR-0005). Yön ve rejim kapalı kalır.
 - [ ] OI collector'ını process supervision ile sürekli çalıştır; geçmiş endpoint'i sınırlıdır.
+  - [x] `collect` her koşuda en yeni geçmiş sayfasını da yazıyor; `backfill` sayfalı ve bütçeli.
+  - [ ] Scheduler, heartbeat ve kesintisiz işletim kanıtı.
 - [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
   doğrula.
 - [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
@@ -214,3 +218,24 @@ geniş provider ailesi iddiası değildir.
 Bu paket yön/rejim skoru açmaz. Bir sonraki ürün işi historical OI/funding serisini PIT'e
 toplamak, yeterli geçmiş şartını tanımlamak ve yalnız kanıtlı **fragility** feature'larını
 kurmaktır. Direction, kabul edilmiş signal setup'ı olmadan null kalır.
+
+### WP-0003 — Tarihsel türev geçmişi ve kırılganlık kapısı
+
+**Durum:** Kodlama, test ve canlı smoke tamamlandı (MCP ADR-0005).
+
+1. `binance_futures_history` provider: settled funding (ileri sayfalama) ve saatlik OI
+   (geriye sayfalama; ~30 gün saklama sınırı adlandırılmış hataya çevrildi)
+2. Backfill satırlarında yayın-anı semantiği: `available_at = event_time + publication_lag`,
+   canlı gözlemden ayrı provider adıyla; backfill kesintisiz işletim kanıtı sayılmaz
+3. PIT deposunda revizyon-farkında, look-ahead'siz `read_series`
+4. Yeterli-geçmiş kapısı: `min_samples`, `min_span_days`, `max_gap_seconds`; ihlal
+   `feature_unavailable:<feature>:<neden>` blocker'ı üretir
+5. `funding_stress` ve `oi_buildup` kırılganlık feature'ları; midrank yüzdelik; `d=None`
+6. Feature kanıtı değişmez snapshot'a bağlandı; girdi digest'i kullanılan geçmişi kapsıyor
+
+Canlı doğrulama: 360 settlement + 744 saatlik OI kovası toplandı; `2026-08-04T14:00Z`
+context'i `fragility=0.0`, `direction=null`, blocker `direction_rules_unavailable` ile
+yayınlandı. Yetersiz geçmişli bir saat için kapı blocker yazarak kapandı.
+
+Bu paket kârlılık veya güvenilir yön sinyali iddiası **değildir**. Sıradaki işler: kesintisiz
+toplama kanıtı (scheduler/heartbeat), spot/perp basis ve spread/depth collector'ları.

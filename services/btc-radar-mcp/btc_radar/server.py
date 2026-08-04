@@ -18,6 +18,7 @@ from btc_radar.core.config import load_signal_rules, load_weights, weights_hash
 from btc_radar.core.snapshot import FEATURE_VERSION, SCORING_VERSION
 from btc_radar.core.store import SCHEMA_VERSION as STORE_SCHEMA_VERSION
 from btc_radar.providers.binance_futures import BinanceFuturesProvider
+from btc_radar.providers.binance_futures_history import BinanceFuturesHistoryProvider
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +129,10 @@ async def get_derivatives(
         get_derivatives(metric="all")
         get_derivatives(metric="open_interest")
 
-    Ham gözlemler PIT-uyumlu zaman alanlarıyla döner. Bu araç yön/rejim skoru üretmez;
-    ``signal_rules.yaml`` boş olduğu sürece scoring durumu açıkça unavailable'dır.
+    Ham gözlemler PIT-uyumlu zaman alanlarıyla döner. Bu araç anlık gözlem aracıdır:
+    kırılganlık skoru geçmiş seri gerektirir ve saatlik ``decision-context/v1`` üzerinden
+    yayınlanır (ADR-0005). Yön skoru hiçbir yüzeyde üretilmez — kabul edilmiş yönsel kural
+    yoktur.
     """
     logger.info("get_derivatives çağrıldı: metric=%s", metric)
     try:
@@ -153,7 +156,7 @@ async def get_derivatives(
                     "provider": provider.name,
                     "observation_count": len(rows),
                     "scoring_available": False,
-                    "scoring_blocker": "signal_rules_unavailable",
+                    "scoring_blocker": "tool_returns_raw_observations_only",
                 },
             }
         )
@@ -196,7 +199,13 @@ async def get_health() -> dict[str, Any]:
                     "mode": "public_current_snapshot",
                     "metrics": sorted(BinanceFuturesProvider.supported_metrics - {"all"}),
                     "health": "not_polled",
-                }
+                },
+                {
+                    "name": BinanceFuturesHistoryProvider.name,
+                    "mode": "public_history_backfill",
+                    "metrics": sorted(BinanceFuturesHistoryProvider.supported_metrics),
+                    "health": "not_polled",
+                },
             ],
             "cache": {"initialized": False},
             "store": {

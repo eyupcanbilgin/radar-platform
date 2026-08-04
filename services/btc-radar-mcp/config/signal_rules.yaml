@@ -1,5 +1,63 @@
-# Metrik → d/r dönüşüm kuralları (SPEC §5.1). Faz 1'de doldurulacak.
-# Kurallar rolling percentile / robust z-score temelli GÖRELİ eşik kullanır;
-# sabit mutlak sayı kullanılmaz (metodoloji §5.2). Interaction kuralları desteklenir.
-version: "0.1.0"
-rules: []
+# Metrik → d/r dönüşüm kuralları (SPEC §5.1) ve bunların YETERLİ GEÇMİŞ şartı.
+#
+# Bu dosyadaki her eşik GÖRELİDİR (metodoloji §5.2): "funding %0.05'in üstünde" gibi mutlak
+# bir sayı yoktur, yalnız serinin kendi geçmişindeki yüzdelik konumu vardır.
+#
+# İKİ BİLİNÇLİ SINIR:
+# 1. Yönsel kural YOKTUR. Kabul edilmiş bir setup olmadan d üretmek uydurma olurdu; bu
+#    yüzden `directional` yalnız false olabilir ve context `direction: null` yayınlar.
+# 2. Interaction kuralı YOKTUR. Kırılganlık formülünde bağımsızlık terimi (u) bulunmadığı
+#    için aynı feature'ı bir de etkileşim kuralında saymak skoru şişirirdi (CR-002 P1-1).
+#
+# Buradaki sayılar tuning sonucu DEĞİLDİR; "ölçüm yapmaya yetecek veri var mı" tabanlarıdır.
+# Bir feature şartı sağlamazsa skor üretilmez, blocker yazılır (fail-closed).
+version: "0.2.0"
+
+# Geçmişten toplanan satırın yayın anı = event_time + bu gecikme (ADR-0005).
+# Tam saatte damgalanmış bir değerin aynı saatin kararına girmesini bu engeller.
+publication_lag_seconds: 60
+
+features:
+  funding_stress:
+    # Settle olmuş 8h funding'in kendi 90 günlük dağılımındaki mutlak konumu.
+    # Mutlak alınır: aşırı negatif funding de (kalabalık short) kırılganlıktır.
+    kind: abs_percentile
+    metric: funding_rate_settled
+    lookback_days: 90
+    expected_period_seconds: 28800 # 8h settlement
+    min_samples: 120 # ~40 gün; altında yüzdelik konuşmak ölçüm değil süslemedir
+    min_span_days: 45
+    max_gap_seconds: 43200 # 4 kaçırılmış settlement serinin bütünlüğünü bozar
+
+  oi_buildup:
+    # Saatlik OI notional'ının 24 saatlik göreli değişiminin mutlak yüzdeliği.
+    # Notional kullanılır: kontrat adedi fiyat hareketiyle kaldıraç değişimini gizleyebilir.
+    kind: change_abs_percentile
+    metric: open_interest_value_1h
+    change_window_seconds: 86400
+    lookback_days: 21 # openInterestHist ~30 gün saklıyor; ötesi kendi deposundan gelir
+    expected_period_seconds: 3600
+    min_samples: 336 # 14 gün × 24 saatlik değişim noktası
+    min_span_days: 14
+    max_gap_seconds: 10800 # 3 saatten uzun boşluk = toplayıcı kesintisi
+
+rules:
+  - id: funding_stress
+    layer: derivatives
+    feature: funding_stress
+    directional: false
+    independence_group: derivatives_leverage
+    fragility_bands:
+      - { min_percentile: 95.0, r: 2.0 }
+      - { min_percentile: 80.0, r: 1.0 }
+      - { min_percentile: 0.0, r: 0.0 }
+
+  - id: oi_buildup
+    layer: derivatives
+    feature: oi_buildup
+    directional: false
+    independence_group: derivatives_leverage
+    fragility_bands:
+      - { min_percentile: 95.0, r: 2.0 }
+      - { min_percentile: 80.0, r: 1.0 }
+      - { min_percentile: 0.0, r: 0.0 }

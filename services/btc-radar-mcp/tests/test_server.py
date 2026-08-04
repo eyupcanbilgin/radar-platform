@@ -52,7 +52,8 @@ async def test_get_health_roundtrip():
     assert abs(sum(data["config"]["layers"].values()) - 1.0) < 1e-9
     assert data["providers"][0]["name"] == "binance_futures"
     assert data["providers"][0]["health"] == "not_polled"
-    assert data["config"]["signal_rule_count"] == 0
+    assert data["config"]["signal_rule_count"] == 2
+    assert data["providers"][1]["name"] == "binance_futures_history"
     assert data["retrieved_at_utc"].endswith("+00:00")
 
 
@@ -91,4 +92,4 @@ async def test_get_derivatives_roundtrip_without_live_network(monkeypatch):
     data = getattr(result, "data", None) or json.loads(result.content[0].text)
     assert data["observations"][0]["metric"] == "open_interest"
     assert data["meta"]["scoring_available"] is False
-    assert data["meta"]["scoring_blocker"] == "signal_rules_unavailable"
+    assert data["meta"]["scoring_blocker"] == "tool_returns_raw_observations_only"

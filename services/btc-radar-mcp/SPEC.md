@@ -32,8 +32,14 @@ Metodoloji v1.0'daki çok katmanlı Bitcoin analiz çerçevesini, Claude'un (Des
 
 **Mevcut Faz 1a dilimi:** Binance BTCUSDT anlık mark/funding/OI provider'ı,
 `get_derivatives`, append-only PIT toplama ve `decision-context/v1` exact-hour publisher
-uygulanmıştır. `signal_rules.yaml` boş olduğu için direction/fragility/rejim üretimi bilinçli
-olarak kapalıdır.
+uygulanmıştır.
+
+**Mevcut Faz 1b dilimi (ADR-0005):** Tarihsel settled funding ve saatlik OI backfill'i,
+PIT-güvenli seri okuma, yeterli-geçmiş kapısı ve iki **kırılganlık** feature'ı
+(`funding_stress`, `oi_buildup`) uygulanmıştır. `fragility` artık gerçek veriden üretilir;
+**direction ve rejim üretimi bilinçli olarak kapalı kalır** — kabul edilmiş yönsel setup ve
+çok katmanlı kapsam yoktur. Context bu nedenle `direction: null` ve
+`direction_rules_unavailable` blocker'ı ile yayınlanır.
 
 ### 1.3 Kapsam dışı (tüm fazlar için)
 - Emir iletimi, borsa API key'i ile private endpoint kullanımı, bakiye erişimi.
@@ -123,7 +129,9 @@ MVP ile metodolojinin **~%80 ağırlığı** ücretsiz kaynaklarla ölçülebili
         ▼
 [ core/normalizer.py ]  birim/venue/timestamp standardizasyonu
 [ core/validator.py ]   şema, tazelik, duplicate, outlier (metodoloji §10.2)
-[ core/features.py ]    rolling percentile, robust z-score (median/MAD), persistence
+[ core/features.py ]    rolling percentile + yeterli-geçmiş kapısı (UYGULANDI, ADR-0005)
+[ core/components.py ]  feature → d/r dönüşümü; d şu an daima None (yön kuralı yok)
+[ core/backfill.py ]    sayfalı geçmiş toplama (funding ileri, OI geriye)
 [ core/scoring.py ]     yön/kırılganlık/güven + rejim (metodoloji §5–6)
 [ core/cache.py ]       kaynak bazlı TTL (diskcache)
 [ config/weights.yaml ] katman ağırlıkları + eşikler — KODA GÖMÜLMEZ
@@ -198,7 +206,7 @@ Genel kurallar (hepsi borsa-mcp'den doğrulanmış desenler):
 | # | Araç | Ana parametreler | Kaynaklar | Not |
 |---|---|---|---|---|
 | 1 | `get_market_snapshot` | `detail: Literal["summary","full"]` | CoinGecko, Binance spot | Fiyat, 24s değişim, dominance, ETH/BTC, mcap, breadth özeti |
-| 2 | `get_derivatives` | **Faz 1a:** `metric: Literal["mark_price","funding_rate","open_interest","all"]`; gelecekte venue/window genişler | Binance USD-M futures | **Dar dilim uygulandı:** PIT zamanlı anlık ham gözlemler. Tarihsel yüzdelikler ve Bybit henüz yok |
+| 2 | `get_derivatives` | **Faz 1a:** `metric: Literal["mark_price","funding_rate","open_interest","all"]`; gelecekte venue/window genişler | Binance USD-M futures | **Dar dilim uygulandı:** PIT zamanlı anlık ham gözlemler. Tarihsel funding/OI serisi `btc-radar-producer backfill` ile PIT'e toplanır ve kırılganlık yüzdelikleri saatlik context'te yayınlanır (ADR-0005); bu araç skor döndürmez. Bybit henüz yok |
 | 3 | `get_liquidations` | `window: Literal["1h","6h","12h","24h"]` | WS birikimi veya bitcoin-data.com | Gerçekleşen long/short tasfiyeleri; "tahmini harita DEĞİL" notu yanıt metasında sabit |
 | 4 | `get_onchain` | `metric: Literal["sth_sopr","sopr","cdd","netflow","reserve","mvrv","nupl","whale_cohort"]`, `lookback_days` | bitcoin-data.com | Önbellek zorunlu; yanıtta `retrieved_at` ve veri yaşı her zaman görünür |
 | 5 | `get_premiums` | `premium: Literal["coinbase","korea","both"]` | Coinbase+Binance, Upbit | Hesaplama formülü yanıt metasında; anlık + kısa trend (son N gözlem) |
@@ -219,8 +227,10 @@ Kırılganlık = 50 × Σ(vᵢ·rᵢ·qᵢ·fᵢ) / Σ(vᵢ·qᵢ·fᵢ)        
 Güven      = 100 × ağırlıklı kapsam×kalite oranı              → [0, 100]
 d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 ```
-- Metrik→d/r dönüşüm kuralları `config/signal_rules.yaml`'da tanımlanır (ör. "funding 90 günlük yüzdelik >95 VE OI 24s değişim >+%8 → r=2"). Kurallar rolling percentile/z-score ile göreli eşik kullanır, sabit sayı kullanmaz (metodoloji §5.2).
-- Interaction kuralları desteklenir: bir metriğin puanı başka metriğin durumuna koşullanabilir (§5.2 adım 6).
+- Metrik→d/r dönüşüm kuralları `config/signal_rules.yaml`'da tanımlanır. Kurallar rolling percentile ile göreli eşik kullanır, sabit sayı kullanmaz (metodoloji §5.2). **Uygulandı (ADR-0005):** `funding_stress` ve `oi_buildup` kuralları yüzdelik bantlarıyla r üretir.
+- **Yeterli geçmiş şartı (ADR-0005):** her feature `min_samples`, `min_span_days` ve `max_gap_seconds` taşır. Şart sağlanmazsa feature üretilmez ve context'e `feature_unavailable:<feature>:<neden>` blocker'ı yazılır — eksik geçmiş nötr skora dönüşmez.
+- **`d` boş olabilir:** yön iddiası taşımayan bileşen (`d=None`) yön paydasına girmez; hiçbir kural yön iddia etmiyorsa `direction` null kalır ve `direction_rules_unavailable` blocker'ı yazılır. Yönsel kural kabul edilmiş bir setup olmadan açılmaz.
+- Interaction kuralları §5.2 adım 6'da öngörülür fakat **henüz uygulanmadı**: kırılganlık formülünde bağımsızlık terimi (u) olmadığı için aynı feature'ı etkileşim kuralında tekrar saymak skoru şişirir. Önce CR-002 P1-1 iki kademeli toplaması gerekir (ADR-0005).
 - Rejim sınıflandırması §6 tablosu birebir: sağlıklı risk-on / kaldıraçlı coşku / sıkışmalı nötr / düzenli risk-off / deleveraging / birikim-kapitülasyon / veri yetersiz.
 
 ### 5.2 Skor çıktı sözleşmesi
@@ -245,6 +255,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 |---|---|---|
 | **0 — İskelet** | Repo yapısı, uv, FastMCP hello-world, CI, config yükleme | `uvx --from . btc-radar` Claude Desktop'ta görünür, `get_health` çalışır |
 | **1a — Veri taşıması (tamamlandı)** | Binance mark/funding/OI provider, PIT collector, immutable exact-hour context | Gerçek public fixture'lar, no-look-ahead, hash/ID doğrulama, atomik no-overwrite ve fail-closed consumer sözleşmesi testli |
+| **1b — Geçmiş ve kırılganlık (tamamlandı)** | Settled funding + saatlik OI backfill, PIT seri okuma, yeterli-geçmiş kapısı, `funding_stress`/`oi_buildup` | Gerçek veriyle fragility üretiliyor; yetersiz geçmiş blocker yazıyor; digest kullanılan geçmişi kapsıyor; direction hâlâ null (ADR-0005) |
 | **1 — MVP** | 8 araç, 9 provider, cache, scoring, testler | `compute_scores` gerçek veriyle üç skor + rejim üretir; test coverage çekirdek modüllerde ≥%80; smoke yeşil |
 | **2 — Derinlik** | Haber katmanı (CryptoPanic/CoinMarketCal), spot CVD, whale kohort iyileştirme, SKILL.md (analiz beyni) yazımı | Skill + MCP birlikte günlük tek-sayfa raporu (metodoloji §11.1) üretebiliyor |
 | **3 — Yayın** | HTTP transport + /health, Docker, opsiyonel paralı kaynak adaptörleri, ay-fazı backtest modülü (ayrı, skor dışı) | Uzak sunucuda çalışır; README ile üçüncü kişi kurabilir |
