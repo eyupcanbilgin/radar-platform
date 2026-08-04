@@ -71,6 +71,19 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 [ Telegram kanalı ]  — insan-okur formatı; her mesajda gerekçe + invalidasyon + yasal not
 ```
 
+Webhook ingress `/webhook/signal`, `/webhook/fill` ve `/webhook/exit` yollarında fail-closed
+HMAC-SHA256 doğrulaması ister. İmzalanan byte dizisi
+`timestamp + "." + nonce + "." + raw_body` biçimindedir; header'lar
+`X-Radar-Timestamp`, `X-Radar-Nonce`, `X-Radar-Signature: sha256=<hex>` olarak taşınır.
+Secret yalnız `RADAR_SIGNAL_WEBHOOK_SECRET` environment değeridir. Saat toleransı ve nonce
+retention `config/lifecycle.yaml` içindedir. Doğrulanmış nonce ayrı SQLite store'a atomik
+yazılır; tekrar 409, eksik/yanlış/bayat kimlik 401, sunucuda secret eksikliği 503 döner.
+`/health` kimliksiz kalır ve secret bilgisi göstermez.
+
+Freqtrade'in yerleşik webhook config'i dinamik imza header'ı üretmediğinden doğrudan uyumlu
+sayılmaz. Freqtrade→enricher canlı bağlantısı ayrı bir yerel signer adaptörü eklenene kadar
+kapalıdır; URL içine secret koymak veya imzasız fallback yasaktır.
+
 **Veri sorumluluğu ayrımı:** Strateji/backtest mumunu freqtrade kendi CCXT katmanıyla çeker.
 İlk BTC 1h standalone karar defteri de yeni bir HTTP provider yazmadan aynı sabitlenmiş CCXT
 bağımlılığının `binanceusdm` public OHLCV yüzeyini kullanır. btc-radar provider'ları mum için

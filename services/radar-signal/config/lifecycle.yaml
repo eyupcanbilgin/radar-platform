@@ -39,3 +39,8 @@ outbox:
   retry_backoff_seconds: [5, 15, 30, 60, 120, 300]
   # Kesinti sonrası kuyruk bu yaştan eskiyse "geç teslim" notuyla gönderilir
   late_delivery_after_minutes: 5
+
+# --- Webhook taşıma güvenliği ----------------------------------------------------------
+webhook_auth:
+  max_clock_skew_seconds: 300
+  nonce_retention_seconds: 900

@@ -51,6 +51,11 @@ Telegram bildirimleri için `RADAR_SIGNAL_DELIVERY_MODE=telegram` seçin ve
 `RADAR_SIGNAL_DELIVERY_MODE=console` kullanılabilir; eksik Telegram secret'ı otomatik olarak
 console'a düşmez.
 
+Enricher webhook mutasyonları için ayrıca `RADAR_SIGNAL_WEBHOOK_SECRET` gerekir. İstemci ham
+JSON gövdesini `timestamp.nonce.body` HMAC-SHA256 sözleşmesiyle imzalamalıdır; ayrıntılar
+Signal ADR-0015'tedir. Freqtrade'in yerleşik webhook'u dinamik imza üretmediği için signer
+adaptörü olmadan doğrudan enricher'a bağlanmaz.
+
 ---
 
 ## BTCUSDT 1h Paper Karar Runtime'ı

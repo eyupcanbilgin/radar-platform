@@ -160,6 +160,8 @@ locked OOS başarısı değildir, yalnız forward karantina adaylığıdır.
   (Signal ADR-0011; saatlik DecisionCard hattı).
 - [ ] `valid_until`, `max_entry_deviation` ve aktif expiry'yi teslimden önce uygula.
 - [ ] Webhook kimlik doğrulama/replay koruması ekle.
+  - [x] Enricher ingress için HMAC, timestamp ve kalıcı atomik nonce kapısı (Signal ADR-0015).
+  - [ ] Freqtrade çıkışına dinamik HMAC üreten yerel signer adaptörünü bağla; imzasız fallback yok.
 - [ ] Stop mesafeli risk bütçesi, toplam açık risk ve BTC/ETH korelasyon limiti ekle.
 - [ ] Günlük/haftalık zarar, maksimum drawdown, stale-data ve manuel pause kill-switch'lerini ekle.
 - [ ] Paper-sim fill/slippage/latency drift raporu üret.

@@ -62,7 +62,8 @@ def test_empty_required_config_fails_loud(tmp_path):
     p = tmp_path / "lifecycle.yaml"
     p.write_text(
         "version: '1'\ninputs:\n  required: []\ndegraded_flags: {}\nvalidity: {}\n"
-        "exit_precedence: []\noutbox: {}\n",
+        "exit_precedence: []\noutbox: {}\n"
+        "webhook_auth:\n  max_clock_skew_seconds: 300\n  nonce_retention_seconds: 900\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="fail-closed"):
