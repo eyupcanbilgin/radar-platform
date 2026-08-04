@@ -13,7 +13,9 @@ Kart A Kurallarına Tam Sadakat:
 - Her giriş koşulu ayrı enter_tag taşıyor
 """
 
+import sys
 from datetime import datetime
+from pathlib import Path
 
 import talib.abstract as ta
 from freqtrade.persistence import Trade
@@ -24,6 +26,13 @@ from freqtrade.strategy import (
     stoploss_from_absolute,
 )
 from pandas import DataFrame
+
+# Boyutlandırma oranı config'den okunur (Ç6). Strateji dosyaları freqtrade tarafından
+# user_data/strategies altından yüklendiği için servis kökü sys.path'e elle eklenir.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from sizinglib import load_sizing, wallet_pct_stake  # noqa: E402
+
+_SIZING = load_sizing()
 
 
 class S0002bVolumeMomentum(IStrategy):
@@ -74,9 +83,12 @@ class S0002bVolumeMomentum(IStrategy):
         side: str,
         **kwargs,
     ) -> float:
-        """Cüzdan bakiyesinin %10'u (cüzdan yüzdesi sizing — bakiyeye tavanlanma engelleme)."""
-        wallet = self.wallets.get_total_stake_amount()
-        return max(wallet * 0.10, min_stake or 10.0)
+        """Cüzdan yüzdesi sizing — oran `config/sizing.yaml`'dan gelir (Ç6, koda gömülmez).
+
+        Sabit notional, cüzdan düşerken bahis oranını büyütür ve terminal getiriyi
+        stratejinin değil sermaye tükenişinin ölçüsü hâline getirir (S-0002 vakası).
+        """
+        return wallet_pct_stake(self.wallets.get_total_stake_amount(), min_stake, _SIZING)
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # 1. ATR

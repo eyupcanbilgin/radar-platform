@@ -1,0 +1,14 @@
+# Pozisyon boyutlandırma — platform geneli (Ç6 kapanışı, 4 Ağu 2026).
+#
+# NEDEN CONFIG'DE: `config.dryrun.json` sabit notional (`stake_amount: 1000`) kullanıyordu.
+# Cüzdan düşerken bahis oranı büyüdüğü için S-0002 geliştirme koşusu −%90'da tavanladı;
+# terminal getiri stratejinin değil, cüzdanın tükenişinin ölçüsü oldu. Düzeltme önce
+# yalnız S-0002b içinde sabit kodlanmıştı — yani platform geneli değildi ve bir sonraki
+# strateji aynı tuzağa düşecekti. Oran artık burada, koda gömülü değil (CLAUDE.md kural 3).
+version: "1.0"
+
+# İşlem başına cüzdanın yüzde kaçı riske edilir (0.10 = %10).
+stake_pct_of_wallet: 0.10
+
+# Bir işlemin altına düşemeyeceği taban tutar (borsa min_stake yoksa kullanılır).
+min_stake_fallback: 10.0
