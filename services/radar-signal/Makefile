@@ -1,4 +1,4 @@
-.PHONY: test lint download-data manifest verify backtest lookahead
+.PHONY: test lint download-data manifest verify backtest lookahead pulse-smoke pulse-reanalysis
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -28,3 +28,10 @@ backtest:
 lookahead:
 	$(FT) lookahead-analysis --userdir user_data --config config/config.dryrun.json \
 	  --strategy $(S) --timerange $(TR)
+
+pulse-smoke:
+	$(PY) scripts/run_pulse_reanalysis.py --allow-dirty-smoke --permutations 50 \
+	  --out var/pulse-v2-smoke.json
+
+pulse-reanalysis:
+	$(PY) scripts/run_pulse_reanalysis.py

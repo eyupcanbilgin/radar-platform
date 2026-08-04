@@ -17,6 +17,9 @@ Her geliştirme görevi tek bir yazar rolü tarafından yürütülür. Kod geli�
 
 1. **Feature Branch & Main Koruması:** Doğrudan `main` dalına commit atılması YASAKTIR. Tüm geliştirmeler `feature/<görev-adı>` dalında yürütülür (CLAUDE.md Değiştirilemez Kurallara eklendi).
 2. **Kart ↔ Kod Uyum Denetimi:** İncelemeci, hipotez kartındaki metinsel kurallar ile koddaki matematiksel gösterim ve mantığın (örn. stop loss türü, rolling pencere türü, filtre varlığı) %100 örtüştüğünü denetlemek zorundadır.
-3. **Registry Verdict Kaydı:** Deneme tamamlandıktan sonra koşu sonucu `registry/experiments.jsonl` üzerinde `verdict` (`accepted`, `rejected`, `invalid`) olarak güncellenmelidir.
+3. **Registry Verdict Kaydı:** İlk verdict deney satırında bulunur. Sonraki düzeltmeler
+   `registry/verdict_events.jsonl` dosyasına append-only event olarak eklenir; tarihî
+   `experiments.jsonl` satırı yeniden yazılmaz. Etkin değer `registrylib.read_all()` ile
+   çözülür (`accepted`, `rejected`, `invalid`).
 4. **Temiz Çalışma Ağacı (Clean Working Tree) Zorunluluğu:** Locked Out-of-Sample (OOS) ve final backtest koşuları yalnızca git commit'i atılmış, temiz çalışma ağacında (`git_dirty: False`) çalıştırılabilir.
 5. **Sermaye Tükenmesi (Underwater / Bankruptcy) Kontrolü:** Backtest süresince bakiye tükenmesi (sabit notional nedeniyle işlemlerin durması) gerçekleşirse koşu otomatik olarak `INVALID` kabul edilir ve terminal getiri olarak raporlanamaz.

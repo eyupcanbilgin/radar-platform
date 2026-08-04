@@ -21,8 +21,10 @@ from registrylib import (  # noqa: E402
     REGISTRY_PATH,
     VALID_CREATORS,
     VALID_VERDICTS,
+    VERDICT_EVENTS_PATH,
     RegistryEncodingError,
     read_all,
+    read_verdict_events,
     verify_encoding,
 )
 
@@ -65,6 +67,16 @@ def test_read_all_works_on_real_file():
     assert all("experiment_id" in r for r in rows)
 
 
+def test_verdict_event_file_is_valid_and_targets_known_experiments():
+    assert VERDICT_EVENTS_PATH.exists(), "append-only verdict event kütüğü yok"
+    assert verify_encoding(VERDICT_EVENTS_PATH) == []
+    known_ids = {row["experiment_id"] for row in read_all()}
+    events = read_verdict_events()
+    assert events, "en az S-0002b kanıt düzeltmesi bekleniyor"
+    assert all(event["experiment_id"] in known_ids for event in events)
+    assert len({event["event_id"] for event in events}) == len(events)
+
+
 def test_experiment_ids_are_unique():
     ids = [r["experiment_id"] for r in read_all()]
     assert len(ids) == len(set(ids)), "yinelenen experiment_id var"
@@ -86,6 +98,13 @@ def test_verdicts_are_valid_and_closed():
         assert base != "pending", (
             f"{r['experiment_id']} hâlâ 'pending' — hipotez kartıyla eşleştirilmeli"
         )
+
+
+def test_s0002b_runs_are_effectively_invalid_after_audit():
+    rows = [row for row in read_all() if row.get("hypothesis_id") == "S-0002b"]
+    assert len(rows) == 3
+    assert all(row["verdict"] == "invalid" for row in rows)
+    assert all(row.get("initial_verdict") == "rejected" for row in rows)
 
 
 def test_created_by_is_known():

@@ -35,7 +35,9 @@ radar-signal/
 5. **Türev/harici veri yayın-anı kuralı:** funding/OI/likidasyon/rejim verisi backtest'te yalnız `available_at ≤ karar_anı` ise kullanılabilir.
 6. **Maliyetsiz backtest raporlanmaz.** Her koşu `config/costs.yaml` ile; sonuç raporunda maliyet senaryosu adı yazar. Backtest komutlarında `--timeframe-detail 1m` varsayılan; aynı detay mumunda stop+hedef çakışırsa stop önce sayılır (muhafazakâr kural).
 7. **Out-of-sample kilidi:** locked-test dönemi hyperopt'a ve göz kararı iterasyona kapalıdır; bir kez açılır. Açıldıktan sonra strateji değişirse eski OOS sonucu "final" etiketi alamaz (CI kontrolü).
-8. **Her deney Registry'ye yazılır** (başarısız/reddedilen dahil). Registry'siz backtest koşusu = geçersiz koşu. DSR'a giren N, registry'den gelir.
+8. **Her deney Registry'ye yazılır** (başarısız/reddedilen dahil). Registry'siz backtest
+   koşusu = geçersiz koşu. DSR'a giren N, registry'den gelir. Tarihî deney satırı yeniden
+   yazılmaz; verdict düzeltmesi append-only `registry/verdict_events.jsonl` olayıdır.
 9. **Sinyal yaşam döngüsü yalnız state machine üzerinden** ilerler (CR-002 P0-4); durum atlaması veya elle durum yazımı yasak. Bildirimler outbox + `signal_id` idempotency ile.
 10. **Yatırım tavsiyesi dili yasak.** "Al/sat/kesin" kalıpları hiçbir çıktıda yer almaz; "STOP ÇALIŞTI—kapandı" yerine "SİSTEM İNVALIDASYONU—gerçek pozisyonunuz otomatik kapatılmadı" dili (CR-002 P2-8). Her bildirimde invalidasyon + yasal not.
 11. **Aynı anda yayında ≤3 strateji; araç/strateji eklemeden önce mevcut olana parametre eklemek değerlendirilir**, yeni strateji ADR ister.

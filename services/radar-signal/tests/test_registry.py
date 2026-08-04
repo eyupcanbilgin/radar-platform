@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from registrylib import count_runs, record_run
+from registrylib import count_runs, read_all, record_run, update_verdict
 
 
 def _run(tmp: Path, **over):
@@ -54,3 +54,43 @@ def test_count_runs_family(tmp_path: Path):
     assert count_runs("S-0001", registry_path=reg) == 2
     assert count_runs("S-0002", registry_path=reg) == 1
     assert count_runs("S-9999", registry_path=reg) == 0
+
+
+def test_verdict_update_appends_event_without_rewriting_experiment(tmp_path: Path):
+    entry = _run(tmp_path, verdict="rejected")
+    registry = tmp_path / "experiments.jsonl"
+    original_bytes = registry.read_bytes()
+
+    assert update_verdict(
+        entry["experiment_id"],
+        "invalid",
+        "davranışsal entegrasyon hatası",
+        registry_path=registry,
+        created_by="codex",
+    )
+
+    assert registry.read_bytes() == original_bytes
+    events = tmp_path / "verdict_events.jsonl"
+    event_lines = events.read_text(encoding="utf-8").splitlines()
+    assert len(event_lines) == 1
+    effective = read_all(registry)[0]
+    assert effective["initial_verdict"] == "rejected"
+    assert effective["verdict"] == "invalid"
+    assert effective["verdict_reason"] == "davranışsal entegrasyon hatası"
+
+
+def test_latest_verdict_event_wins_without_changing_trial_count(tmp_path: Path):
+    entry = _run(tmp_path, verdict="pending")
+    registry = tmp_path / "experiments.jsonl"
+    assert update_verdict(entry["experiment_id"], "rejected", registry_path=registry)
+    assert update_verdict(entry["experiment_id"], "invalid", registry_path=registry)
+    effective = read_all(registry)
+    assert effective[0]["verdict"] == "invalid"
+    assert count_runs("S-0001", registry_path=registry) == 1
+
+
+def test_verdict_event_refuses_unknown_experiment(tmp_path: Path):
+    _run(tmp_path)
+    registry = tmp_path / "experiments.jsonl"
+    assert not update_verdict("E-NOT-FOUND", "invalid", registry_path=registry)
+    assert not (tmp_path / "verdict_events.jsonl").exists()

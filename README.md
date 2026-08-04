@@ -11,6 +11,9 @@ Sistem gerçek borsa emri göndermez.
 - `contracts/`: İki servis arasında paylaşılacak sürümlü veri sözleşmeleri.
 - `docs/`: Yalnız platformun tamamını ilgilendiren mimari belgeler.
 
+Aktif ürün hedefi, fazlar ve kabul kapıları için
+[`docs/HEDEFE-GELISTIRME-PLANI.md`](docs/HEDEFE-GELISTIRME-PLANI.md) belgesi kaynak kabul edilir.
+
 Her servis kendi bağımlılıklarını, lock dosyasını, konfigürasyonunu ve testlerini
 korur. Servise özel geliştirme kuralları ilgili klasördeki `CLAUDE.md` dosyasındadır.
 

@@ -1,5 +1,10 @@
 # 0006 — Kart A'nın kapatılması ve rolling pencere kararı (Ç5)
 
+> **KANIT DÜZELTMESİ (4 Ağustos 2026):** ADR-0007, bu karardaki permütasyon p-değerlerini
+> ve S-0002b “tam sadakat” varsayımını geri çekmiştir. Kart A'ya kaynak ayırmama kararı
+> ekonomik büyüklük ve negatif ham ortalamalar nedeniyle korunur; “istatistiksel olarak
+> kanıtlandı” ve “geçerli tam backtest” ifadeleri artık geçerli değildir.
+
 * **Tarih:** 4 Ağustos 2026
 * **Durum:** KABUL EDİLDİ
 * **Kanıt:** `docs/reviews/2026-08-04-s0002/nabiz-analizi.md` (+ `.json` ham çıktı)

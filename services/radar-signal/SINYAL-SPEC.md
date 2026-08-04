@@ -1,7 +1,8 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.1**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.2**
 
-> v1.1 (3 Ağu 2026): CR-001 maddeleri (CR-1…CR-8) ve CR-002 onaylı çelişki çözümleri işlendi. v1.0 → git geçmişi.
+> v1.2 (4 Ağu 2026): ADR-0007 ile eleme istatistiği v2 kapıları ve S-0002b kanıt
+> düzeltmesi işlendi. v1.1 → git geçmişi.
 
 | Alan | Değer |
 |---|---|
@@ -69,6 +70,11 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 
 Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme disiplinidir.** Her strateji şu hattan geçer:
 
+**Registry değişmezliği:** İlk deney kaydı `registry/experiments.jsonl` dosyasına append
+edilir. Sonradan bulunan kanıt veya uygulama hataları tarihî satırı yeniden yazmaz;
+append-only `registry/verdict_events.jsonl` olayıyla etkin verdict'i düzeltir. DSR deneme
+sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
+
 1. **Hipotez kartı** (`docs/hypotheses/NNNN.md`): tek paragraf — hangi piyasa davranışını yakalıyor, neden var olmalı, hangi rejimde çalışması/çalışmaması beklenir.
 2. **Claude Code implementasyonu:** freqtrade strateji sınıfı; her giriş koşulu ayrı `enter_tag` ile etiketlenir (gerekçe mekanizmasının temeli).
 3. **Backtest protokolü (pazarlıksız):**
@@ -87,6 +93,11 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
    sürümü ve 17 backtest koşusu, tek bir ölçümle baştan elenebilecek bir sinyal için
    harcandı.
 
+   **Yöntem v2 zorunluluğu (ADR-0007):** Her ufuk kendi forward-return null'una karşı
+   circular moving-block bootstrap ile sınanır; örtüşen sinyaller efektif olay olarak
+   tekilleştirilir; test alternatifi sonuç görülmeden tanımlanır; NaN/geçersiz test FDR
+   evrenine girmez; seanslar DST-aware ve referans giriş sonraki mum açılışıdır.
+
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
@@ -97,7 +108,7 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
 | Kod | Hipotez (kaynak kart) | Öncelik | Not |
 |---|---|---|---|
 | S-0001 | EMA(20/50) kesişimi + ATR stop | Taban | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
-| ~~S-0002~~ | ~~Hacim-koşullu intraday momentum (Kart A)~~ | **KAPALI** | Nabız teşhisi: ölçülebilir öngörü gücü yok; 20 hücrenin 20'sinde negatif brüt beklenti, rastgeleden anlamlı biçimde kötü (ADR-0006). S-0002 GEÇERSİZ TEST, S-0002b NİHAİ RET |
+| ~~S-0002~~ | ~~Hacim-koşullu intraday momentum (Kart A)~~ | **KAPALI / KANIT DÜZELTİLDİ** | Kaynak ayrılmıyor; ham büyüklükler negatif/düşük. S-0002 ve S-0002b koşuları INVALID; eski p-değerleri ve “tam sadakat” iddiası ADR-0007 ile geri çekildi. |
 | S-0003 | **Rejim filtresi = funding–OI–likidasyon (Kart E+G+L), meta-labeling** | 2 | Yön üretmez; S-0002+ sinyallerine izin/boyut verir. btc-radar Faz D entegrasyonunun hedefi. Önce GÖZLEM modunda (bloklamaz, loglar — CR-002 yol haritası 7) |
 | S-0004a | **Seans volatilite kırılması (Kart I)** | 3 | Neredeyse günlük örneklem; seans tanımı Kart I kurallarıyla (TZ-aware) |
 | S-0005 | **FOMC event-study (Kart K)** | 4 | Seyrek olay, ayrı pipeline; karartma penceresinde "armed" bekler (P0-7) |

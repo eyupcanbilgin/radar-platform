@@ -19,11 +19,13 @@ import hashlib
 import json
 import sys
 import uuid
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO / "registry" / "experiments.jsonl"
+VERDICT_EVENTS_PATH = REPO / "registry" / "verdict_events.jsonl"
 MANIFEST_DIR = REPO / "docs" / "data"
 STRATEGY_DIR = REPO / "user_data" / "strategies"
 
@@ -114,26 +116,53 @@ def record_run(*, registry_path: Path | None = None, **fields) -> dict:
     return entry
 
 
+def _events_path(registry_path: Path, verdict_events_path: Path | None = None) -> Path:
+    if verdict_events_path is not None:
+        return verdict_events_path
+    if registry_path == REGISTRY_PATH:
+        return VERDICT_EVENTS_PATH
+    return registry_path.with_name("verdict_events.jsonl")
+
+
+def _verdict_base(verdict: str) -> str:
+    base = verdict.split()[0].lower()
+    if base not in VALID_VERDICTS:
+        raise ValueError(f"geçersiz verdict: {verdict!r}; izinli: {VALID_VERDICTS}")
+    return base
+
+
 def update_verdict(
-    experiment_id: str, verdict: str, reason: str | None = None, registry_path: Path | None = None
+    experiment_id: str,
+    verdict: str,
+    reason: str | None = None,
+    registry_path: Path | None = None,
+    verdict_events_path: Path | None = None,
+    created_by: str = "claude",
 ) -> bool:
-    """Belirtilen experiment_id'nin verdict'ini güncelle (kaydı korur)."""
+    """Append an immutable verdict event; never rewrite the experiment registry."""
+    _verdict_base(verdict)
+    if created_by not in VALID_CREATORS:
+        raise ValueError(f"geçersiz created_by: {created_by!r}; izinli: {VALID_CREATORS}")
     path = registry_path or REGISTRY_PATH
     if not path.exists():
         return False
-    rows = read_all(path)
-    updated = False
-    new_rows = []
-    for r in rows:
-        if r.get("experiment_id") == experiment_id:
-            r["verdict"] = verdict
-            if reason:
-                r["verdict_reason"] = reason
-            updated = True
-        new_rows.append(r)
-    if updated:
-        _rewrite(path, [json.dumps(r, ensure_ascii=False, sort_keys=True) for r in new_rows])
-    return updated
+    events_path = _events_path(path, verdict_events_path)
+    rows = read_all(path, verdict_events_path=events_path)
+    current = next((row for row in rows if row.get("experiment_id") == experiment_id), None)
+    if current is None:
+        return False
+    event = {
+        "event_id": f"V-{datetime.now(UTC):%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}",
+        "schema_version": "1",
+        "created_at_utc": datetime.now(UTC).isoformat(),
+        "experiment_id": experiment_id,
+        "previous_verdict": current.get("verdict"),
+        "verdict": verdict,
+        "reason": reason,
+        "created_by": created_by,
+    }
+    _append_line(events_path, json.dumps(event, ensure_ascii=False, sort_keys=True))
+    return True
 
 
 # --- Encoding savunma katmanı -----------------------------------------------------------
@@ -148,12 +177,6 @@ def _append_line(path: Path, line: str) -> None:
     # newline="\n": Windows'ta CRLF'e çevrilmeyi engeller (JSONL satır bütünlüğü)
     with path.open("a", encoding="utf-8", newline="\n") as f:
         f.write(line + "\n")
-
-
-def _rewrite(path: Path, lines: list[str]) -> None:
-    with path.open("w", encoding="utf-8", newline="\n") as f:
-        for line in lines:
-            f.write(line + "\n")
 
 
 def verify_encoding(registry_path: Path | None = None) -> list[int]:
@@ -176,14 +199,7 @@ class RegistryEncodingError(Exception):
     """Registry dosyası UTF-8 değil — okuma reddedildi (sessiz fallback yapılmaz)."""
 
 
-def read_all(registry_path: Path | None = None) -> list[dict]:
-    """Tüm kayıtları oku.
-
-    Bozuk baytta SESSİZCE başka bir kod sayfasına düşülmez: yanlış çözülen bir kayıt
-    kanıt zincirini görünmez biçimde bozardı. Bunun yerine hangi satırların bozuk
-    olduğu ve nasıl onarılacağı söylenir (fail-loud, CLAUDE.md kural 2).
-    """
-    path = registry_path or REGISTRY_PATH
+def _read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     bad = verify_encoding(path)
@@ -192,7 +208,45 @@ def read_all(registry_path: Path | None = None) -> list[dict]:
             f"{path.name}: {len(bad)} satır UTF-8 değil (satırlar: {bad}). "
             "Onarım: python scripts/repair_registry_encoding.py --apply"
         )
-    return [json.loads(ln) for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+
+
+def read_verdict_events(
+    registry_path: Path | None = None,
+    verdict_events_path: Path | None = None,
+) -> list[dict]:
+    path = registry_path or REGISTRY_PATH
+    return _read_jsonl(_events_path(path, verdict_events_path))
+
+
+def read_all(
+    registry_path: Path | None = None,
+    verdict_events_path: Path | None = None,
+) -> list[dict]:
+    """Tüm kayıtları oku.
+
+    Bozuk baytta SESSİZCE başka bir kod sayfasına düşülmez: yanlış çözülen bir kayıt
+    kanıt zincirini görünmez biçimde bozardı. Bunun yerine hangi satırların bozuk
+    olduğu ve nasıl onarılacağı söylenir (fail-loud, CLAUDE.md kural 2).
+    """
+    path = registry_path or REGISTRY_PATH
+    rows = _read_jsonl(path)
+    by_id = {row.get("experiment_id"): row for row in rows}
+    for event in read_verdict_events(path, verdict_events_path):
+        experiment_id = event.get("experiment_id")
+        if experiment_id not in by_id:
+            raise ValueError(f"verdict event bilinmeyen deney kimliğine bağlı: {experiment_id!r}")
+        row = deepcopy(by_id[experiment_id])
+        row.setdefault("initial_verdict", row.get("verdict"))
+        row["verdict"] = event["verdict"]
+        if event.get("reason"):
+            row["verdict_reason"] = event["reason"]
+        row["verdict_event_id"] = event["event_id"]
+        row["verdict_updated_at_utc"] = event["created_at_utc"]
+        by_id[experiment_id] = row
+    return [by_id[row.get("experiment_id")] for row in rows]
 
 
 def count_runs(strategy_family: str, registry_path: Path | None = None) -> int:

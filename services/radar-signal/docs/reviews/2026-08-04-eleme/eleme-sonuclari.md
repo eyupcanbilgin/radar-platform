@@ -1,4 +1,11 @@
-# Hipotez Eleme Tezgâhı — Nihai Karar ve Kanıt Raporu
+# Hipotez Eleme Tezgâhı — GERİ ÇEKİLMİŞ Tarihî Rapor
+
+> [!CAUTION]
+> **Bu rapor artık nihai veya çıkarımsal kanıt değildir.** Bağımsız kod denetiminde
+> ufuk-null eşleşmesi, IID/örtüşen örneklem, post-hoc test yönü, olay tekilleştirme,
+> NaN testler ve DST/giriş zamanı kusurları bulundu. P-değerleri, FDR kararları ve
+> E/I/J/K/L sınıflandırmaları ürün kuralına dönüştürülemez. Ayrıntı:
+> [`AUDIT-NOTU.md`](AUDIT-NOTU.md) ve ADR-0007. Ham ortalamalar yalnız betimleyicidir.
 
 **Tarih:** 4 Ağustos 2026  
 **Değerlendirilen Dönem:** 2024-01-01 → 2026-08-03 (Development + Development Extension)  
