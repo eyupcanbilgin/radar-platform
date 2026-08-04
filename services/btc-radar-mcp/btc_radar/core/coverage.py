@@ -24,6 +24,7 @@ class MetricCoverage:
     """One metric's collection health over a window ending at ``as_of``."""
 
     metric: str
+    history_mode: str
     window_seconds: float
     expected_period_seconds: float
     expected_samples: int
@@ -36,6 +37,7 @@ class MetricCoverage:
     oldest_event_at: str | None
     newest_event_at: str | None
     seconds_since_newest: float | None
+    complete: bool
     gap_ok: bool
     fresh: bool
     healthy: bool
@@ -53,6 +55,7 @@ def metric_coverage(
     window_seconds: float,
     expected_period_seconds: float,
     tolerated_gap_seconds: float,
+    history_mode: str = "unspecified",
 ) -> MetricCoverage:
     """Measure one metric's completeness using only rows knowable at ``as_of``."""
     if expected_period_seconds <= 0:
@@ -68,6 +71,7 @@ def metric_coverage(
     expected_samples = int(window_seconds // expected_period_seconds)
     observed = len(events)
     ratio = round(observed / expected_samples, ROUND_NDIGITS) if expected_samples else 0.0
+    complete = observed >= expected_samples
 
     longest_gap = 0.0
     gap_start: datetime | None = None
@@ -86,6 +90,7 @@ def metric_coverage(
 
     return MetricCoverage(
         metric=metric,
+        history_mode=history_mode,
         window_seconds=float(window_seconds),
         expected_period_seconds=float(expected_period_seconds),
         expected_samples=expected_samples,
@@ -98,9 +103,10 @@ def metric_coverage(
         oldest_event_at=None if not events else events[0].isoformat(),
         newest_event_at=None if newest is None else newest.isoformat(),
         seconds_since_newest=age,
+        complete=complete,
         gap_ok=gap_ok,
         fresh=fresh,
-        healthy=gap_ok and fresh,
+        healthy=complete and gap_ok and fresh,
     )
 
 
@@ -112,8 +118,23 @@ def collection_coverage(
     window_seconds: float,
     asset: str = "BTC",
 ) -> list[MetricCoverage]:
-    """Coverage for every metric the configured features depend on, in metric order."""
-    specs = {spec.metric: spec for spec in rules.features.values()}
+    """Coverage for scoring inputs and explicitly monitored non-scoring collectors."""
+    specs = {
+        spec.metric: (
+            spec.expected_period_seconds,
+            spec.max_gap_seconds,
+            "backfill_and_live",
+        )
+        for spec in rules.features.values()
+    }
+    for metric, spec in rules.collection_metrics.items():
+        candidate = (spec.expected_period_seconds, spec.max_gap_seconds, spec.history_mode)
+        existing = specs.get(metric)
+        if existing is not None and existing[:2] != candidate[:2]:
+            raise ValueError(
+                f"{metric} feature ve collection cadence tanimlari birbiriyle celisiyor"
+            )
+        specs[metric] = candidate
     return [
         metric_coverage(
             store,
@@ -121,8 +142,9 @@ def collection_coverage(
             asset=asset,
             as_of=as_of,
             window_seconds=window_seconds,
-            expected_period_seconds=spec.expected_period_seconds,
-            tolerated_gap_seconds=spec.max_gap_seconds,
+            expected_period_seconds=spec[0],
+            tolerated_gap_seconds=spec[1],
+            history_mode=spec[2],
         )
         for metric, spec in sorted(specs.items())
     ]

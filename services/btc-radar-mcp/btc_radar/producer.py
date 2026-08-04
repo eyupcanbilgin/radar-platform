@@ -21,7 +21,7 @@ from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from btc_radar.core.backfill import backfill_funding, backfill_open_interest
+from btc_radar.core.backfill import backfill_funding, backfill_open_interest, backfill_spot_ohlcv
 from btc_radar.core.config import load_signal_rules
 from btc_radar.core.context_producer import collect_derivatives, produce_context
 from btc_radar.core.context_publisher import ExactHourContextPublisher, require_utc_hour
@@ -46,6 +46,7 @@ from btc_radar.providers.binance_futures_history import (
     BinanceFuturesHistoryProvider,
 )
 from btc_radar.providers.binance_spot import BinanceSpotProvider
+from btc_radar.providers.binance_spot_history import BinanceSpotHistoryProvider
 
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -79,7 +80,7 @@ def _positive_days(value: str) -> float:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="btc-radar-producer",
-        description="Binance public türev verisini PIT'e al ve fail-closed context yayınla.",
+        description="Binance public piyasa verisini PIT'e al ve fail-closed context yayınla.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -102,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     backfill = subparsers.add_parser(
-        "backfill", help="settled funding ve saatlik OI geçmişini sayfalayarak PIT'e al"
+        "backfill", help="funding, saatlik OI ve spot OHLCV geçmişini sayfalayarak PIT'e al"
     )
     add_pit_db(backfill)
     backfill.add_argument("--funding-days", type=_positive_days, default=120.0)
@@ -111,6 +112,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=_positive_days,
         default=float(OPEN_INTEREST_HISTORY_RETENTION_DAYS),
         help=f"Binance ~{OPEN_INTEREST_HISTORY_RETENTION_DAYS} günden eskisini saklamaz",
+    )
+    backfill.add_argument(
+        "--spot-days",
+        type=_positive_days,
+        default=120.0,
+        help="kapanmış Binance spot 1h OHLCV geçmişi (basis/depth geçmişi üretmez)",
     )
 
     def add_snapshot_db(target: argparse.ArgumentParser) -> None:
@@ -187,6 +194,10 @@ def _history_provider(lag_seconds: float) -> BinanceFuturesHistoryProvider:
     return BinanceFuturesHistoryProvider(publication_lag_seconds=lag_seconds)
 
 
+def _spot_history_provider(lag_seconds: float) -> BinanceSpotHistoryProvider:
+    return BinanceSpotHistoryProvider(publication_lag_seconds=lag_seconds)
+
+
 async def _collect(pit_path: Path, *, history_limit: int) -> dict:
     lag = load_signal_rules().publication_lag_seconds
     with PointInTimeStore(pit_path) as store:
@@ -234,7 +245,13 @@ async def _collect(pit_path: Path, *, history_limit: int) -> dict:
         }
 
 
-async def _backfill(pit_path: Path, *, funding_days: float, open_interest_days: float) -> dict:
+async def _backfill(
+    pit_path: Path,
+    *,
+    funding_days: float,
+    open_interest_days: float,
+    spot_days: float,
+) -> dict:
     lag = load_signal_rules().publication_lag_seconds
     now = datetime.now(UTC)
     with PointInTimeStore(pit_path) as store:
@@ -251,11 +268,19 @@ async def _backfill(pit_path: Path, *, funding_days: float, open_interest_days: 
                 start=now - timedelta(days=open_interest_days),
                 end=now,
             )
+        async with _spot_history_provider(lag) as provider:
+            spot = await backfill_spot_ohlcv(
+                provider,
+                store,
+                start=now - timedelta(days=spot_days),
+                end=now,
+            )
     return {
         "command": "backfill",
         "requested_funding_days": funding_days,
         "requested_open_interest_days": open_interest_days,
-        "results": [funding.as_payload(), open_interest.as_payload()],
+        "requested_spot_days": spot_days,
+        "results": [funding.as_payload(), open_interest.as_payload(), spot.as_payload()],
         "pit_db": str(pit_path),
     }
 
@@ -412,6 +437,7 @@ def _dispatch(argv: Sequence[str] | None) -> int:
                 args.pit_db,
                 funding_days=args.funding_days,
                 open_interest_days=args.open_interest_days,
+                spot_days=args.spot_days,
             )
         )
     elif args.command == "status":

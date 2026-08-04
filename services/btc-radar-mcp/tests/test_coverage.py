@@ -59,6 +59,7 @@ def test_a_complete_series_reports_full_coverage():
     assert report.observed_samples == 48
     assert report.coverage_ratio == 1.0
     assert report.max_gap_seconds == 3600.0
+    assert report.complete is True
     assert report.gap_ok is True
     assert report.fresh is True
     assert report.healthy is True
@@ -89,6 +90,17 @@ def test_a_stopped_collector_shows_up_as_stale_even_with_a_dense_history():
     assert report.fresh is False  # ama toplama durmuş
     assert report.healthy is False
     assert report.seconds_since_newest == 8 * 3600.0
+
+
+def test_a_fresh_but_new_collector_does_not_claim_the_whole_window_is_healthy():
+    with PointInTimeStore() as store:
+        _hourly(store, range(1, 4))
+        report = _coverage(store)
+
+    assert report.fresh is True
+    assert report.gap_ok is True
+    assert report.complete is False
+    assert report.healthy is False
 
 
 def test_an_empty_store_is_reported_as_unhealthy_not_as_perfect():
@@ -124,7 +136,16 @@ def test_collection_coverage_uses_the_shipped_feature_specs():
 
     metrics = {report.metric: report for report in reports}
     # Config'de tanımlı her feature metriği raporlanır; toplanmamış olan da görünür.
-    assert set(metrics) == {"funding_rate_settled", "open_interest_value_1h"}
+    assert set(metrics) == {
+        "funding_rate_settled",
+        "open_interest_value_1h",
+        "spot_close",
+        "spot_perp_basis",
+        "order_book_spread_bps",
+    }
     assert metrics["funding_rate_settled"].observed_samples == 0
     assert metrics["funding_rate_settled"].expected_period_seconds == 28800.0
     assert metrics["funding_rate_settled"].tolerated_gap_seconds == 43200.0
+    assert metrics["spot_close"].history_mode == "backfill_and_live"
+    assert metrics["spot_perp_basis"].history_mode == "live_only"
+    assert metrics["order_book_spread_bps"].expected_period_seconds == 300.0

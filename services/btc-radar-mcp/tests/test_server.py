@@ -54,6 +54,8 @@ async def test_get_health_roundtrip():
     assert data["providers"][0]["health"] == "not_polled"
     assert data["config"]["signal_rule_count"] == 2
     assert data["providers"][1]["name"] == "binance_futures_history"
+    assert data["providers"][2]["name"] == "binance_spot"
+    assert data["providers"][3]["name"] == "binance_spot_history"
     assert data["retrieved_at_utc"].endswith("+00:00")
 
 

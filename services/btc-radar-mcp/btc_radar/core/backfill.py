@@ -1,11 +1,13 @@
 """Paged history backfill into the PIT store.
 
-The two endpoints page in opposite directions and this module encodes that difference once
+The endpoints do not all page in the same direction and this module encodes that difference
 (see ``providers/binance_futures_history`` for the probe results behind it):
 
 - settled funding pages FORWARD from ``start_time``;
 - hourly open interest pages BACKWARD from ``end_time``, because supplying ``start_time``
   alone returns the newest rows instead of the oldest.
+- spot hourly klines page FORWARD from ``start_time`` and produce five observations per
+  candle (OHLCV) while event counts remain candle counts.
 
 Every loop is bounded by ``max_pages``.  An unbounded "just keep asking" loop against a
 rate-limited public endpoint is how an IP gets banned, and a silent partial result is worse
@@ -24,6 +26,8 @@ from btc_radar.providers.binance_futures_history import (
     BinanceFuturesHistoryProvider,
     HistoryWindowError,
 )
+from btc_radar.providers.binance_spot import OHLCV_METRIC
+from btc_radar.providers.binance_spot_history import BinanceSpotHistoryProvider
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +183,54 @@ async def backfill_open_interest(
 
     return _summarize(
         OPEN_INTEREST_HOURLY_METRIC,
+        pages=pages,
+        fetched=fetched,
+        inserted=inserted,
+        events=events,
+        truncated_reason=truncated,
+    )
+
+
+async def backfill_spot_ohlcv(
+    provider: BinanceSpotHistoryProvider,
+    store: PointInTimeStore,
+    *,
+    start: datetime,
+    end: datetime,
+    page_limit: int = 1000,
+    max_pages: int = DEFAULT_MAX_PAGES,
+) -> BackfillResult:
+    """Walk closed hourly spot candles forward without fabricating basis/depth history."""
+    cursor = start.astimezone(UTC)
+    end = end.astimezone(UTC)
+    pages = fetched = inserted = 0
+    events: set[datetime] = set()
+    truncated: str | None = None
+
+    while pages < max_pages:
+        page = await provider.fetch(
+            OHLCV_METRIC,
+            start_time=cursor,
+            end_time=end,
+            limit=page_limit,
+        )
+        pages += 1
+        if not page:
+            break
+        fetched += len(page)
+        inserted += store.append(page, provider=provider.name)
+        page_events = _event_times(page)
+        events.update(page_events)
+        if len(page_events) < page_limit:
+            break
+        cursor = page_events[-1] + timedelta(milliseconds=1)
+        if cursor >= end:
+            break
+    else:
+        truncated = "max_pages"
+
+    return _summarize(
+        OHLCV_METRIC,
         pages=pages,
         fetched=fetched,
         inserted=inserted,
