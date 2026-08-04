@@ -80,6 +80,13 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
    - **Türev verisi yayın-anı kuralı** (CR-3): funding/OI/likidasyon backtest'te ancak gerçek zamanda erişilebilir olduğu anda (`available_at ≤ karar_anı`) kullanılabilir; saat sonu verisiyle saat başında işlem = look-ahead.
    - Maliyet: komisyon + kayma + funding her koşuda açık (`config/costs.yaml`); "maliyetsiz sonuç" raporlanmaz.
    - Karşılaştırma tabanı: buy&hold BTC ve basit EMA-kesişim kontrol stratejisi (S-0001). Kontrolü geçemeyen strateji tartışılmaz.
+0. **Nabız kapısı (ADR-0006, 4 Ağu 2026):** Strateji kodu yazılmadan ÖNCE
+   `scripts/signal_pulse.py` koşulur — çıkış kuralı, stop, maliyet ve boyutlandırma
+   olmadan sinyalin ham forward getirisi taban dağılımla karşılaştırılır. Ölçülebilir
+   öngörü gücü göstermeyen hipotez için strateji YAZILMAZ. Gerekçe: Kart A'da 3 strateji
+   sürümü ve 17 backtest koşusu, tek bir ölçümle baştan elenebilecek bir sinyal için
+   harcandı.
+
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
@@ -90,7 +97,7 @@ Bu projenin asıl ürünü tek bir strateji değil, **strateji üretme-test etme
 | Kod | Hipotez (kaynak kart) | Öncelik | Not |
 |---|---|---|---|
 | S-0001 | EMA(20/50) kesişimi + ATR stop | Taban | Kontrol/taban çizgisi — iyi olduğu için değil, kıyas için |
-| S-0002 | **Hacim-koşullu intraday momentum (Kart A)** | 1 | En güçlü akademik temelli yönsel aday (Wen ve ark. 2022); koşullar kartın test taslağından |
+| ~~S-0002~~ | ~~Hacim-koşullu intraday momentum (Kart A)~~ | **KAPALI** | Nabız teşhisi: ölçülebilir öngörü gücü yok; 20 hücrenin 20'sinde negatif brüt beklenti, rastgeleden anlamlı biçimde kötü (ADR-0006). S-0002 GEÇERSİZ TEST, S-0002b NİHAİ RET |
 | S-0003 | **Rejim filtresi = funding–OI–likidasyon (Kart E+G+L), meta-labeling** | 2 | Yön üretmez; S-0002+ sinyallerine izin/boyut verir. btc-radar Faz D entegrasyonunun hedefi. Önce GÖZLEM modunda (bloklamaz, loglar — CR-002 yol haritası 7) |
 | S-0004a | **Seans volatilite kırılması (Kart I)** | 3 | Neredeyse günlük örneklem; seans tanımı Kart I kurallarıyla (TZ-aware) |
 | S-0005 | **FOMC event-study (Kart K)** | 4 | Seyrek olay, ayrı pipeline; karartma penceresinde "armed" bekler (P0-7) |

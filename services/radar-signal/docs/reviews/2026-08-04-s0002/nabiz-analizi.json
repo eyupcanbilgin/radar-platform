@@ -1,0 +1,523 @@
+{
+  "period": [
+    "2024-01-01",
+    "2026-08-03"
+  ],
+  "permutations": 5000,
+  "seed": 20260804,
+  "roundtrip_cost_bps": 17.0,
+  "results": {
+    "BTC · 20g (koddaki)": {
+      "bars": 90720,
+      "signals": 6915,
+      "long_share": 0.49891540130151846,
+      "horizons": [
+        {
+          "horizon_bars": 1,
+          "horizon_min": 15,
+          "n_signals": 6915,
+          "mean_bps": -0.7123754556621527,
+          "median_bps": -3.6042049057227743,
+          "hit_rate": 0.44266088214027477,
+          "std_bps": 39.15392575981766,
+          "null_mean_bps": 0.00032465944868332263,
+          "null_std_bps": 0.31185528381349076,
+          "edge_vs_null_bps": -0.712700115110836,
+          "p_greater": 0.9896020795840832,
+          "p_less": 0.010597880423915218,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 2,
+          "horizon_min": 30,
+          "n_signals": 6915,
+          "mean_bps": -1.1025617606200102,
+          "median_bps": -4.42973523421708,
+          "hit_rate": 0.44786695589298625,
+          "std_bps": 53.00867015892421,
+          "null_mean_bps": 0.005442044708650435,
+          "null_std_bps": 0.4323924161477214,
+          "edge_vs_null_bps": -1.1080038053286607,
+          "p_greater": 0.9952009598080384,
+          "p_less": 0.004999000199960008,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 4,
+          "horizon_min": 60,
+          "n_signals": 6914,
+          "mean_bps": -1.8765496576775775,
+          "median_bps": -4.73472137061115,
+          "hit_rate": 0.4555973387330055,
+          "std_bps": 70.67327553677316,
+          "null_mean_bps": -0.016421727318440986,
+          "null_std_bps": 0.6170525627839208,
+          "edge_vs_null_bps": -1.8601279303591365,
+          "p_greater": 0.9992001599680064,
+          "p_less": 0.0009998000399920016,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 8,
+          "horizon_min": 120,
+          "n_signals": 6914,
+          "mean_bps": -2.464119327195038,
+          "median_bps": -6.264426673594503,
+          "hit_rate": 0.45617587503615853,
+          "std_bps": 91.40133998489773,
+          "null_mean_bps": -0.013336938267226602,
+          "null_std_bps": 0.854779587275055,
+          "edge_vs_null_bps": -2.450782388927811,
+          "p_greater": 0.9966006798640272,
+          "p_less": 0.003599280143971206,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 16,
+          "horizon_min": 240,
+          "n_signals": 6913,
+          "mean_bps": -3.211407743551079,
+          "median_bps": -6.943732031290395,
+          "hit_rate": 0.46521047302184293,
+          "std_bps": 124.08936303492159,
+          "null_mean_bps": 0.002274506196041499,
+          "null_std_bps": 1.218625723276598,
+          "edge_vs_null_bps": -3.2136822497471202,
+          "p_greater": 0.9958008398320336,
+          "p_less": 0.004399120175964807,
+          "beats_cost": false
+        }
+      ],
+      "by_hour_h4": [
+        {
+          "bucket": "00-05",
+          "n": 1641,
+          "mean_bps": -2.0779514833185257,
+          "hit_rate": 0.4448507007921999
+        },
+        {
+          "bucket": "06-11",
+          "n": 1692,
+          "mean_bps": -2.119406989522672,
+          "hit_rate": 0.43321513002364065
+        },
+        {
+          "bucket": "12-17",
+          "n": 1904,
+          "mean_bps": 0.765678652200544,
+          "hit_rate": 0.4847689075630252
+        },
+        {
+          "bucket": "18-23",
+          "n": 1675,
+          "mean_bps": -4.425845250877184,
+          "hit_rate": 0.45552238805970147
+        }
+      ],
+      "by_vol_h4": [
+        {
+          "bucket": "düşük vol",
+          "n": 592,
+          "mean_bps": -0.7548987214358155,
+          "hit_rate": 0.40540540540540543
+        },
+        {
+          "bucket": "orta vol",
+          "n": 2149,
+          "mean_bps": -0.15587129031834376,
+          "hit_rate": 0.46905537459283386
+        },
+        {
+          "bucket": "yüksek vol",
+          "n": 4171,
+          "mean_bps": -2.917651931393763,
+          "hit_rate": 0.45576600335650924
+        }
+      ]
+    },
+    "BTC · 60g (Kart A)": {
+      "bars": 90720,
+      "signals": 6895,
+      "long_share": 0.49354604786076867,
+      "horizons": [
+        {
+          "horizon_bars": 1,
+          "horizon_min": 15,
+          "n_signals": 6895,
+          "mean_bps": -0.8817148201637076,
+          "median_bps": -4.1754926729487,
+          "hit_rate": 0.437708484408992,
+          "std_bps": 39.5370759250793,
+          "null_mean_bps": -0.0005833714572344173,
+          "null_std_bps": 0.31935291853573206,
+          "edge_vs_null_bps": -0.8811314487064732,
+          "p_greater": 0.9962007598480304,
+          "p_less": 0.003999200159968006,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 2,
+          "horizon_min": 30,
+          "n_signals": 6895,
+          "mean_bps": -1.706714363278576,
+          "median_bps": -5.146799442524719,
+          "hit_rate": 0.4461203770848441,
+          "std_bps": 53.13327060458045,
+          "null_mean_bps": -0.006914486699017069,
+          "null_std_bps": 0.438575661376321,
+          "edge_vs_null_bps": -1.6997998765795588,
+          "p_greater": 0.9996000799840032,
+          "p_less": 0.0005998800239952009,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 4,
+          "horizon_min": 60,
+          "n_signals": 6894,
+          "mean_bps": -2.5781535419936747,
+          "median_bps": -5.180919127371064,
+          "hit_rate": 0.45184218160719464,
+          "std_bps": 71.28455756813419,
+          "null_mean_bps": -0.0037034761689800078,
+          "null_std_bps": 0.6160316232525199,
+          "edge_vs_null_bps": -2.5744500658246947,
+          "p_greater": 0.9998000399920016,
+          "p_less": 0.0003999200159968006,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 8,
+          "horizon_min": 120,
+          "n_signals": 6894,
+          "mean_bps": -3.5500969562577334,
+          "median_bps": -6.5051352631573245,
+          "hit_rate": 0.45271250362634174,
+          "std_bps": 93.16609891214115,
+          "null_mean_bps": -0.008819297726414299,
+          "null_std_bps": 0.8622616045639288,
+          "edge_vs_null_bps": -3.5412776585313193,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 16,
+          "horizon_min": 240,
+          "n_signals": 6893,
+          "mean_bps": -4.484976131896067,
+          "median_bps": -8.325339533868936,
+          "hit_rate": 0.4597417670100102,
+          "std_bps": 126.04196486944763,
+          "null_mean_bps": -0.02438535841966327,
+          "null_std_bps": 1.212258389743261,
+          "edge_vs_null_bps": -4.460590773476404,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        }
+      ],
+      "by_hour_h4": [
+        {
+          "bucket": "00-05",
+          "n": 1677,
+          "mean_bps": -3.0240943097293824,
+          "hit_rate": 0.4370900417412045
+        },
+        {
+          "bucket": "06-11",
+          "n": 1689,
+          "mean_bps": -2.7005538782692806,
+          "hit_rate": 0.42984014209591476
+        },
+        {
+          "bucket": "12-17",
+          "n": 1859,
+          "mean_bps": -0.5586233677921395,
+          "hit_rate": 0.478214093598709
+        },
+        {
+          "bucket": "18-23",
+          "n": 1669,
+          "mean_bps": -4.255642911902826,
+          "hit_rate": 0.45955662073097664
+        }
+      ],
+      "by_vol_h4": [
+        {
+          "bucket": "düşük vol",
+          "n": 643,
+          "mean_bps": -1.4221882054575368,
+          "hit_rate": 0.4105754276827372
+        },
+        {
+          "bucket": "orta vol",
+          "n": 2172,
+          "mean_bps": -2.0429215635975577,
+          "hit_rate": 0.4544198895027624
+        },
+        {
+          "bucket": "yüksek vol",
+          "n": 4079,
+          "mean_bps": -3.0453782462028203,
+          "hit_rate": 0.4569747487129198
+        }
+      ]
+    },
+    "ETH · 20g (koddaki)": {
+      "bars": 90720,
+      "signals": 6382,
+      "long_share": 0.49420244437480415,
+      "horizons": [
+        {
+          "horizon_bars": 1,
+          "horizon_min": 15,
+          "n_signals": 6382,
+          "mean_bps": -1.0054196344517434,
+          "median_bps": -6.0168456492476485,
+          "hit_rate": 0.43528674396740835,
+          "std_bps": 51.67252536258321,
+          "null_mean_bps": -0.006356277784190302,
+          "null_std_bps": 0.44016295602665195,
+          "edge_vs_null_bps": -0.9990633566675531,
+          "p_greater": 0.9888022395520896,
+          "p_less": 0.011397720455908818,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 2,
+          "horizon_min": 30,
+          "n_signals": 6382,
+          "mean_bps": -1.9678864890584338,
+          "median_bps": -6.810428364319443,
+          "hit_rate": 0.44296458790347853,
+          "std_bps": 69.88143038796721,
+          "null_mean_bps": -0.008946749429052138,
+          "null_std_bps": 0.6252607305899253,
+          "edge_vs_null_bps": -1.9589397396293817,
+          "p_greater": 0.9998000399920016,
+          "p_less": 0.0003999200159968006,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 4,
+          "horizon_min": 60,
+          "n_signals": 6381,
+          "mean_bps": -3.592294652991661,
+          "median_bps": -8.294433085145325,
+          "hit_rate": 0.4414668547249647,
+          "std_bps": 91.38710180502389,
+          "null_mean_bps": -0.005272846150459623,
+          "null_std_bps": 0.9024695095670686,
+          "edge_vs_null_bps": -3.5870218068412014,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 8,
+          "horizon_min": 120,
+          "n_signals": 6380,
+          "mean_bps": -4.0013858555484605,
+          "median_bps": -9.74431389300423,
+          "hit_rate": 0.45391849529780565,
+          "std_bps": 125.09385753362687,
+          "null_mean_bps": -0.011490884062885249,
+          "null_std_bps": 1.2543026476886863,
+          "edge_vs_null_bps": -3.989894971485575,
+          "p_greater": 0.9988002399520096,
+          "p_less": 0.0013997200559888023,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 16,
+          "horizon_min": 240,
+          "n_signals": 6379,
+          "mean_bps": -3.321580298015743,
+          "median_bps": -12.421077392203994,
+          "hit_rate": 0.4561843549145634,
+          "std_bps": 171.3093332929931,
+          "null_mean_bps": -0.04807311041924886,
+          "null_std_bps": 1.776942488440408,
+          "edge_vs_null_bps": -3.2735071875964943,
+          "p_greater": 0.9662067586482703,
+          "p_less": 0.033993201359728054,
+          "beats_cost": false
+        }
+      ],
+      "by_hour_h4": [
+        {
+          "bucket": "00-05",
+          "n": 1535,
+          "mean_bps": -1.1943023910299415,
+          "hit_rate": 0.4514657980456026
+        },
+        {
+          "bucket": "06-11",
+          "n": 1544,
+          "mean_bps": -2.5929587322078707,
+          "hit_rate": 0.4332901554404145
+        },
+        {
+          "bucket": "12-17",
+          "n": 1731,
+          "mean_bps": -2.4898704876990756,
+          "hit_rate": 0.463316002310803
+        },
+        {
+          "bucket": "18-23",
+          "n": 1570,
+          "mean_bps": -8.11120315348668,
+          "hit_rate": 0.4159235668789809
+        }
+      ],
+      "by_vol_h4": [
+        {
+          "bucket": "düşük vol",
+          "n": 566,
+          "mean_bps": -1.8495383879260945,
+          "hit_rate": 0.42402826855123676
+        },
+        {
+          "bucket": "orta vol",
+          "n": 1986,
+          "mean_bps": 2.422583899336829,
+          "hit_rate": 0.45317220543806647
+        },
+        {
+          "bucket": "yüksek vol",
+          "n": 3828,
+          "mean_bps": -6.9607497686671564,
+          "hit_rate": 0.43808777429467083
+        }
+      ]
+    },
+    "ETH · 60g (Kart A)": {
+      "bars": 90720,
+      "signals": 6689,
+      "long_share": 0.4903573030348333,
+      "horizons": [
+        {
+          "horizon_bars": 1,
+          "horizon_min": 15,
+          "n_signals": 6689,
+          "mean_bps": -1.3786971927960028,
+          "median_bps": -6.399483589498711,
+          "hit_rate": 0.43309911795485123,
+          "std_bps": 51.924842119139775,
+          "null_mean_bps": 0.0028368301101657513,
+          "null_std_bps": 0.43494925607757795,
+          "edge_vs_null_bps": -1.3815340229061686,
+          "p_greater": 0.9994001199760048,
+          "p_less": 0.0007998400319936012,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 2,
+          "horizon_min": 30,
+          "n_signals": 6689,
+          "mean_bps": -2.4180878550070366,
+          "median_bps": -7.16235312336666,
+          "hit_rate": 0.4407235760203319,
+          "std_bps": 70.2056846067061,
+          "null_mean_bps": -0.005641096146316041,
+          "null_std_bps": 0.6156589667022214,
+          "edge_vs_null_bps": -2.4124467588607206,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 4,
+          "horizon_min": 60,
+          "n_signals": 6688,
+          "mean_bps": -4.980685487822152,
+          "median_bps": -9.337702869530172,
+          "hit_rate": 0.43570574162679426,
+          "std_bps": 92.3866252960588,
+          "null_mean_bps": -0.007323969480654476,
+          "null_std_bps": 0.8815034105647619,
+          "edge_vs_null_bps": -4.973361518341497,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 8,
+          "horizon_min": 120,
+          "n_signals": 6687,
+          "mean_bps": -4.528175347661134,
+          "median_bps": -10.070055260982258,
+          "hit_rate": 0.4532675340212352,
+          "std_bps": 125.97025119431682,
+          "null_mean_bps": -0.016802097991985135,
+          "null_std_bps": 1.2127898467440654,
+          "edge_vs_null_bps": -4.511373249669148,
+          "p_greater": 1.0,
+          "p_less": 0.0001999600079984003,
+          "beats_cost": false
+        },
+        {
+          "horizon_bars": 16,
+          "horizon_min": 240,
+          "n_signals": 6686,
+          "mean_bps": -3.9698609466237014,
+          "median_bps": -13.542147589354903,
+          "hit_rate": 0.4539335925815136,
+          "std_bps": 171.72270762472849,
+          "null_mean_bps": -0.030451808226942483,
+          "null_std_bps": 1.7575047831450812,
+          "edge_vs_null_bps": -3.939409138396759,
+          "p_greater": 0.9880023995200959,
+          "p_less": 0.01219756048790242,
+          "beats_cost": false
+        }
+      ],
+      "by_hour_h4": [
+        {
+          "bucket": "00-05",
+          "n": 1644,
+          "mean_bps": -3.2055672491994147,
+          "hit_rate": 0.43369829683698297
+        },
+        {
+          "bucket": "06-11",
+          "n": 1634,
+          "mean_bps": -2.843724619842635,
+          "hit_rate": 0.43023255813953487
+        },
+        {
+          "bucket": "12-17",
+          "n": 1775,
+          "mean_bps": -5.075331416262943,
+          "hit_rate": 0.4619718309859155
+        },
+        {
+          "bucket": "18-23",
+          "n": 1635,
+          "mean_bps": -8.798478710814143,
+          "hit_rate": 0.41467889908256883
+        }
+      ],
+      "by_vol_h4": [
+        {
+          "bucket": "düşük vol",
+          "n": 719,
+          "mean_bps": -4.746717921934958,
+          "hit_rate": 0.4325452016689847
+        },
+        {
+          "bucket": "orta vol",
+          "n": 2103,
+          "mean_bps": 0.44355972478933325,
+          "hit_rate": 0.442225392296719
+        },
+        {
+          "bucket": "yüksek vol",
+          "n": 3866,
+          "mean_bps": -7.974842332621646,
+          "hit_rate": 0.4327470253491981
+        }
+      ]
+    }
+  }
+}
