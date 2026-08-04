@@ -27,7 +27,7 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | Yönsel avantaj | Kabul edilmiş strateji yok | Yeni stratejiden önce güvenilir nabız kapısı gerekir |
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
 | MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005); spot OHLCV, spot/perp basis ve order-book spread/depth toplayıcıları (ADR-0007) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
-| Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
+| Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor, değişmez WAIT yazıyor; kararların maliyet sonrası sonucu artık ölçülüyor (ADR-0010). Yönsel setup ve Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
 | Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI + canlı spot OHLCV/basis/spread; spot OHLCV backfill ve yeni ailelerin coverage kanıtı (ADR-0008) | Basis/depth yalnız canlı birikir; kesintiler `live_only` olarak görünür |
 | Operasyonel güven | MCP tarafında scheduler, heartbeat ve kapsama kanıtı var (ADR-0006); expiry, outbox atomikliği, Telegram env, kesinti bildirimi ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
@@ -109,7 +109,9 @@ alamıyor.
   - [x] Producer scheduler, process supervision/heartbeat ve kesintisiz işletim kanıtı
     (ADR-0006). Kalan operasyon işi kesinti bildirimi ve uzak izlemedir.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.
-- [ ] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet.
+- [x] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet
+  (Signal ADR-0010). Append-only `decision_outcomes` defteri; maliyet `config/costs.yaml`'dan
+  gelir, ufuk kapanmadan sonuç `pending` kalır, WAIT kararları `opportunity_return` ile ölçülür.
 
 **İlk çekirdek veri aileleri:**
 
