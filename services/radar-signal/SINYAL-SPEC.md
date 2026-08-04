@@ -1,5 +1,8 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.2**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.3**
+
+> v1.3 (4 Ağu 2026): İlk ürün dilimi BTCUSDT 1h paper olarak daraltıldı ve
+> `decision-context/v1` tüketici/fail-closed sözleşmesi eklendi. v1.2 → git geçmişi.
 
 > v1.2 (4 Ağu 2026): ADR-0007 ile eleme istatistiği v2 kapıları ve S-0002b kanıt
 > düzeltmesi işlendi. v1.1 → git geçmişi.
@@ -63,6 +66,13 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 ```
 
 **Veri sorumluluğu ayrımı:** Mum verisini freqtrade kendisi çeker (ccxt) — btc-radar provider'ları burada KULLANILMAZ (tekrar yazım yok). btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı) ve Faz D'de HTTP endpoint'i üzerinden sorgulanır.
+
+**İlk ürün dilimi:** Platformun ilk uçtan uca paper döngüsü yalnız
+`BTCUSDT · Binance USDT perpetual · kapanmış 1h mum · LONG/SHORT/WAIT` kapsamındadır.
+MCP rejim snapshot'ı `contracts/decision-context/v1` ile taşınır. Tüketici tam mum
+`as_of` eşleşmesini ve `data_cutoff_at <= as_of` kuralını doğrular. Sözleşmedeki
+`directional_decision_allowed=false` değeri yönsel sonucu kapatır ve `WAIT` üretir.
+HTTP taşıması ve karar motoruna gerçek bağlama bu sözleşmeden sonraki ayrı iş paketidir.
 
 ---
 

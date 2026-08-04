@@ -88,10 +88,11 @@ alamıyor.
 
 **Amaç:** Platform genişletmeden çalışan ürün döngüsünü görmek.
 
-- [ ] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
+- [x] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
 - [ ] Binance spot/futures OHLCV, funding, OI, basis ve spread/depth collector'larını ekle.
 - [ ] OI verisini append-only PIT olarak hemen toplamaya başla; geçmiş endpoint'i sınırlıdır.
-- [ ] `contracts/decision-context/v1` sözleşmesini oluştur.
+- [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
+  doğrula.
 - [ ] Kapanmış 1h mum için versioned `FeatureSnapshot` üret.
 - [ ] Her saat karar üret; setup yoksa açık gerekçeli `WAIT` kartı yaz.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.

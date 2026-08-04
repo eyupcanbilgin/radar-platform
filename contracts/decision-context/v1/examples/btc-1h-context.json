@@ -1,0 +1,39 @@
+{
+  "schema_version": "decision-context/v1",
+  "instrument": {
+    "asset": "BTC",
+    "symbol": "BTCUSDT",
+    "market": "USDT_PERPETUAL",
+    "venue": "binance",
+    "timeframe": "1h"
+  },
+  "as_of_utc": "2026-08-03T12:00:00Z",
+  "snapshot": {
+    "snapshot_id": "SNAP-0123456789abcdef",
+    "data_cutoff_at_utc": "2026-08-03T12:00:00Z",
+    "computed_at_utc": "2026-08-03T12:00:05Z",
+    "direction": 31.25,
+    "fragility": 44.0,
+    "confidence": 78.5,
+    "regime_label": "siniflandirilmadi_faz1",
+    "feature_version": "features-v0",
+    "scoring_version": "scoring-v0",
+    "weights_hash": "0123456789ab",
+    "input_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "content_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+  },
+  "data_quality": {
+    "status": "degraded",
+    "directional_decision_allowed": true,
+    "stale_sources": [],
+    "missing_layers": ["news_catalyst"],
+    "blockers": [],
+    "warnings": ["missing_optional_layer:news_catalyst"]
+  },
+  "usage": {
+    "decision_role": "context_only",
+    "allowed_outputs": ["LONG", "SHORT", "WAIT"],
+    "mode": "paper",
+    "real_orders": false
+  }
+}

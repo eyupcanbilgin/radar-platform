@@ -1,5 +1,8 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.0**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.1**
+
+> v1.1 (4 Ağu 2026): Monorepo `decision-context/v1` üretici sözleşmesi ve BTCUSDT 1h
+> paper kapsamı eklendi. v1.0 → git geçmişi.
 
 | Alan | Değer |
 |---|---|
@@ -152,6 +155,15 @@ unit, window, source_group, source_url, quality(q: 0-1), notes
 - Depo, kaydın taşıdığı `content_hash`'e güvenmez — gövdeden yeniden hesaplayıp doğrular.
 - **`get_as_of` vardır, `get_latest` YOKTUR:** radar-signal `as_of=<mum kapanışı>` sormak zorundadır ve ürettiği sinyale `snapshot_id` yazar.
 - Kabul testi karşılandı: 100 replay → bit-bit özdeş skor/gerekçe (`tests/test_snapshot.py`). Ayrıntı: ADR-0003.
+
+### 3.5 Signal servis sınırı — `decision-context/v1`
+
+MCP'nin `RegimeSnapshot` çıktısı monorepo kökündeki
+`contracts/decision-context/v1/schema.json` sözleşmesiyle signal servisine taşınır. İlk
+dar kapsam `BTCUSDT · Binance USDT perpetual · 1h · paper`dır. MCP yalnız bağlam üretir;
+`LONG/SHORT/WAIT` seçmez. Zorunlu veri eksiği `directional_decision_allowed=false` ve
+blocker listesiyle fail-closed taşınır. Ortak fixture iki servisin testinde doğrulanır;
+HTTP transport bu sözleşmenin dışındadır ve daha sonraki fazda uygulanır.
 
 ---
 

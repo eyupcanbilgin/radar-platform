@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://radar.local/contracts/decision-context/v1/schema.json",
+  "title": "RADAR Decision Context v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "instrument",
+    "as_of_utc",
+    "snapshot",
+    "data_quality",
+    "usage"
+  ],
+  "properties": {
+    "schema_version": { "const": "decision-context/v1" },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "symbol", "market", "venue", "timeframe"],
+      "properties": {
+        "asset": { "const": "BTC" },
+        "symbol": { "const": "BTCUSDT" },
+        "market": { "const": "USDT_PERPETUAL" },
+        "venue": { "const": "binance" },
+        "timeframe": { "const": "1h" }
+      }
+    },
+    "as_of_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00(?:\\.0+)?Z$"
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "data_cutoff_at_utc",
+        "computed_at_utc",
+        "direction",
+        "fragility",
+        "confidence",
+        "regime_label",
+        "feature_version",
+        "scoring_version",
+        "weights_hash",
+        "input_digest",
+        "content_hash"
+      ],
+      "properties": {
+        "snapshot_id": { "type": "string", "pattern": "^SNAP-[a-f0-9]{16}$" },
+        "data_cutoff_at_utc": { "type": "string", "format": "date-time" },
+        "computed_at_utc": { "type": "string", "format": "date-time" },
+        "direction": {
+          "type": ["number", "null"],
+          "minimum": -100,
+          "maximum": 100
+        },
+        "fragility": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 100 },
+        "regime_label": { "type": "string", "minLength": 1 },
+        "feature_version": { "type": "string", "minLength": 1 },
+        "scoring_version": { "type": "string", "minLength": 1 },
+        "weights_hash": { "type": "string", "pattern": "^[a-f0-9]{12,64}$" },
+        "input_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "data_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "directional_decision_allowed",
+        "stale_sources",
+        "missing_layers",
+        "blockers",
+        "warnings"
+      ],
+      "properties": {
+        "status": { "enum": ["healthy", "degraded", "unavailable"] },
+        "directional_decision_allowed": { "type": "boolean" },
+        "stale_sources": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "missing_layers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "healthy" } } },
+          "then": {
+            "properties": {
+              "directional_decision_allowed": { "const": true },
+              "blockers": { "maxItems": 0 },
+              "warnings": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "degraded" } } },
+          "then": {
+            "properties": {
+              "directional_decision_allowed": { "const": true },
+              "blockers": { "maxItems": 0 },
+              "warnings": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "unavailable" } } },
+          "then": {
+            "properties": {
+              "directional_decision_allowed": { "const": false },
+              "blockers": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_role", "allowed_outputs", "mode", "real_orders"],
+      "properties": {
+        "decision_role": { "const": "context_only" },
+        "allowed_outputs": { "const": ["LONG", "SHORT", "WAIT"] },
+        "mode": { "const": "paper" },
+        "real_orders": { "const": false }
+      }
+    }
+  }
+}
