@@ -31,6 +31,9 @@
 **/*.db
 **/*.log
 
+# Smoke doğrulama raporu (canlı yanıt örnekleri içerir; CI'da artifact olarak yüklenir)
+**/verify-endpoints.json
+
 # Freqtrade ham veri ve üretilmiş çıktılar
 **/user_data/data/
 **/user_data/backtest_results/

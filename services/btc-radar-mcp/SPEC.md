@@ -276,9 +276,9 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 
 | # | Risk/Soru | Plan |
 |---|---|---|
-| 1 | ~~Endpoint sözleşmeleri değişmiş olabilir~~ **YAPILDI (3 Ağu 2026):** doğrulama scripti yazıldı, 24 kontrol koşuldu, ⚠️ satırlar güncellendi (bkz. §2 tabloları + ADR-0002) | Günlük smoke CI'da sürer (`.github/workflows/smoke.yml`) |
+| 1 | ~~Endpoint sözleşmeleri değişmiş olabilir~~ **YAPILDI (3 Ağu 2026):** doğrulama scripti yazıldı, 24 kontrol koşuldu, ⚠️ satırlar güncellendi (bkz. §2 tabloları + ADR-0002) | Günlük smoke CI'da sürer (`.github/workflows/mcp-smoke.yml`); Binance uçları runner bölgesinde engelli olduğu için CI koşusu onlar için kanıt üretmez — ADR-0007 |
 | 2 | bitcoin-data.com limiti (15/gün) on-chain kapsamı daraltabilir | Metrik önceliklendirme: STH-SOPR + CDD + netflow ilk üç; kalanlar günde 1 çekim |
-| 3 | Türkiye'den bazı borsa API'lerine erişim kısıtı ihtimali — **3 Ağu 2026 itibarıyla gözlenmedi** (Binance spot+futures, Bybit, Upbit, Coinbase erişilebilir); madde açık kalır | Provider'lara opsiyonel proxy config; Bybit yedeği |
+| 3 | Coğrafi erişim kısıtı — geliştirme ağından (TR) **3 Ağu 2026 itibarıyla gözlenmedi** (Binance spot+futures, Bybit, Upbit, Coinbase erişilebilir); ancak **GitHub-hosted runner bölgesinden Binance engellidir** (4 Ağu 2026, koşu 30894903581: CloudFront ülke engeli). Madde açık kalır | Smoke scripti engeli `blocked_in_environment` olarak ayrı raporlar ve CI'yı kırmızıya boyamaz (ADR-0007); Binance kanıtı engellenmemiş ağdan `make smoke` ile üretilir. Provider'lara opsiyonel proxy config; Bybit yedeği |
 | 4 | Skorun aşırı güven yaratması (kullanıcı psikolojisi) | Her `compute_scores` yanıtında invalidasyon + "araştırma aracı" notu; §11.3 dil kuralları skill'e gömülür |
 | 5 | ~~Korea premium için USDKRW kaynağı~~ **YAPILDI:** open.er-api.com birincil, frankfurter.dev yedek — ADR-0002 | Smoke scripti üç adayı izlemeye devam eder |
 | 6 | ~~WS likidasyon toplayıcısı~~ **ÇÖZÜLDÜ (3 Ağu 2026):** bitcoin-data.com hazır likidasyon serisi doğrulandı; WS toplayıcıya MVP'de gerek yok | İhtiyaç doğarsa Faz 2'de ayrı süreç olarak yeniden değerlendirilir |
