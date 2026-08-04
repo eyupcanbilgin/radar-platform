@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -60,10 +60,56 @@ def test_publish_cli_requires_context_root(tmp_path):
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "binance_usdm"
+SPOT_FIXTURES = Path(__file__).parent / "fixtures" / "binance_spot"
 
 
 def _fixture(name: str):
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+
+
+def _spot_fixture(name: str):
+    return json.loads((SPOT_FIXTURES / name).read_text(encoding="utf-8"))
+
+
+def _closed_hour_klines_payload() -> list:
+    """One always-closed candle for the PREVIOUS UTC hour, computed relative to real time.
+
+    `producer._collect` uses the real system clock (no injected clock), so a fixture
+    fixed to a past calendar date would eventually be seen as "the still-open candle"
+    once wall-clock time moves past it. Anchoring to "now - 1h" keeps the fixture valid
+    no matter when the test actually runs.
+    """
+    hour_start = (datetime.now(UTC) - timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    open_ms = int(hour_start.timestamp() * 1000)
+    close_ms = int((hour_start + timedelta(hours=1)).timestamp() * 1000) - 1
+    return [
+        [
+            open_ms,
+            "64233.35000000",
+            "64420.00000000",
+            "64001.68000000",
+            "64341.00000000",
+            "558.35238000",
+            close_ms,
+            "35853995.31908820",
+            96909,
+            "284.87500000",
+            "18292658.93393350",
+            "0",
+        ]
+    ]
+
+
+def _mock_order_book_and_spot() -> None:
+    respx.get("https://fapi.binance.com/fapi/v1/depth").mock(
+        return_value=httpx.Response(200, json=_fixture("depth_btcusdt.json"))
+    )
+    respx.get("https://api.binance.com/api/v3/klines").mock(
+        return_value=httpx.Response(200, json=_closed_hour_klines_payload())
+    )
+    respx.get("https://api.binance.com/api/v3/ticker/price").mock(
+        return_value=httpx.Response(200, json=_spot_fixture("ticker_price_btcusdt.json"))
+    )
 
 
 @respx.mock
@@ -80,17 +126,31 @@ def test_collect_cli_stores_both_the_snapshot_and_the_newest_history(tmp_path, c
     respx.get("https://fapi.binance.com/futures/data/openInterestHist").mock(
         return_value=httpx.Response(200, json=_fixture("open_interest_hist_1h_btcusdt.json"))
     )
+    _mock_order_book_and_spot()
 
     main(["collect", "--pit-db", str(tmp_path / "pit.sqlite"), "--history-limit", "3"])
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["metrics"] == ["funding_rate", "mark_price", "open_interest"]
+    assert payload["order_book"]["metrics"] == [
+        "order_book_depth_ask_usd",
+        "order_book_depth_bid_usd",
+        "order_book_spread_bps",
+    ]
+    assert payload["spot"]["metrics"] == [
+        "spot_close",
+        "spot_high",
+        "spot_low",
+        "spot_open",
+        "spot_perp_basis",
+        "spot_volume",
+    ]
     history = {item["metric"]: item for item in payload["history"]}
     assert set(history) == {"funding_rate_settled", "open_interest_1h"}
     assert history["funding_rate_settled"]["inserted"] == 12
     # 48 saatlik kova × 2 metrik (kontrat + notional)
     assert history["open_interest_1h"]["inserted"] == 96
-    assert payload["rows_total"] == 3 + 12 + 96
+    assert payload["rows_total"] == 3 + 3 + 6 + 12 + 96
 
 
 @respx.mock
@@ -101,12 +161,13 @@ def test_collect_cli_can_skip_history(tmp_path, capsys):
     respx.get("https://fapi.binance.com/fapi/v1/openInterest").mock(
         return_value=httpx.Response(200, json=_fixture("open_interest_btcusdt.json"))
     )
+    _mock_order_book_and_spot()
 
     main(["collect", "--pit-db", str(tmp_path / "pit.sqlite"), "--history-limit", "0"])
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["history"] == []
-    assert payload["rows_total"] == 3
+    assert payload["rows_total"] == 3 + 3 + 6
 
 
 @respx.mock
@@ -159,6 +220,7 @@ def _mock_public_endpoints() -> None:
     respx.get("https://fapi.binance.com/futures/data/openInterestHist").mock(
         return_value=httpx.Response(200, json=_fixture("open_interest_hist_1h_btcusdt.json"))
     )
+    _mock_order_book_and_spot()
 
 
 def _run_args(tmp_path, *extra: str) -> list[str]:

@@ -45,6 +45,7 @@ from btc_radar.providers.binance_futures_history import (
     OPEN_INTEREST_HOURLY_METRIC,
     BinanceFuturesHistoryProvider,
 )
+from btc_radar.providers.binance_spot import BinanceSpotProvider
 
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -191,6 +192,10 @@ async def _collect(pit_path: Path, *, history_limit: int) -> dict:
     with PointInTimeStore(pit_path) as store:
         async with BinanceFuturesProvider() as provider:
             result = await collect_derivatives(provider, store)
+            order_book = await collect_derivatives(provider, store, metric="order_book")
+            # futures_provider paylaşılır: basis bacağı ayrı bir premiumIndex çağrısı yapmaz.
+            async with BinanceSpotProvider(futures_provider=provider) as spot_provider:
+                spot_result = await collect_derivatives(spot_provider, store, metric="all")
 
         history: list[dict] = []
         if history_limit > 0:
@@ -211,6 +216,18 @@ async def _collect(pit_path: Path, *, history_limit: int) -> dict:
             "fetched": result.fetched,
             "inserted": result.inserted,
             "metrics": list(result.metrics),
+            "order_book": {
+                "provider": order_book.provider,
+                "fetched": order_book.fetched,
+                "inserted": order_book.inserted,
+                "metrics": list(order_book.metrics),
+            },
+            "spot": {
+                "provider": spot_result.provider,
+                "fetched": spot_result.fetched,
+                "inserted": spot_result.inserted,
+                "metrics": list(spot_result.metrics),
+            },
             "history": history,
             "pit_db": str(pit_path),
             "rows_total": store.count(),

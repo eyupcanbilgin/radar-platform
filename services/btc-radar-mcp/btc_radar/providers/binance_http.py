@@ -179,6 +179,37 @@ class BinancePublicClient:
             raise ValueError(f"Binance USD-M {field} gecerli epoch milisaniye degil") from exc
 
     @staticmethod
+    def _book_levels(payload: dict[str, Any], field: str) -> list[tuple[float, float]]:
+        """Parse an order-book side (``[[price_str, qty_str], ...]``) fail-loud."""
+        raw = payload.get(field)
+        if not isinstance(raw, list) or not raw:
+            raise ValueError(f"Binance USD-M {field} bos olmayan liste olmali")
+        levels: list[tuple[float, float]] = []
+        for entry in raw:
+            if (
+                not isinstance(entry, list)
+                or len(entry) != 2
+                or not all(isinstance(v, str) for v in entry)
+            ):
+                raise ValueError(
+                    f"Binance USD-M {field} seviyesi [fiyat, miktar] olmali: {entry!r}"
+                )
+            price_str, qty_str = entry
+            try:
+                price = Decimal(price_str)
+                qty = Decimal(qty_str)
+            except InvalidOperation as exc:
+                raise ValueError(
+                    f"Binance USD-M {field} seviyesi parse edilemedi: {entry!r}"
+                ) from exc
+            if not price.is_finite() or price <= 0:
+                raise ValueError(f"Binance USD-M {field} fiyati sonlu ve > 0 olmali: {price_str!r}")
+            if not qty.is_finite() or qty < 0:
+                raise ValueError(f"Binance USD-M {field} miktari sonlu ve >= 0 olmali: {qty_str!r}")
+            levels.append((float(price), float(qty)))
+        return levels
+
+    @staticmethod
     def _number(
         payload: dict[str, Any],
         field: str,

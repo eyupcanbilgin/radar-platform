@@ -14,7 +14,10 @@ from btc_radar.providers.binance_futures import BinanceFuturesProvider
 FIXTURES = Path(__file__).parent / "fixtures" / "binance_usdm"
 PREMIUM_URL = "https://fapi.binance.com/fapi/v1/premiumIndex"
 OPEN_INTEREST_URL = "https://fapi.binance.com/fapi/v1/openInterest"
+DEPTH_URL = "https://fapi.binance.com/fapi/v1/depth"
 RETRIEVED_AT = datetime(2026, 8, 4, 13, 28, 43, 500000, tzinfo=UTC)
+# depth_btcusdt.json fixture'ının kendi E alanına yakın, ondan sonraki bir an.
+DEPTH_RETRIEVED_AT = datetime(2026, 8, 4, 21, 51, 46, tzinfo=UTC)
 
 
 def _fixture(name: str) -> dict:
@@ -61,6 +64,65 @@ async def test_all_normalizes_three_metrics_with_two_public_requests():
     assert oi.raw_value == pytest.approx(109281.542)
     assert oi.unit == "BTC"
     assert oi.timestamp_utc == datetime(2026, 8, 4, 13, 28, 39, 824000, tzinfo=UTC)
+
+
+@respx.mock
+async def test_order_book_computes_spread_and_depth_from_top_levels():
+    respx.get(DEPTH_URL).mock(return_value=httpx.Response(200, json=_fixture("depth_btcusdt.json")))
+    async with httpx.AsyncClient() as client:
+        provider = BinanceFuturesProvider(client, clock=lambda: DEPTH_RETRIEVED_AT)
+        observations = await provider.fetch("order_book")
+
+    assert [obs.metric for obs in observations] == [
+        "order_book_spread_bps",
+        "order_book_depth_bid_usd",
+        "order_book_depth_ask_usd",
+    ]
+    spread, depth_bid, depth_ask = observations
+    assert spread.raw_value == pytest.approx(0.015578714179441054)
+    assert spread.unit == "bps"
+    assert depth_bid.raw_value == pytest.approx(119007.8075)
+    assert depth_ask.raw_value == pytest.approx(1735652.7622)
+    assert depth_bid.window == "top_20x20"
+    assert spread.source_group == "execution_context"
+    assert spread.timestamp_utc == datetime(2026, 8, 4, 21, 51, 45, 685000, tzinfo=UTC)
+    # retrieved_at (DEPTH_RETRIEVED_AT), event_time'dan sonra: available_at onu kullanır.
+    assert spread.available_at_utc == DEPTH_RETRIEVED_AT
+
+
+@respx.mock
+async def test_order_book_rejects_a_crossed_book():
+    payload = _fixture("depth_btcusdt.json")
+    crossed = {**payload, "bids": [["64300.00", "1.0"]], "asks": [["64100.00", "1.0"]]}
+    respx.get(DEPTH_URL).mock(return_value=httpx.Response(200, json=crossed))
+    async with httpx.AsyncClient() as client:
+        provider = BinanceFuturesProvider(client, clock=lambda: DEPTH_RETRIEVED_AT)
+        with pytest.raises(ValueError, match="best_ask"):
+            await provider.fetch("order_book")
+
+
+@respx.mock
+async def test_order_book_is_not_included_in_the_all_bundle():
+    premium_route = respx.get(PREMIUM_URL, params={"symbol": "BTCUSDT"}).mock(
+        return_value=httpx.Response(200, json=_fixture("premium_index_btcusdt.json"))
+    )
+    oi_route = respx.get(OPEN_INTEREST_URL, params={"symbol": "BTCUSDT"}).mock(
+        return_value=httpx.Response(200, json=_fixture("open_interest_btcusdt.json"))
+    )
+    depth_route = respx.get(DEPTH_URL).mock(
+        return_value=httpx.Response(200, json=_fixture("depth_btcusdt.json"))
+    )
+    async with httpx.AsyncClient() as client:
+        provider = BinanceFuturesProvider(client, clock=lambda: RETRIEVED_AT)
+        observations = await provider.fetch("all")
+    assert [obs.metric for obs in observations] == [
+        "mark_price",
+        "funding_rate",
+        "open_interest",
+    ]
+    assert depth_route.call_count == 0
+    assert premium_route.call_count == 1
+    assert oi_route.call_count == 1
 
 
 @respx.mock

@@ -26,9 +26,9 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 | Araştırma altyapısı | Manifest, Registry, maliyet modeli, replay ve test temeli var | Korunacak |
 | Yönsel avantaj | Kabul edilmiş strateji yok | Yeni stratejiden önce güvenilir nabız kapısı gerekir |
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
-| MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
+| MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005); spot OHLCV, spot/perp basis ve order-book spread/depth toplayıcıları (ADR-0007) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
 | Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; setup/outcome/Telegram zinciri eksik | Tek dikey paper akışı tamamlanacak |
-| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI | Spot/perp basis, spread/depth ve kesintisiz toplama sırada |
+| Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI + canlı spot OHLCV/basis/spread (ADR-0007, tarihsel geçmişi yok) | Spot/basis/spread'in tarihsel backfill'i ve kesintisiz toplaması sırada |
 | Operasyonel güven | MCP tarafında scheduler, heartbeat ve kapsama kanıtı var (ADR-0006); expiry, outbox atomikliği, Telegram env, kesinti bildirimi ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
 ## 3. Değişmez Ürün İlkeleri
@@ -90,7 +90,7 @@ alamıyor.
 
 - [x] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
 - [x] İlk Binance public mark/funding/OI collector'ını ve PIT yazımını ekle.
-- [ ] Binance spot OHLCV, basis ve spread/depth collector'larını ekle.
+- [x] Binance spot OHLCV, basis ve spread/depth collector'larını ekle (MCP ADR-0007).
 - [x] Tarihsel settled funding ve saatlik OI'yi PIT'e biriktir; yeterli-geçmiş şartını tanımla
   ve yalnız kırılganlık feature'larını kur (ADR-0005). Yön ve rejim kapalı kalır.
 - [x] OI collector'ını process supervision ile sürekli çalıştır; geçmiş endpoint'i sınırlıdır.
@@ -258,4 +258,21 @@ Canlı doğrulama: daemon 15 sn aralıkla üç toplama yaptı, aynı saati ikinc
 `status` 7 günlük pencerede iki metrik için de `coverage_ratio=1.0` ve `hours_behind=0`
 raporladı; sert öldürülen süreçten kalan kilit ikinci başlatmayı reddetti.
 
-Sıradaki işler: spot/perp basis ve spread/depth collector'ları, kesinti bildirimi.
+### WP-0005 — Spot OHLCV, spot/perp basis ve order-book spread/depth toplama
+
+**Durum:** Kodlama, test ve canlı `collect` smoke tamamlandı (MCP ADR-0007).
+
+1. `BinanceSpotProvider`: saatlik spot OHLCV (yalnız kapanmış mum; açık mum fail-loud atılır)
+2. Spot/perp basis: `(Binance spot − Binance perp mark) / mark × 100`, Binance içi hesap
+   (cross-exchange bağımsız değil, `funding_stress`/`oi_buildup` ile aynı kırılganlık ailesi)
+3. `BinanceFuturesProvider`'a `order_book` metriği: USD-M perp defterinden spread (bps) ve
+   sabit `limit=20` sayfalık iki taraflı notional depth
+4. `_collect()` üç bacağı da tek tick içinde toplar; futures provider basis bacağıyla
+   paylaşılır (ikinci bir `premiumIndex` isteği açılmaz)
+
+Canlı doğrulama (5 Ağustos 2026): `collect` 12 satır yazdı (3 derivatives + 3 order_book + 6
+spot); açık (henüz kapanmamış) mum kullanılmadı; basis ≈%0.04, spread ≈0.016 bps.
+
+Bu paket tarihsel backfill, yeni fragility feature'ı veya yeni MCP aracı açmaz; `direction`
+hâlâ null. Sıradaki işler: bu üç ailenin tarihsel backfill'i, kesintisiz toplama kanıtı
+(ADR-0006 desenini bu ailelere genişletmek) ve kesinti bildirimi.

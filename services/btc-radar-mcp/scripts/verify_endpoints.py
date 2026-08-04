@@ -70,6 +70,16 @@ def _need_list_item(data: Any, *keys: str) -> str | None:
     return _need(data[0], *keys)
 
 
+def _klines_ok(data: Any) -> str | None:
+    """Kline satırı dict değil: [openTime, o, h, l, c, v, closeTime, ...] sabit-pozisyonlu liste."""
+    if not isinstance(data, list) or not data:
+        return f"boş olmayan liste bekleniyordu, {type(data).__name__} geldi"
+    row = data[0]
+    if not isinstance(row, list) or len(row) < 7:
+        return f"kline satırı en az 7 alanlı liste olmalı: {row!r}"
+    return None
+
+
 def _bybit_ok(data: Any) -> str | None:
     if not isinstance(data, dict) or data.get("retCode") != 0:
         return f"retCode != 0: {str(data)[:200]}"
@@ -206,6 +216,15 @@ CHECKS: list[Check] = [
         {"category": "linear", "symbol": "BTCUSDT", "limit": "2"},
         _bybit_ok,
     ),
+    Check(
+        "binance_futures_depth",
+        "derivatives",
+        "SPEC:80",
+        "https://fapi.binance.com/fapi/v1/depth",
+        {"symbol": "BTCUSDT", "limit": "20"},
+        lambda d: _need(d, "bids", "asks", "E"),
+        notes="ADR-0007 order_book metriği; yanıtta symbol alanı YOK (istek zaten sabit BTCUSDT).",
+    ),
     # ── §2.2 On-chain: bitcoin-data.com ayrı, bütçeli akışta; ChainExposed sadece erişim
     Check(
         "chainexposed_html",
@@ -233,6 +252,15 @@ CHECKS: list[Check] = [
         "https://api.binance.com/api/v3/ticker/price",
         {"symbol": "BTCUSDT"},
         lambda d: _need(d, "price", "symbol"),
+    ),
+    Check(
+        "binance_spot_klines",
+        "spot_regional",
+        "SPEC:97",
+        "https://api.binance.com/api/v3/klines",
+        {"symbol": "BTCUSDT", "interval": "1h", "limit": "2"},
+        _klines_ok,
+        notes="ADR-0007 ohlcv_1h metriği; satırlar dict değil sabit-pozisyonlu liste.",
     ),
     Check(
         "upbit_ticker",
