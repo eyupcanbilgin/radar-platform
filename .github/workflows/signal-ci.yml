@@ -22,7 +22,12 @@ jobs:
       run:
         working-directory: services/radar-signal
     steps:
+      # İnceleme kapısı testleri gerçek git geçmişine bakar (reviewed_commit HEAD'in atası
+      # mı?). Varsayılan sığ klonda (depth=1) HEAD'in atası yoktur ve test ortam yüzünden
+      # kırılır — kod yüzünden değil. Tam geçmiş bu yüzden zorunlu.
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
