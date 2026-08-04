@@ -1,5 +1,8 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.3**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.4**
+
+> v1.4 (4 Ağu 2026): BTCUSDT 1h teknik FeatureSnapshot, birinci sınıf WAIT karar kartı ve
+> atomik append-only DecisionLedger eklendi. v1.3 → git geçmişi.
 
 > v1.3 (4 Ağu 2026): İlk ürün dilimi BTCUSDT 1h paper olarak daraltıldı ve
 > `decision-context/v1` tüketici/fail-closed sözleşmesi eklendi. v1.2 → git geçmişi.
@@ -73,6 +76,21 @@ MCP rejim snapshot'ı `contracts/decision-context/v1` ile taşınır. Tüketici 
 `as_of` eşleşmesini ve `data_cutoff_at <= as_of` kuralını doğrular. Sözleşmedeki
 `directional_decision_allowed=false` değeri yönsel sonucu kapatır ve `WAIT` üretir.
 HTTP taşıması ve karar motoruna gerçek bağlama bu sözleşmeden sonraki ayrı iş paketidir.
+
+### 2.1 BTC 1h karar çekirdeği
+
+`decision_engine/`, kapanmış ve karar anında erişilebilir son 200 adet 1h mumdan
+`FeatureSnapshotV1` üretir. Snapshot kimliği input digest+sürümden, content hash tüm
+türetilmiş feature gövdesinden gelir. Eksik/gap history sessizce doldurulmaz; snapshot
+`ready=false` ve açık eksik listesi taşır.
+
+Her değerlendirilen saat `DecisionCardV1` üretir. Feature/context kapısı kapalıysa veya
+yönsel setup yoksa sonuç `WAIT`tir. MCP direction skoru doğrudan LONG/SHORT yapılamaz.
+Setup exact karar saati ve feature snapshot ID/hash'ine bağlıdır. Feature+context+karar
+payload'ları `DecisionLedger` içinde tek transaction'la append-only saklanır; aynı saat
+farklı içerikle UPDATE/DELETE/REPLACE edilemez. Ledger kartı girdilerden yeniden üretir ve
+okumada kolon-payload tutarlılığını doğrular. Scheduler ve canlı veri bağlantısı henüz kapsam
+dışıdır; bu nedenle motor hazır olsa da otomatik saatlik işletim tamamlanmamıştır.
 
 ---
 

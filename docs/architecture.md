@@ -6,7 +6,10 @@ btc-radar-mcp
                                       |
                                       v
 radar-signal
-  mum verisi -> deterministik strateji -> politika/defter -> Telegram veya konsol
+  kapanmış 1h mum -> FeatureSnapshot --+
+                                         +-> LONG / SHORT / WAIT -> DecisionLedger
+  decision-context/v1 ------------------+
+                                         +-> yönsel aday varsa SignalLedger/outbox
 ```
 
 İki bileşen aynı repoda geliştirilir fakat ayrı süreçler ve ayrı bağımlılık ortamları
@@ -15,4 +18,3 @@ yaşam döngüsünden sorumludur.
 
 Platform seviyesindeki entegrasyon sürümlü bir sözleşme üzerinden yapılır; bir
 servisin diğerinin iç Python modüllerini doğrudan import etmesi hedeflenmez.
-

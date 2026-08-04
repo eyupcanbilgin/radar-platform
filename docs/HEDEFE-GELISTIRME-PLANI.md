@@ -93,8 +93,10 @@ alamıyor.
 - [ ] OI verisini append-only PIT olarak hemen toplamaya başla; geçmiş endpoint'i sınırlıdır.
 - [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
   doğrula.
-- [ ] Kapanmış 1h mum için versioned `FeatureSnapshot` üret.
+- [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
 - [ ] Her saat karar üret; setup yoksa açık gerekçeli `WAIT` kartı yaz.
+  - [x] Deterministik karar motoru, context-missing WAIT ve append-only ledger.
+  - [ ] Gerçek mum/context adaptörü, scheduler ve kesintisiz işletim.
 - [ ] Signal candidate -> policy -> ledger -> outbox -> Telegram hattını gerçek dry-run sürecine bağla.
 - [ ] Kararların +1h/+4h/+24h sonuçlarını, MFE/MAE ve veri sağlığını otomatik kaydet.
 
