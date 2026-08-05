@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.6**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.7**
+
+> v1.7 (5 Ağu 2026): ADR-0016 ile Faz 2 referans taban çizgileri (`cash`, `buy_and_hold`,
+> `simple_trend`) maliyet sonrası değerlendiricisi (`scripts/baseline_evaluator.py`) eklendi.
+> v1.6 → git geçmişi.
 
 > v1.6 (5 Ağu 2026): ADR-0014 ile Purged Walk-Forward + Embargo split ve ölçüm protokolü,
 > config güdümlü eşikler, fail-closed Locked OOS kuralı ve `scripts/walk_forward.py` eklendi.

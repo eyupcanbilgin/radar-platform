@@ -79,7 +79,7 @@ def load_research_protocol_config(config_path: Path | None = None) -> dict:
     if data.get("version") != "1.0":
         raise ProtocolValidationError(f"Desteklenmeyen konfigürasyon sürümü: {data.get('version')}")
 
-    for req_sec in ["boundaries", "walk_forward", "data_integrity", "locked_oos"]:
+    for req_sec in ["boundaries", "walk_forward", "data_integrity", "locked_oos", "baselines"]:
         if req_sec not in data:
             raise ProtocolValidationError(f"Konfigürasyonda zorunlu bölüm eksik: '{req_sec}'")
 

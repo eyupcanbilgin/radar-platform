@@ -1,4 +1,4 @@
-# Araştırma ve Ölçüm Protokolü (Phase 2 - Purged Walk-Forward + Embargo)
+# Araştırma ve Ölçüm Protokolü (Phase 2 - Purged Walk-Forward + Embargo + Baselines)
 # Eşikler koda gömülmez; config doğrulama fail-closed çalışır.
 version: "1.0"
 
@@ -23,3 +23,10 @@ data_integrity:
 
 locked_oos:
   allow_unlock_default: false
+
+baselines:
+  cost_scenario: "realistic"
+  simple_trend:
+    fast_period: 20
+    slow_period: 50
+    signal_mode: "long_short"
