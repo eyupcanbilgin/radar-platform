@@ -135,16 +135,24 @@ aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yön
 
 **Amaç:** Basit baseline'ları aşan maliyet sonrası avantaj aramak; kazanan uydurmamak.
 
-- [ ] BTC 1h için basit, açıklanabilir yönsel aileleri hipotez kartlarıyla ön-kayıt et.
+- [x] BTC 1h için basit, açıklanabilir yönsel aileleri hipotez kartlarıyla ön-kayıt et
+  (S-0003 ve S-0004 ölçüldü; ikisi de Development düzeyinde reddedildi).
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
-  - [ ] Gerçek bir yönsel aileyi bu protokolle koş ve sonucu hipotez kartına bağla.
-- [ ] Net getiriyi hesap özel maker/taker, funding, spread, kayma ve latency ile ölç.
+  - [x] İki gerçek yönsel aileyi protokolle koş ve sonucu hipotez kartına bağla
+    (S-0003/ADR-0017, S-0004/ADR-0018; ikisi de reddedildi).
+- [x] Net getiriyi `realistic` ve `taker_heavy` maliyet senaryolarında ölç.
 - [ ] DSR'a ek olarak PBO/CSCV veya White Reality Check uygula.
+  - [x] Registry-güdümlü DSR + PBO/CSCV altyapısı ve sentetik kabul testleri (ADR-0019).
+  - [ ] Sonraki ön-kayıtlı hipotezin Development raporuna iki kapıyı da uygula.
 - [ ] ±%20 parametre hassasiyeti ve dönem/venue kırılganlığını raporla.
-- [ ] Baseline'lar: cash, buy-and-hold ve basit trend kontrolü.
+  - [x] Config-güdümlü ±%20 parametre hassasiyet kapısı hazır (ADR-0019).
+  - [ ] Sonraki hipotezde hassasiyet ile dönem/venue kırılganlık raporunu üret.
+- [x] Baseline'lar: cash, buy-and-hold ve basit trend kontrolü (ADR-0016).
 - [ ] Bir veri ailesini eklemeden/çıkarmadan önce aynı koşuda ablation yap.
+  - [x] Eşleşmiş fold ve iki maliyet senaryolu ablation kapısı hazır (ADR-0019).
+  - [ ] Sonraki çok-aileli hipotezde ön-kayıtlı ablation raporunu üret.
 - [ ] BTC'de kabul edilen sabit kuralları ETH'de bağımsız replikasyon adayı olarak sınama.
 
 **Kabul kapısı:** Development ve validation'da gerçekçi + taker-heavy maliyette pozitif;

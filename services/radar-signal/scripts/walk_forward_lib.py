@@ -79,13 +79,57 @@ def load_research_protocol_config(config_path: Path | None = None) -> dict:
     if data.get("version") != "1.0":
         raise ProtocolValidationError(f"Desteklenmeyen konfigürasyon sürümü: {data.get('version')}")
 
-    for req_sec in ["boundaries", "walk_forward", "data_integrity", "locked_oos", "baselines"]:
+    for req_sec in [
+        "boundaries",
+        "walk_forward",
+        "data_integrity",
+        "locked_oos",
+        "baselines",
+        "statistical_gates",
+    ]:
         if req_sec not in data:
             raise ProtocolValidationError(f"Konfigürasyonda zorunlu bölüm eksik: '{req_sec}'")
 
     wf = data["walk_forward"]
     if wf.get("min_embargo_days", 0) < 1:
         raise ProtocolValidationError("min_embargo_days 1 günden az olamaz (fail-closed).")
+
+    gates = data["statistical_gates"]
+    if gates.get("version") != "1.0":
+        raise ProtocolValidationError("Desteklenmeyen statistical_gates sürümü.")
+    for section in ("dsr", "pbo_cscv", "sensitivity", "ablation"):
+        if not isinstance(gates.get(section), dict):
+            raise ProtocolValidationError(f"statistical_gates.{section} bölümü eksik.")
+    if gates["dsr"].get("min_unique_trials", 0) < 2:
+        raise ProtocolValidationError("DSR min_unique_trials en az 2 olmalıdır.")
+    confidence = gates["dsr"].get("confidence_threshold")
+    if not isinstance(confidence, int | float) or not 0 < confidence < 1:
+        raise ProtocolValidationError("DSR confidence_threshold 0 ile 1 arasında olmalıdır.")
+    partitions = gates["pbo_cscv"].get("partitions", 0)
+    if not isinstance(partitions, int) or partitions < 4 or partitions % 2:
+        raise ProtocolValidationError("PBO partitions çift ve en az 4 olmalıdır.")
+    max_combinations = gates["pbo_cscv"].get("max_combinations")
+    if not isinstance(max_combinations, int) or max_combinations < 1:
+        raise ProtocolValidationError("PBO max_combinations pozitif integer olmalıdır.")
+    rejection_threshold = gates["pbo_cscv"].get("rejection_threshold")
+    if not isinstance(rejection_threshold, int | float) or not 0 <= rejection_threshold <= 1:
+        raise ProtocolValidationError("PBO rejection_threshold [0,1] aralığında olmalıdır.")
+    if gates["pbo_cscv"].get("performance_metric") != "mean_net_return":
+        raise ProtocolValidationError("PBO performance_metric mean_net_return olmalıdır.")
+    relative_delta = gates["sensitivity"].get("relative_delta")
+    if not isinstance(relative_delta, int | float) or not 0 < relative_delta < 1:
+        raise ProtocolValidationError("Sensitivity relative_delta 0 ile 1 arasında olmalıdır.")
+    retention = gates["sensitivity"].get("min_performance_retention_ratio")
+    if not isinstance(retention, int | float) or not 0 < retention <= 1:
+        raise ProtocolValidationError("Sensitivity retention ratio (0,1] aralığında olmalıdır.")
+    positive_ratio = gates["ablation"].get("min_positive_fold_ratio")
+    if not isinstance(positive_ratio, int | float) or not 0 <= positive_ratio <= 1:
+        raise ProtocolValidationError("Ablation positive fold ratio [0,1] aralığında olmalıdır.")
+    required_scenarios = gates.get("required_cost_scenarios")
+    if required_scenarios != ["realistic", "taker_heavy"]:
+        raise ProtocolValidationError(
+            "required_cost_scenarios realistic ve taker_heavy sırasını içermelidir."
+        )
 
     # Locked OOS tarihini doğrula
     locked_str = data["boundaries"].get("locked_oos_start_utc")
