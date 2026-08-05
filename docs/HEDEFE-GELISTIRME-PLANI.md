@@ -162,7 +162,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 
 **Aktif kırılganlık işleri:**
 
-- [ ] İleri olay etiketini ön-kayıt et: gerçekleşen volatilite genişlemesi ve MAE; yön etiketi yok.
+- [x] F-0001 ileri olay etiketini ön-kayıt et: gerçekleşen volatilite genişlemesi ve maksimum
+  mutlak sapma; yön etiketi yok (`config/fragility_calibration.yaml`).
 - [ ] Funding stress ve OI buildup için purged walk-forward kalibrasyon raporu üret.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
