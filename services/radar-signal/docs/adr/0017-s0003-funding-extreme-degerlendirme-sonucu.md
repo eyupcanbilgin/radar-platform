@@ -1,7 +1,7 @@
 # 0017 — S-0003 Aşırı Settled Funding Hipotez Değerlendirme Sonucu
 
 - **Tarih:** 5 Ağustos 2026
-- **Durum:** KABUL EDİLDİ
+- **Durum:** Kabul edildi (ADR karar kaydı) — S-0003 Hipotezi REDDEDİLDİ
 - **İlgili:** S-0003 Hipotez Kartı, ADR-0014, ADR-0016, `SINYAL-SPEC.md`, Hedefe Geliştirme Planı Faz 2
 
 ## Bağlam
@@ -25,7 +25,7 @@ Faz 2'nin ilk yönsel hipotezi olan S-0003 (Aşırı Settled Funding Yönsel Rev
    S-0003 hipotezi dondurulmuş ret kriterlerinin tamamını tetiklemiş ve **REDDEDİLMİŞTİR (REJECTED).**
 
 4. **Provenance ve Kayıt:**
-   Sonuç Experiment Registry `registry/experiments.jsonl` kütüğüne `E-20260805-084135-e80d0f` kimliğiyle append edilmiş; code SHA (`d445953ef87f`), dataset_snapshot (`6217119a82205871a3268b5badcc108f42ac1e2196f434f5a347156fc6549e28`) ve ortam parmak izi bağlanmıştır.
+   Tek birincil ve geçerli kanıt kaydı `E-20260805-084135-e80d0f` kimlikli deneydir (code SHA: `d445953ef87f`, dataset_snapshot: `6217119a82205871a3268b5badcc108f42ac1e2196f434f5a347156fc6549e28`). Aynı koşunun mükerrer tekrarları olan `E-20260805-084344-eb6141` ve `E-20260805-084520-51861d` satırları `registry/verdict_events.jsonl` üzerinden `invalid` olarak işaretlenerek tekil kanıt kütüğü netleştirilmiştir.
 
 5. **Locked OOS Koruması:**
    Locked OOS (`2026-08-04T00:00:00Z`) açılmamıştır. Reddedilen hipotez için sonradan parametre oynatma, filtre ekleme veya Locked OOS testi yapılmayacaktır.

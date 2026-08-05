@@ -11,6 +11,7 @@ Bu script S-0003 hipotez kartındaki kuralları birebir ve sızıntısız uygula
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,12 @@ from scripts.costslib import effective_fee, load_costs
 from scripts.datapaths import data_dir, verify_manifest
 from scripts.provenance import environment_fingerprint
 from scripts.pulse_stats import moving_block_test, non_overlapping_positions
-from scripts.registrylib import record_run
+from scripts.registrylib import (
+    git_commit_hash,
+    latest_manifest_hash,
+    read_all,
+    record_run,
+)
 from scripts.walk_forward_lib import (
     generate_walk_forward_plan,
     load_research_protocol_config,
@@ -102,7 +108,7 @@ def compute_funding_signals(
     return merged
 
 
-def run_s0003_evaluation() -> dict:
+def run_s0003_evaluation(registry_path: Path | None = None) -> dict:
     # STEP 2: Manifest kontrolü
     manifest_info = verify_manifest()
     if manifest_info.get("status") != "ok":
@@ -349,17 +355,29 @@ def run_s0003_evaluation() -> dict:
         "rejection_reasons": rejection_reasons,
     }
 
-    reg_entry = record_run(
-        hypothesis_id="S-0003",
-        strategy="S0003FundingExtreme",
-        scenario="realistic_and_taker_heavy",
-        effective_fee=fee_real,
-        exit_code=0,
-        verdict=verdict,
-        result=summary,
-        pairs=["BTC/USDT:USDT"],
-        created_by="claude",
-    )
+    existing_runs = [
+        r
+        for r in read_all(registry_path)
+        if r.get("hypothesis_id") == "S-0003"
+        and r.get("strategy_version") == git_commit_hash()
+        and r.get("dataset_snapshot") == latest_manifest_hash()
+        and not r.get("verdict", "").startswith("invalid")
+    ]
+    if existing_runs:
+        reg_entry = existing_runs[0]
+    else:
+        reg_entry = record_run(
+            registry_path=registry_path,
+            hypothesis_id="S-0003",
+            strategy="S0003FundingExtreme",
+            scenario="realistic_and_taker_heavy",
+            effective_fee=fee_real,
+            exit_code=0,
+            verdict=verdict,
+            result=summary,
+            pairs=["BTC/USDT:USDT"],
+            created_by="claude",
+        )
 
     summary["registry_experiment_id"] = reg_entry["experiment_id"]
     summary["provenance"] = environment_fingerprint()
