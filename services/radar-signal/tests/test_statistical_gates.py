@@ -10,6 +10,7 @@ from scripts.statistical_gates import (
     evaluate_ablation,
     evaluate_dsr_gate,
     evaluate_pbo_cscv,
+    evaluate_period_venue_fragility,
     evaluate_sensitivity,
 )
 
@@ -152,6 +153,65 @@ def test_ablation_is_paired_and_fails_non_contributing_family():
     assert report["status"] == "failed"
     assert "volume:realistic" in report["failures"]
     assert "funding:realistic" not in report["failures"]
+
+
+def _fragility_kwargs() -> dict:
+    def scenarios(value: float) -> dict[str, list[float]]:
+        return {
+            "realistic": [value, value * 1.1, value * 0.9],
+            "taker_heavy": [value * 0.8, value * 0.9, value * 0.7],
+        }
+
+    return {
+        "period_returns": {
+            "early": scenarios(0.010),
+            "middle": scenarios(0.012),
+            "late": scenarios(0.009),
+        },
+        "venue_returns": {
+            "binance": scenarios(0.010),
+            "independent_venue": scenarios(0.009),
+        },
+        "required_scenarios": ["realistic", "taker_heavy"],
+        "min_period_groups": 3,
+        "min_venue_groups": 2,
+        "min_observations_per_group": 3,
+        "min_worst_group_retention_ratio": 0.50,
+        "min_positive_group_ratio": 0.67,
+    }
+
+
+def test_period_venue_fragility_passes_balanced_groups_deterministically():
+    kwargs = _fragility_kwargs()
+    outputs = {
+        json.dumps(evaluate_period_venue_fragility(**kwargs), sort_keys=True) for _ in range(100)
+    }
+    assert len(outputs) == 1
+    report = evaluate_period_venue_fragility(**kwargs)
+    assert report["status"] == "passed"
+    assert report["period"]["status"] == "passed"
+    assert report["venue"]["status"] == "passed"
+
+
+def test_period_venue_fragility_exposes_weak_slice_and_both_costs():
+    kwargs = _fragility_kwargs()
+    kwargs["period_returns"]["late"]["taker_heavy"] = [-0.002, -0.001, -0.003]
+    report = evaluate_period_venue_fragility(**kwargs)
+    assert report["status"] == "failed"
+    assert "period:taker_heavy" in report["period"]["failures"]
+    assert report["period"]["rows"][1]["scenario"] == "taker_heavy"
+
+
+def test_period_venue_fragility_fails_loud_on_missing_or_short_groups():
+    kwargs = _fragility_kwargs()
+    del kwargs["venue_returns"]["independent_venue"]
+    with pytest.raises(StatisticalGateError, match="en az 2 grup"):
+        evaluate_period_venue_fragility(**kwargs)
+
+    kwargs = _fragility_kwargs()
+    kwargs["period_returns"]["early"]["realistic"] = [0.01, 0.02]
+    with pytest.raises(StatisticalGateError, match="en az 3 gözlem"):
+        evaluate_period_venue_fragility(**kwargs)
 
 
 def _registry_row(experiment_id: str, *, verdict: str, hypothesis: str, code: str) -> dict:

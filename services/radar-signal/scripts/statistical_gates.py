@@ -268,3 +268,105 @@ def evaluate_ablation(
     if not rows:
         raise StatisticalGateError("ablation en az bir veri ailesi ister")
     return {"status": "passed" if not failures else "failed", "failures": failures, "rows": rows}
+
+
+def _evaluate_fragility_dimension(
+    *,
+    dimension: str,
+    grouped_returns: dict[str, dict[str, list[float]]],
+    required_scenarios: list[str],
+    min_groups: int,
+    min_observations_per_group: int,
+    min_worst_group_retention_ratio: float,
+    min_positive_group_ratio: float,
+) -> dict:
+    if len(grouped_returns) < min_groups:
+        raise StatisticalGateError(f"{dimension} kırılganlığı en az {min_groups} grup ister")
+    if any(not str(name).strip() for name in grouped_returns):
+        raise StatisticalGateError(f"{dimension} grup adı boş olamaz")
+
+    rows = []
+    failures = []
+    names = sorted(grouped_returns)
+    for scenario in required_scenarios:
+        means = {}
+        for name in names:
+            series = _finite_series(
+                grouped_returns[name].get(scenario, []),
+                name=f"fragility:{dimension}:{name}:{scenario}",
+                minimum=min_observations_per_group,
+            )
+            means[name] = fmean(series)
+        reference = fmean(means.values())
+        if reference <= 0:
+            failures.append(f"{dimension}:{scenario}:non_positive_reference")
+            retention = {name: 0.0 for name in names}
+        else:
+            retention = {name: value / reference for name, value in means.items()}
+        worst_name = min(names, key=lambda name: (retention[name], name))
+        worst_retention = retention[worst_name]
+        positive_ratio = sum(value > 0 for value in means.values()) / len(means)
+        passed = (
+            reference > 0
+            and worst_retention >= min_worst_group_retention_ratio
+            and positive_ratio >= min_positive_group_ratio
+        )
+        if not passed and f"{dimension}:{scenario}:non_positive_reference" not in failures:
+            failures.append(f"{dimension}:{scenario}")
+        rows.append(
+            {
+                "dimension": dimension,
+                "scenario": scenario,
+                "group_means": means,
+                "cross_group_mean": reference,
+                "worst_group": worst_name,
+                "worst_group_retention_ratio": worst_retention,
+                "positive_group_ratio": positive_ratio,
+                "passed": passed,
+            }
+        )
+    return {"status": "passed" if not failures else "failed", "failures": failures, "rows": rows}
+
+
+def evaluate_period_venue_fragility(
+    *,
+    period_returns: dict[str, dict[str, list[float]]],
+    venue_returns: dict[str, dict[str, list[float]]],
+    required_scenarios: list[str],
+    min_period_groups: int,
+    min_venue_groups: int,
+    min_observations_per_group: int,
+    min_worst_group_retention_ratio: float,
+    min_positive_group_ratio: float,
+) -> dict:
+    """Require a candidate to survive pre-registered time and venue slices."""
+    if required_scenarios != ["realistic", "taker_heavy"]:
+        raise StatisticalGateError("realistic ve taker_heavy senaryoları birlikte zorunlu")
+    if min_period_groups < 3 or min_venue_groups < 2 or min_observations_per_group < 2:
+        raise StatisticalGateError("fragility grup ve gözlem alt sınırları geçersiz")
+    if not 0 < min_worst_group_retention_ratio <= 1 or not 0 < min_positive_group_ratio <= 1:
+        raise StatisticalGateError("fragility göreli eşikleri (0,1] aralığında olmalı")
+
+    period = _evaluate_fragility_dimension(
+        dimension="period",
+        grouped_returns=period_returns,
+        required_scenarios=required_scenarios,
+        min_groups=min_period_groups,
+        min_observations_per_group=min_observations_per_group,
+        min_worst_group_retention_ratio=min_worst_group_retention_ratio,
+        min_positive_group_ratio=min_positive_group_ratio,
+    )
+    venue = _evaluate_fragility_dimension(
+        dimension="venue",
+        grouped_returns=venue_returns,
+        required_scenarios=required_scenarios,
+        min_groups=min_venue_groups,
+        min_observations_per_group=min_observations_per_group,
+        min_worst_group_retention_ratio=min_worst_group_retention_ratio,
+        min_positive_group_ratio=min_positive_group_ratio,
+    )
+    return {
+        "status": "passed" if period["status"] == venue["status"] == "passed" else "failed",
+        "period": period,
+        "venue": venue,
+    }
