@@ -166,7 +166,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   mutlak sapma; yön etiketi yok (`config/fragility_calibration.yaml`).
 - [ ] Funding stress ve OI buildup için purged walk-forward kalibrasyon raporu üret.
   - [x] Train-only olasılık ve pooled out-of-fold metrik çekirdeği hazır (Signal ADR-0021).
-  - [ ] PIT kırılganlık + OHLCV'den provenance bağlı tetik/etiket satırlarını üret ve ölç.
+  - [x] PIT kırılganlık + OHLCV'den provenance bağlı tetik/etiket üreticisi hazır (ADR-0022).
+  - [ ] Manifest doğrulanmış gerçek iki-venue girdisiyle F-0001 ölçümünü koş.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
