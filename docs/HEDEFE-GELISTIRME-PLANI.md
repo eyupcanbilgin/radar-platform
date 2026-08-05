@@ -11,23 +11,23 @@
 RADAR'ın hedef ürünü şudur:
 
 > Çok kaynaklı piyasa verisini otomatik izleyen; yalnız ölçülmüş bir kurulum oluştuğunda
-> açıklanabilir BTC/ETH `LONG`, `SHORT` veya `WAIT` kararı üreten, riski sınırlayan ve
-> kararlarının maliyet sonrası sonuçlarını değişmez bir defterde ölçen kişisel trading
-> karar-destek sistemi.
+> açıklanabilir kırılganlık, volatilite genişlemesi riski, veri güveni ve blocker uyarısı
+> üreten; yön ölçülmedikçe `direction=null`/`WAIT` kalan ve uyarılarının ileri sonuçlarını
+> değişmez bir defterde ölçen kişisel piyasa risk karar-destek sistemi.
 
-Kârlılık bir yazılım özelliği veya vaat değildir. Kilitli OOS ve forward paper ölçümünde
-kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek emir göndermez ve
-çıktılar `DENEYSEL/PAPER` etiketi taşır.
+Kârlılık bir yazılım özelliği veya vaat değildir. Ürün v1'in kanıt koşulu, kırılganlık
+uyarılarının kilitli değerlendirme ve forward paper döneminde kalibre olmasıdır. Sistem
+gerçek emir göndermez ve çıktılar `DENEYSEL/PAPER` etiketi taşır.
 
 ## 2. Bugünkü Gerçeklik
 
 | Alan | Bugünkü durum | Hedefe etkisi |
 |---|---|---|
 | Araştırma altyapısı | Manifest, Registry, maliyet modeli, replay ve test temeli var | Korunacak |
-| Yönsel avantaj | Kabul edilmiş strateji yok | Yeni stratejiden önce güvenilir nabız kapısı gerekir |
+| Yönsel avantaj | S-0003 ve S-0004 Development'ta reddedildi; eski seans ailesi yönsel öngörü göstermedi | Ürün v1 için park edildi; ADR-0004 yeniden-açma kapısı geçilmeden yeni yön denemesi yok |
 | Eleme raporu | 126 kayıt var; istatistik uygulamasında doğruluk kusurları bulundu | Sonuçlar geçici; yeniden analiz edilecek |
 | MCP | Binance mark/funding/OI provider'ı, PIT collector, fail-closed context publisher; ayrıca tarihsel funding/OI backfill'i ve iki kırılganlık feature'ı (ADR-0005); spot OHLCV, spot/perp basis ve order-book spread/depth toplayıcıları (ADR-0007) | Kırılganlık gözlemi çalışıyor; yön ve rejim hâlâ kapalı |
-| Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; kararların maliyet sonrası sonucu ölçülüyor (ADR-0010), teslimat idempotent outbox üzerinden bağlı (ADR-0011). Kabul edilmiş yönsel setup yok | Yönsel araştırma Faz 2 kapısından geçecek |
+| Signal ürünü | BTC 1h runtime exact-hour context'i tüketiyor ve değişmez WAIT yazıyor; karar sonuçları ölçülüyor (ADR-0010), teslimat idempotent outbox üzerinden bağlı (ADR-0011) | Kırılganlık uyarı kartı ve ileri olay kalibrasyonu Faz 2'de tamamlanacak |
 | Veri kapsamı | Signal BTC futures OHLCV; MCP anlık mark/funding/OI + 120 gün settled funding, ~30 gün saatlik OI + canlı spot OHLCV/basis/spread; spot OHLCV backfill ve yeni ailelerin coverage kanıtı (ADR-0008) | Basis/depth yalnız canlı birikir; kesintiler `live_only` olarak görünür |
 | Operasyonel güven | MCP scheduler/heartbeat/kapsama kanıtı var; Signal ledger-outbox crash boşluğu sınırlı reconciliation ile kapalı; expiry, Telegram env, kesinti bildirimi ve risk kapıları eksik | Paper karantina öncesi kapatılacak |
 
@@ -42,6 +42,7 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 7. Başarı; win-rate, kaynak sayısı veya test sayısıyla değil maliyet sonrası beklenti, drawdown,
    kalibrasyon ve forward sapmayla ölçülür.
 8. Locked OOS bir kez açılır; geliştirme sonucu hiçbir zaman final OOS diye sunulmaz.
+9. Ürün v1 yön tahmini yapmaz; `direction=null` ölçülmemiş yönün tek doğru gösterimidir.
 
 ## 4. Hedef Mimari
 
@@ -49,10 +50,10 @@ kanıtlanması gereken kabul koşuludur. Kanıt oluşana kadar sistem gerçek em
 Collectors
   -> append-only RawObservation / PIT store
   -> versioned FeatureSnapshot
-  -> directional Setup Engine
-  -> regime + fragility observation
-  -> deterministic Risk Gate
-  -> LONG / SHORT / WAIT DecisionCard
+  -> fragility + volatility-risk features
+  -> data confidence + blockers
+  -> deterministic Alert Gate
+  -> FRAGILITY / DATA-UNAVAILABLE / NORMAL observation + WAIT DecisionCard
   -> Telegram + decision ledger
   -> outcome evaluator (MFE, MAE, +1h, +4h, +24h, costs)
 ```
@@ -88,7 +89,8 @@ alamıyor.
 
 **Amaç:** Platform genişletmeden çalışan ürün döngüsünü görmek.
 
-- [x] İlk ürün kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle.
+- [x] İlk teknik sözleşme kapsamını `BTCUSDT · 1h · LONG/SHORT/WAIT · paper` olarak sabitle;
+  aktif ürün v1 profilini ADR-0004 ile `direction=null`/`WAIT` kırılganlık uyarısına daralt.
 - [x] İlk Binance public mark/funding/OI collector'ını ve PIT yazımını ekle.
 - [x] Binance spot OHLCV, basis ve spread/depth collector'larını ekle (MCP ADR-0007).
 - [x] Tarihsel settled funding ve saatlik OI'yi PIT'e biriktir; yeterli-geçmiş şartını tanımla
@@ -131,12 +133,14 @@ dışındadır. Her biri daha sonra ayrı ablation ile katkı gösterirse ekleni
 **Kabul kapısı:** Kesintisiz çalışan `veri -> snapshot -> karar -> Telegram -> sonuç` zinciri;
 aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yönsel karar yok.
 
-### Faz 2 — Yönsel araştırma ve kabul kapısı
+### Faz 2 — Kırılganlık uyarısı kalibrasyonu ve araştırma arşivi
 
-**Amaç:** Basit baseline'ları aşan maliyet sonrası avantaj aramak; kazanan uydurmamak.
+**Amaç:** Yön iddia etmeden, kırılganlık uyarısının ileri oynaklık ve olumsuz hareket
+riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmayı değiştirmeden korumak.
 
 - [x] BTC 1h için basit, açıklanabilir yönsel aileleri hipotez kartlarıyla ön-kayıt et
   (S-0003 ve S-0004 ölçüldü; ikisi de Development düzeyinde reddedildi).
+- [x] Yönsel ürün araştırmasını park et; yeniden-açma kapısını tanımla (Platform ADR-0004).
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
@@ -156,13 +160,23 @@ aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yön
   - [ ] Sonraki çok-aileli hipotezde ön-kayıtlı ablation raporunu üret.
 - [ ] BTC'de kabul edilen sabit kuralları ETH'de bağımsız replikasyon adayı olarak sınama.
 
-**Kabul kapısı:** Development ve validation'da gerçekçi + taker-heavy maliyette pozitif;
-tek döneme yoğunlaşmayan; baseline'ı aşan; parametre hassasiyetinde çökmeyen aday. Bu kapı
-locked OOS başarısı değildir, yalnız forward karantina adaylığıdır.
+**Aktif kırılganlık işleri:**
+
+- [ ] İleri olay etiketini ön-kayıt et: gerçekleşen volatilite genişlemesi ve MAE; yön etiketi yok.
+- [ ] Funding stress ve OI buildup için purged walk-forward kalibrasyon raporu üret.
+- [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
+- [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
+- [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
+- [ ] Saatlik uyarı kartını direction üretmeden ledger/outbox hattına bağla.
+
+**Kabul kapısı:** Development ve validation'da veri kapsamı yeterli; kalibrasyon ve
+precision/recall config kapılarını geçen; tek döneme yoğunlaşmayan; baseline uyarı oranını
+aşan kırılganlık modeli. Bu kapı yön veya kârlılık kanıtı değildir.
 
 ### Faz 3 — Forward paper karantina ve ürün güvenliği
 
-**Amaç:** Backtest ile gerçek zamanlı karar üretimi arasındaki sapmayı ölçmek.
+**Amaç:** Tarihsel kırılganlık kalibrasyonu ile gerçek zamanlı uyarı davranışı arasındaki
+sapmayı ölçmek.
 
 - [ ] Minimum 4 hafta AND 100 bağımsız karar/sinyal AND 2 rejim koşulunu uygula.
 - [ ] Tercih edilen gözlem süresi 8-12 haftadır; fırsat koşulu dolmadan süre tek başına yetmez.
@@ -195,7 +209,7 @@ kurumsal akış/makro -> on-chain -> yapılandırılmış haber. Her kaynak aile
 |---|---|
 | Ekonomik | Maliyet sonrası expectancy, net PnL, profit factor, drawdown, Calmar |
 | İstatistik | Efektif bağımsız örneklem, DSR/PBO, zaman/varlık replikasyonu |
-| Karar kalitesi | LONG/SHORT/WAIT kapsamı, abstention oranı, calibration/Brier |
+| Uyarı kalitesi | Precision/recall, lead time, false-alarm, abstention, calibration/Brier |
 | Operasyon | Veri yaşı, null oranı, provider drift, pending/dead outbox, replay uyumu |
 | Gerçekçilik | Sim-paper fill, spread, slippage ve latency sapması |
 

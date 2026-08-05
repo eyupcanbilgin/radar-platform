@@ -1,5 +1,9 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.5**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.6**
+
+> v1.6 (5 Ağu 2026): Platform ADR-0004 ile ürün v1 kırılganlık/volatilite uyarısı odağına
+> alındı. Aktif profil `direction=null`; direction alanı uyumluluk için korunur, ürün özelliği
+> değildir. v1.5 → git geçmişi.
 
 > v1.5 (5 Ağu 2026): Saatlik spot OHLCV backfill'i ve scoring'den ayrı spot/basis/depth
 > collection coverage sözleşmesi (ADR-0008).
@@ -13,7 +17,7 @@
 |---|---|
 | Proje sahibi | Eyüpcan |
 | Tarih | 3 Ağustos 2026 |
-| Durum | Uygulamada — Faz 1'in çekirdek veri aileleri toplanıyor (spot/basis/spread dahil); yön/rejim kapalı |
+| Durum | Ürün v1 kırılganlık/volatilite uyarısı; yön park edilmiş ve runtime'da null |
 | Çalışma adı | `btc-radar-mcp` (değiştirilebilir) |
 | Temel girdiler | Kripto Piyasa Analiz Metodolojisi v1.0 (Eyüpcan), borsa-mcp mimari incelemesi (3 Ağu 2026), veri kaynağı fizibilite envanteri |
 
@@ -31,7 +35,8 @@ Metodoloji v1.0'daki çok katmanlı Bitcoin analiz çerçevesini, Claude'un (Des
 ### 1.2 MVP kapsamı (Faz 1)
 - Tek varlık: **BTC** (BTCUSDT perpetual + BTC-USD spot).
 - 8 MCP aracı (Bölüm 4).
-- Deterministik skorlama motoru: yön (−100..+100), kırılganlık (0..100), güven (0..100), rejim etiketi (Bölüm 5).
+- Deterministik skorlama motoru: kırılganlık (0..100), güven (0..100) ve blocker dökümü;
+  direction alanı aktif profilde daima null (Bölüm 5).
 - Kaynak bazlı TTL önbelleği ve rate-limit koruması.
 - stdio transport (uvx ile lokal çalıştırma). HTTP transport Faz 3.
 
@@ -62,6 +67,11 @@ provider ile PIT'e backfill edilir. Spot close, canlı spot/perp basis ve order-
 serileri feature ilan edilmeden collection coverage raporuna alınır. Basis/depth uçları
 tarihsel snapshot sunmadığından geçmişleri uydurulmaz; `history_mode=live_only` ile yalnız
 canlı birikim kanıtlanır. Yeni skor/yön kuralı yoktur; `direction` hâlâ null.
+
+**Ürün v1 kapsam kararı (Platform ADR-0004):** İki yönsel Development reddi ve seans
+ailesinin yön yerine volatilite zamanlaması göstermesi nedeniyle yönsel araştırma park
+edilmiştir. MCP'nin aktif görevi PIT-güvenli kırılganlık, veri güveni ve blocker bağlamı
+üretmektir. Kabul edilmiş yeni bir yönsel araştırma kapısı olmadan direction kuralı eklenmez.
 
 ### 1.3 Kapsam dışı (tüm fazlar için)
 - Emir iletimi, borsa API key'i ile private endpoint kullanımı, bakiye erişimi.
