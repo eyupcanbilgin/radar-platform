@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.8**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.9**
+
+> v1.9 (5 Ağu 2026): ADR-0018 ile S-0004 (Volatilite Rejimi Koşullandırmalı Trend) hipotezinin
+> sızıntısız Purged Walk-Forward Development ölçüm sonuçları ve REDDEDİLDİ kararı işlendi.
+> v1.8 → git geçmişi.
 
 > v1.8 (5 Ağu 2026): ADR-0017 ile S-0003 (Aşırı Settled Funding) hipotezinin sızıntısız
 > Purged Walk-Forward Development ölçüm sonuçları ve REDDEDİLDİ (REJECTED) kararı işlendi.
