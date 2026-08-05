@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.6**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.7**
+
+> v2.7 (6 Ağu 2026): ADR-0024 ile F-0001 gerçek Development koşusu için manifest
+> doğrulamalı, iki zorunlu leave-one-family-out ablation girdili ve Registry'de mükerrer
+> kanıtı engelleyen fail-closed orkestratör eklendi. Gerçek ölçüm yapılmadı. v2.6 → git geçmişi.
 
 > v2.6 (5 Ağu 2026): ADR-0023 ile public Coinbase BTC-USD 1h kapalı mum indiricisi ve
 > Binance/Coinbase dosyalarını birlikte kapsayan çok-venue manifest üretimi eklendi.
