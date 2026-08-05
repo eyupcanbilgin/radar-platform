@@ -137,6 +137,9 @@ aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yön
 
 - [ ] BTC 1h için basit, açıklanabilir yönsel aileleri hipotez kartlarıyla ön-kayıt et.
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
+  - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
+    göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
+  - [ ] Gerçek bir yönsel aileyi bu protokolle koş ve sonucu hipotez kartına bağla.
 - [ ] Net getiriyi hesap özel maker/taker, funding, spread, kayma ve latency ile ölç.
 - [ ] DSR'a ek olarak PBO/CSCV veya White Reality Check uygula.
 - [ ] ±%20 parametre hassasiyeti ve dönem/venue kırılganlığını raporla.
