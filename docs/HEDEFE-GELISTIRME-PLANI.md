@@ -165,6 +165,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [x] F-0001 ileri olay etiketini ön-kayıt et: gerçekleşen volatilite genişlemesi ve maksimum
   mutlak sapma; yön etiketi yok (`config/fragility_calibration.yaml`).
 - [ ] Funding stress ve OI buildup için purged walk-forward kalibrasyon raporu üret.
+  - [x] Train-only olasılık ve pooled out-of-fold metrik çekirdeği hazır (Signal ADR-0021).
+  - [ ] PIT kırılganlık + OHLCV'den provenance bağlı tetik/etiket satırlarını üret ve ölç.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
