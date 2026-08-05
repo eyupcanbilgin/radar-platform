@@ -148,7 +148,8 @@ aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yön
   - [ ] Sonraki ön-kayıtlı hipotezin Development raporuna iki kapıyı da uygula.
 - [ ] ±%20 parametre hassasiyeti ve dönem/venue kırılganlığını raporla.
   - [x] Config-güdümlü ±%20 parametre hassasiyet kapısı hazır (ADR-0019).
-  - [ ] Sonraki hipotezde hassasiyet ile dönem/venue kırılganlık raporunu üret.
+  - [x] Göreli dönem/venue kırılganlık kapısı ve sentetik kabul testleri hazır (ADR-0020).
+  - [ ] Sonraki hipotezde hassasiyet ile gerçek dönem/venue kırılganlık raporunu üret.
 - [x] Baseline'lar: cash, buy-and-hold ve basit trend kontrolü (ADR-0016).
 - [ ] Bir veri ailesini eklemeden/çıkarmadan önce aynı koşuda ablation yap.
   - [x] Eşleşmiş fold ve iki maliyet senaryolu ablation kapısı hazır (ADR-0019).

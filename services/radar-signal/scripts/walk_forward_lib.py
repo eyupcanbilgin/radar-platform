@@ -95,9 +95,9 @@ def load_research_protocol_config(config_path: Path | None = None) -> dict:
         raise ProtocolValidationError("min_embargo_days 1 günden az olamaz (fail-closed).")
 
     gates = data["statistical_gates"]
-    if gates.get("version") != "1.0":
+    if gates.get("version") != "1.1":
         raise ProtocolValidationError("Desteklenmeyen statistical_gates sürümü.")
-    for section in ("dsr", "pbo_cscv", "sensitivity", "ablation"):
+    for section in ("dsr", "pbo_cscv", "sensitivity", "ablation", "fragility"):
         if not isinstance(gates.get(section), dict):
             raise ProtocolValidationError(f"statistical_gates.{section} bölümü eksik.")
     if gates["dsr"].get("min_unique_trials", 0) < 2:
@@ -125,6 +125,18 @@ def load_research_protocol_config(config_path: Path | None = None) -> dict:
     positive_ratio = gates["ablation"].get("min_positive_fold_ratio")
     if not isinstance(positive_ratio, int | float) or not 0 <= positive_ratio <= 1:
         raise ProtocolValidationError("Ablation positive fold ratio [0,1] aralığında olmalıdır.")
+    fragility = gates["fragility"]
+    for field, minimum in (("min_period_groups", 3), ("min_venue_groups", 2)):
+        value = fragility.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise ProtocolValidationError(f"Fragility {field} en az {minimum} olmalıdır.")
+    observations = fragility.get("min_observations_per_group")
+    if not isinstance(observations, int) or isinstance(observations, bool) or observations < 2:
+        raise ProtocolValidationError("Fragility min_observations_per_group en az 2 olmalıdır.")
+    for field in ("min_worst_group_retention_ratio", "min_positive_group_ratio"):
+        value = fragility.get(field)
+        if not isinstance(value, int | float) or isinstance(value, bool) or not 0 < value <= 1:
+            raise ProtocolValidationError(f"Fragility {field} (0,1] aralığında olmalıdır.")
     required_scenarios = gates.get("required_cost_scenarios")
     if required_scenarios != ["realistic", "taker_heavy"]:
         raise ProtocolValidationError(

@@ -57,6 +57,32 @@ def _bundle() -> dict:
                 }
             },
         },
+        "fragility": {
+            "period_returns": {
+                "early": {
+                    "realistic": [0.01, 0.012, 0.009],
+                    "taker_heavy": [0.008, 0.009, 0.007],
+                },
+                "middle": {
+                    "realistic": [0.012, 0.013, 0.011],
+                    "taker_heavy": [0.009, 0.010, 0.008],
+                },
+                "late": {
+                    "realistic": [0.009, 0.010, 0.008],
+                    "taker_heavy": [0.007, 0.008, 0.006],
+                },
+            },
+            "venue_returns": {
+                "binance": {
+                    "realistic": [0.010, 0.011, 0.009],
+                    "taker_heavy": [0.008, 0.009, 0.007],
+                },
+                "independent_venue": {
+                    "realistic": [0.009, 0.010, 0.008],
+                    "taker_heavy": [0.007, 0.008, 0.006],
+                },
+            },
+        },
     }
 
 
@@ -69,6 +95,9 @@ def test_bundle_is_deterministic_and_does_not_write_registry(tmp_path: Path):
     }
     assert len(outputs) == 1
     assert registry.read_bytes() == before
+    report = evaluate_bundle(_bundle(), registry_path=registry)
+    assert report["schema_version"] == "phase2-statistical-gates/v2"
+    assert report["reports"]["fragility"]["status"] == "passed"
 
 
 def test_bundle_cannot_open_locked_oos(tmp_path: Path):

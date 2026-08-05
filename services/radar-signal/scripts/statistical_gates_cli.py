@@ -10,6 +10,7 @@ from scripts.statistical_gates import (
     evaluate_ablation,
     evaluate_dsr_gate,
     evaluate_pbo_cscv,
+    evaluate_period_venue_fragility,
     evaluate_sensitivity,
 )
 from scripts.walk_forward_lib import (
@@ -63,9 +64,21 @@ def evaluate_bundle(bundle: dict, *, registry_path: Path | None = None) -> dict:
             min_mean_contribution=float(gates["ablation"]["min_mean_contribution"]),
             min_positive_fold_ratio=float(gates["ablation"]["min_positive_fold_ratio"]),
         ),
+        "fragility": evaluate_period_venue_fragility(
+            period_returns=bundle["fragility"]["period_returns"],
+            venue_returns=bundle["fragility"]["venue_returns"],
+            required_scenarios=required_scenarios,
+            min_period_groups=int(gates["fragility"]["min_period_groups"]),
+            min_venue_groups=int(gates["fragility"]["min_venue_groups"]),
+            min_observations_per_group=int(gates["fragility"]["min_observations_per_group"]),
+            min_worst_group_retention_ratio=float(
+                gates["fragility"]["min_worst_group_retention_ratio"]
+            ),
+            min_positive_group_ratio=float(gates["fragility"]["min_positive_group_ratio"]),
+        ),
     }
     return {
-        "schema_version": "phase2-statistical-gates/v1",
+        "schema_version": "phase2-statistical-gates/v2",
         "scope": "development",
         "registry_trial_count": trial_count,
         "overall_status": (

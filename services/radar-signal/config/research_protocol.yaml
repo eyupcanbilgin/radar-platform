@@ -32,7 +32,7 @@ baselines:
     signal_mode: "long_short"
 
 statistical_gates:
-  version: "1.0"
+  version: "1.1"
   dsr:
     confidence_threshold: 0.95
     min_unique_trials: 2
@@ -47,4 +47,10 @@ statistical_gates:
   ablation:
     min_mean_contribution: 0.0
     min_positive_fold_ratio: 0.60
+  fragility:
+    min_period_groups: 3
+    min_venue_groups: 2
+    min_observations_per_group: 3
+    min_worst_group_retention_ratio: 0.50
+    min_positive_group_ratio: 0.67
   required_cost_scenarios: ["realistic", "taker_heavy"]

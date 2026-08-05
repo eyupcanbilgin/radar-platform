@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.0**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.1**
+
+> v2.1 (5 Ağu 2026): ADR-0020 ile Faz 2 dönem/venue kırılganlık kapısı eklendi;
+> istatistik rapor sözleşmesi `phase2-statistical-gates/v2` oldu. Gerçek veri ölçümü
+> yapılmadı. v2.0 → git geçmişi.
 
 > v2.0 (5 Ağu 2026): ADR-0019 ile Faz 2 DSR, PBO/CSCV, config-güdümlü ±%20
 > parametre hassasiyeti ve eşleşmiş-fold veri ailesi ablation kapıları eklendi. Reddedilmiş
@@ -245,6 +249,14 @@ sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
    maliyet senaryosunda çıkarıp tam modelle eşleşmiş karşılaştırır; eksik fold sıfır sayılamaz.
    CLI yalnız hazırlanmış JSON kanıtını okur/stdout raporu üretir, Registry'ye yazmaz ve
    Development sınırını aşan bundle'ı reddeder.
+
+   **Dönem/venue kırılganlığı (ADR-0020):** Aynı adayın ön-kayıtlı en az üç Development
+   dönemi ve en az iki bağımsız venue dilimindeki net getirileri ayrı tutulur. Her grubun
+   iki maliyet senaryosu için asgari gözlem sayısı config'dedir. Kapı, gruplar arası ortalamaya
+   göre en kötü grubun korunma oranını ve pozitif grup oranını ölçer; mutlak getiri eşiği
+   kullanmaz. Eksik venue/dönem, kısa seri, NaN veya ortak ortalamanın pozitif olmaması
+   dayanıklılık diye yorumlanamaz. Binance dışı gerçek venue verisi hazır değilken kapı
+   sentetik test edilebilir, fakat gerçek bir hipoteze `passed` kanıtı üretemez.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
