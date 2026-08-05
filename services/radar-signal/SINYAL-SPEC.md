@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.5**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.6**
+
+> v1.6 (5 Ağu 2026): ADR-0014 ile Purged Walk-Forward + Embargo split ve ölçüm protokolü,
+> config güdümlü eşikler, fail-closed Locked OOS kuralı ve `scripts/walk_forward.py` eklendi.
+> v1.5 → git geçmişi.
 
 > v1.5 (4 Ağu 2026): Public Binance USD-M kapalı mum adaptörü, exact-hour context JSON
 > inbox ve UTC tek-sefer/daemon paper runtime eklendi. v1.4 → git geçmişi.
@@ -182,7 +186,7 @@ sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
 2. **Claude Code implementasyonu:** freqtrade strateji sınıfı; her giriş koşulu ayrı `enter_tag` ile etiketlenir (gerekçe mekanizmasının temeli).
 3. **Backtest protokolü (pazarlıksız):**
    - Veri: mevcut tüm 15m tarihçe; **train/test ayrımı** — son 6 ay yalnız out-of-sample, hyperopt ASLA görmez. Dönem disiplini CR-002 P1-3 ile derinleşir: Development / Validation / Locked-test / Forward-quarantine; locked sonuç bir kez açılır.
-   - **Purged walk-forward** (CR-3): 3 ay pencere, 1 ay kaydırma; train/test sınırında ≥1 gün embargo boşluğu — overlap eden örnek sızıntısı engellenir. Sonuçlar pencere bazında raporlanır.
+   - **Purged walk-forward** (CR-3, ADR-0014): `config/research_protocol.yaml` güdümlü; varsayılan 90 gün train, 30 gün test, 30 gün kaydırma; train/test sınırında en az 1 gün embargo boşluğu; forward horizon etiketi train sonunu aşıyorsa `train_purged_end_utc` ile temizlenir. Tüm zamanlar timezone-aware UTC zorunlu. Locked OOS dönemi (`2026-08-04T00:00:00Z`) varsayılan CLI ile kilitlidir ve erişilemez (`LockedOOSAccessError`). Boş/yetersiz veri pencereleri "0 getiri" sayılmaz; `unavailable`/`invalid` olarak raporlanır (`scripts/walk_forward.py`).
    - **BTC/ETH ayrı kalibrasyon** (CR-3): BTC'de geliştirilen parametre ETH'ye kopyalanmaz; ETH ayrıca bağımsız out-of-sample doğrulama seti olarak raporlanır.
    - **A/B/C kıyası zorunlu** (CR-3): her strateji (A) çıplak, (B) + rejim filtresi, (C) + rejim + karartma varyantlarıyla backtest edilir; filtre sonucu iyileştirmiyorsa o stratejide kullanılmaz — birleşim inanç değil ölçümdür.
    - **Zaman standardı** (CR-3): ham veri UTC; seans tanımları `Europe/London` / `America/New_York` timezone-aware (DST otomatik). Sabit İstanbul saatiyle seans tanımı yasak.

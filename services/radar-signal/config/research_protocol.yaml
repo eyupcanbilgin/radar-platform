@@ -1,0 +1,25 @@
+# Araştırma ve Ölçüm Protokolü (Phase 2 - Purged Walk-Forward + Embargo)
+# Eşikler koda gömülmez; config doğrulama fail-closed çalışır.
+version: "1.0"
+
+boundaries:
+  # Locked OOS başlangıç tarihi (değişmez kilit). Varsayılan CLI ile çalıştırılamaz.
+  locked_oos_start_utc: "2026-08-04T00:00:00Z"
+  # Geliştirme başlangıç tarihi
+  development_start_utc: "2024-01-01T00:00:00Z"
+
+walk_forward:
+  train_window_days: 90
+  test_window_days: 30
+  step_days: 30
+  min_embargo_days: 1
+  default_embargo_days: 1
+  default_label_horizon_hours: 24
+
+data_integrity:
+  min_candles_per_window: 100
+  max_allowed_gap_seconds: 3600
+  strict_timezone_utc: true
+
+locked_oos:
+  allow_unlock_default: false
