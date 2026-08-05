@@ -1,4 +1,4 @@
-.PHONY: test lint download-data manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon
+.PHONY: test lint download-data download-coinbase-spot manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -12,6 +12,9 @@ lint:
 download-data:
 	$(FT) download-data --exchange binance --trading-mode futures \
 	  --pairs BTC/USDT:USDT ETH/USDT:USDT -t 15m 1h --timerange 20190908- --userdir user_data
+
+download-coinbase-spot:
+	$(PY) scripts/download_coinbase_spot.py --end 2026-08-04T00:00:00Z
 
 manifest:
 	$(PY) scripts/data_manifest.py

@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from datapaths import data_dir, verify_manifest  # noqa: E402
+from datapaths import market_data_root, verify_manifest  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO / "docs" / "data"
@@ -102,7 +102,7 @@ def main() -> None:
         run_verify(args.allow_missing_data)
         return
 
-    data_path = data_dir()
+    data_path = market_data_root()
     if not data_path.is_dir():
         sys.exit(f"HATA: veri dizini yok: {data_path} (RADAR_SIGNAL_USERDIR ile yol verilebilir)")
     files = sorted(data_path.rglob("*.feather"))
@@ -112,8 +112,7 @@ def main() -> None:
     entries = [file_entry(p) for p in files]
     manifest = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
-        "exchange": "binance",
-        "trading_mode": "futures",
+        "scope": "multi_venue_market_data",
         "files": entries,
     }
     blob = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)

@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.5**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.6**
+
+> v2.6 (5 Ağu 2026): ADR-0023 ile public Coinbase BTC-USD 1h kapalı mum indiricisi ve
+> Binance/Coinbase dosyalarını birlikte kapsayan çok-venue manifest üretimi eklendi.
+> Ham veri ve gerçek F-0001 ölçümü repoya alınmadı. v2.5 → git geçmişi.
 
 > v2.5 (5 Ağu 2026): ADR-0022 ile PIT context ve saatlik venue OHLCV'den provenance bağlı
 > F-0001 event-row üreticisi eklendi. Gerçek veri ölçümü yapılmadı. v2.4 → git geçmişi.
@@ -98,6 +102,14 @@ Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 ---
 
 ## 2. Mimari
+
+F-0001 araştırma girdisi iki bağımsız venue gerektirir. Binance futures verisi mevcut
+freqtrade indirme hattından, Coinbase spot BTC-USD verisi anahtarsız public CCXT yüzeyinden
+alınır. Coinbase indiricisi yalnız tam kapanmış `1h` mumları, kesintisiz ve tekil bir zaman
+aralığı olarak atomik biçimde `user_data/data/coinbase/spot/` altına yazar. Açık mum,
+başlangıç/son eksikliği, gap, duplicate veya ilerlemeyen pagination fail-closed hatadır.
+`data_manifest.py` artık `user_data/data/` altındaki tüm venue dosyalarını tek snapshot'ta
+hashler; geçmiş manifestler değiştirilmez.
 
 ```
 [ Binance USDT-M public verisi (ccxt / freqtrade dahili) ]

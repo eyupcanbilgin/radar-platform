@@ -7,6 +7,19 @@ manifestin `manifest_sha256` değerine işaret eder.
 **Manifestler silinmez ve yeniden yazılmaz.** Veri değiştiğinde yeni tarihli manifest
 üretilir; eski manifest, ona atıf yapan koşuların kanıtı olarak yerinde kalır.
 
+F-0001 için Coinbase spot girdisini üretmek ve ardından iki venue'yu tek manifestte
+doğrulamak:
+
+```bash
+python scripts/download_coinbase_spot.py --end 2026-08-04T00:00:00Z
+python scripts/data_manifest.py
+python scripts/data_manifest.py --verify
+```
+
+İlk komut private key kullanmaz ve yalnız `[2024-01-01, 2026-08-04)` aralığındaki kapanmış
+BTC-USD saatlik mumları yazar. `user_data/` ham verisi git dışındadır. Yeni manifest
+oluşturulmadan önce eski manifest dosyalarına dokunulmaz.
+
 | Manifest | Kapsam | Not |
 |---|---|---|
 | `MANIFEST-20260803` | 8 dosya | S-0001, S-0002, S-0002b koşularının `dataset_snapshot`'ı bu manifeste işaret eder (`89f6dbb390dd…`) |

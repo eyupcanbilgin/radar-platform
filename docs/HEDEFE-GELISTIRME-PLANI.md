@@ -167,6 +167,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [ ] Funding stress ve OI buildup için purged walk-forward kalibrasyon raporu üret.
   - [x] Train-only olasılık ve pooled out-of-fold metrik çekirdeği hazır (Signal ADR-0021).
   - [x] PIT kırılganlık + OHLCV'den provenance bağlı tetik/etiket üreticisi hazır (ADR-0022).
+  - [x] Anahtarsız Coinbase spot 1h indiricisi ve çok-venue manifest altyapısı hazır
+    (Signal ADR-0023; ham veri git dışı).
   - [ ] Manifest doğrulanmış gerçek iki-venue girdisiyle F-0001 ölçümünü koş.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

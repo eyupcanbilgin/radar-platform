@@ -13,7 +13,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
 import datapaths  # noqa: E402
-from datapaths import data_dir, user_dir, verify_manifest  # noqa: E402
+from datapaths import data_dir, market_data_root, user_dir, verify_manifest  # noqa: E402
 
 
 def _write_manifest(tmp: Path, files: list[tuple[str, bytes]]) -> Path:
@@ -53,6 +53,7 @@ F2 = ("user_data/data/binance/futures/B.feather", b"bbb")
 def test_env_var_overrides_user_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("RADAR_SIGNAL_USERDIR", str(tmp_path / "baska"))
     assert user_dir() == tmp_path / "baska"
+    assert market_data_root() == tmp_path / "baska" / "data"
     assert data_dir() == tmp_path / "baska" / "data" / "binance"
 
 
