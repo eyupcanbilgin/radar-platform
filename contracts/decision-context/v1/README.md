@@ -17,6 +17,10 @@ MCP'nin rolü rejim, kırılganlık, güven ve veri sağlığı bağlamı sağla
 nihai `LONG/SHORT/WAIT` kararı signal servisinde deterministik kurallarla üretilir. LLM canlı
 döngüde bulunmaz.
 
+Platform ADR-0004 uyarınca ürün v1'in aktif profili `direction=null` ve
+`directional_decision_allowed=false` değerleridir. Şemadaki yönsel alanlar geriye/ileriye
+uyumluluk yüzeyidir; kabul edilmiş yeni yönsel araştırma kapısı olmadan aktif özellik değildir.
+
 ## Dosyalar
 
 - `schema.json`: normatif JSON Schema (Draft 2020-12)

@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.1**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.2**
+
+> v2.2 (5 Ağu 2026): Platform ADR-0004 ile ürün v1 kırılganlık/volatilite uyarısı odağına
+> alındı; yönsel araştırma park edildi ve aktif runtime `direction=null`/`WAIT` olarak
+> sabitlendi. v2.1 → git geçmişi.
 
 > v2.1 (5 Ağu 2026): ADR-0020 ile Faz 2 dönem/venue kırılganlık kapısı eklendi;
 > istatistik rapor sözleşmesi `phase2-statistical-gates/v2` oldu. Gerçek veri ölçümü
@@ -42,24 +46,36 @@
 | Proje sahibi | Eyüpcan |
 | Tarih | 3 Ağustos 2026 |
 | Çalışma adı | `radar-signal` (aynı monorepodaki btc-radar servisinin kardeş bileşeni) |
-| Karar seti | Intraday (15m ana + 1h teyit) · freqtrade motoru · sadece sinyal + gerekçe (emir YOK) |
+| Karar seti | BTC 1h kırılganlık/volatilite uyarısı + veri blocker'ı · direction null · emir YOK |
 | İlişkili proje | `btc-radar-mcp` — Faz D'de rejim filtresi olarak entegre edilir |
 
-> **Yasal ve etik çerçeve:** Bu sistem emir göndermez, borsa hesabına yazma yetkisiyle bağlanmaz, yatırım tavsiyesi değildir. Çıktısı "koşullu sinyal + gerekçe + invalidasyon"dur; işlem kararı ve sorumluluğu kullanıcıya aittir. Bu metin her bildirim şablonunun altında yer alır.
+> **Yasal ve etik çerçeve:** Bu sistem emir göndermez, borsa hesabına yazma yetkisiyle
+> bağlanmaz, yatırım tavsiyesi değildir. Ürün v1 çıktısı "kırılganlık uyarısı + gerekçe +
+> veri blocker'ı"dır; işlem kararı ve sorumluluğu kullanıcıya aittir. Bu metin her bildirim
+> şablonunun altında yer alır.
 
 ---
 
 ## 1. Ürün Tanımı
 
 ### 1.1 Ne yapar
-BTCUSDT ve ETHUSDT için (USDT-M perpetual verisi üzerinden; spot fiyat bağlam olarak) 15 dakikalık mumlarda deterministik stratejilerle long/short sinyali üretir; her sinyali **gerekçe satırıyla** Telegram'a bildirir; dry-run defteriyle hipotetik performansı sürekli ölçer.
+Ürün v1, BTCUSDT için kapanmış 1h veri ve point-in-time context üzerinden deterministik
+kırılganlık, volatilite genişlemesi riski, veri güveni ve blocker uyarısı üretir; açıklamasını
+ledger/outbox üzerinden bildirir ve ileri gerçekleşen sonuçları ölçer. Yön ölçülmediği için
+aktif runtime kararı `WAIT`, direction değeri `null`dır.
 
 ### 1.2 Ne yapmaz
 - Emir göndermez; API anahtarı sadece public veri için (veya hiç — freqtrade public mumlarla çalışır).
 - LLM canlı sinyal döngüsünde yer almaz. Sinyal = deterministik Python. AI'ların rolü: strateji yazımı, backtest analizi, rejim bağlamı.
 - "Kesin al/sat" dili kullanmaz; her sinyal koşullu ve invalidasyonlu ifade edilir.
+- Kabul edilmiş yeni yönsel setup yokken LONG/SHORT veya nötr yön skoru üretmez.
 
 ### 1.3 Başarı tanımı (kusursuzluk değil)
+Ürün v1 başarısı kârlılık veya yön isabetiyle değil; kırılganlık olaylarının ileri
+volatilite/MAE ile kalibrasyonu, precision/recall, lead time, false-alarm, abstention ve veri
+kapsamıyla ölçülür. Eksik sonuç sakin piyasa sayılmaz. Aşağıdaki yönsel strateji kapıları
+araştırma arşivi ve gelecekteki yeniden-açma koşulu olarak korunur:
+
 Bir strateji ancak şu beşini aynı anda sağlarsa "yayında" kalır:
 1. **Maliyet sonrası pozitif beklenti:** komisyon + kayma + funding (`config/costs.yaml`, CR-5) düşüldükten sonra out-of-sample dönemde pozitif getiri.
 2. **İstatistiksel asgari:** out-of-sample'da ≥100 işlem — bu eşik **yüksek-frekans strateji aileleri** içindir; olay-bazlı ailelerde (FOMC, seans) örneklem birimi aileye göre tanımlanır (CR-002 P1-2: olay sayısı + placebo pencere, event-clustered SE).
@@ -114,8 +130,10 @@ bağımlılığının `binanceusdm` public OHLCV yüzeyini kullanır. btc-radar 
 KULLANILMAZ. btc-radar'ın rolü yalnız rejim skorudur (OI/funding/on-chain bağlamı); çalışan
 provider/HTTP context endpoint'i oluşana kadar taşıma exact-hour JSON inbox üzerinden yapılır.
 
-**İlk ürün dilimi:** Platformun ilk uçtan uca paper döngüsü yalnız
-`BTCUSDT · Binance USDT perpetual · kapanmış 1h mum · LONG/SHORT/WAIT` kapsamındadır.
+**İlk ürün dilimi:** Platformun sözleşme kabiliyeti
+`BTCUSDT · Binance USDT perpetual · kapanmış 1h mum · LONG/SHORT/WAIT` kapsamındadır;
+Platform ADR-0004 uyarınca aktif ürün v1 profili yalnız `WAIT` ve direction-null kırılganlık
+uyarısı üretir.
 MCP rejim snapshot'ı `contracts/decision-context/v1` ile taşınır. Tüketici tam mum
 `as_of` eşleşmesini ve `data_cutoff_at <= as_of` kuralını doğrular. Sözleşmedeki
 `directional_decision_allowed=false` değeri yönsel sonucu kapatır ve `WAIT` üretir.
