@@ -1,6 +1,6 @@
 # F-0001 ölçüm öncesi dondurulmuş kırılganlık kalibrasyon protokolü.
 # Sonuç görüldükten sonra eşik/pencere/venue değiştirmek yasaktır.
-version: "1.0"
+version: "1.1"
 hypothesis_id: "F-0001"
 scope: "development"
 
@@ -31,6 +31,9 @@ validation:
   embargo_days: 1
   required_venues: ["binance_futures", "coinbase_spot"]
   min_triggered_events_per_venue: 30
+  probability_estimator: "laplace_by_trigger_state"
+  laplace_alpha: 1.0
+  metric_aggregation: "pooled_out_of_fold"
 
 acceptance:
   min_event_rate_lift: 1.25
