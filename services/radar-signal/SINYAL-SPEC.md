@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.7**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.8**
+
+> v1.8 (5 Ağu 2026): ADR-0017 ile S-0003 (Aşırı Settled Funding) hipotezinin sızıntısız
+> Purged Walk-Forward Development ölçüm sonuçları ve REDDEDİLDİ (REJECTED) kararı işlendi.
+> v1.7 → git geçmişi.
 
 > v1.7 (5 Ağu 2026): ADR-0016 ile Faz 2 referans taban çizgileri (`cash`, `buy_and_hold`,
 > `simple_trend`) maliyet sonrası değerlendiricisi (`scripts/baseline_evaluator.py`) eklendi.
