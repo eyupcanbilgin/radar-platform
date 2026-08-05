@@ -1,0 +1,43 @@
+# F-0001 ölçüm öncesi dondurulmuş kırılganlık kalibrasyon protokolü.
+# Sonuç görüldükten sonra eşik/pencere/venue değiştirmek yasaktır.
+version: "1.0"
+hypothesis_id: "F-0001"
+scope: "development"
+
+boundaries:
+  development_start_utc: "2024-01-01T00:00:00Z"
+  locked_oos_start_utc: "2026-08-04T00:00:00Z"
+
+trigger:
+  source_field: "snapshot.fragility"
+  rolling_lookback_days: 90
+  min_history_days: 45
+  min_observations: 720
+  percentile_threshold: 80
+  episode_cooldown_hours: 24
+
+outcome:
+  horizon_hours: 24
+  trailing_volatility_hours: 24
+  label_distribution_lookback_days: 180
+  min_settled_labels: 60
+  expansion_percentile_threshold: 80
+  secondary_severity_metric: "max_absolute_excursion"
+
+validation:
+  train_window_days: 90
+  test_window_days: 30
+  step_days: 30
+  embargo_days: 1
+  required_venues: ["binance_futures", "coinbase_spot"]
+  min_triggered_events_per_venue: 30
+
+acceptance:
+  min_event_rate_lift: 1.25
+  min_recall_lift_at_equal_coverage: 1.25
+  min_brier_skill_score: 0.0
+  min_positive_fold_ratio: 0.60
+
+features:
+  required: ["funding_stress", "oi_buildup"]
+  require_leave_one_family_out_ablation: true
