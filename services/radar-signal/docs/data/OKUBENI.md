@@ -20,6 +20,22 @@ python scripts/data_manifest.py --verify
 BTC-USD saatlik mumları yazar. `user_data/` ham verisi git dışındadır. Yeni manifest
 oluşturulmadan önce eski manifest dosyalarına dokunulmaz.
 
+Manifest doğrulandıktan sonra F-0001 kanıt koşusu üç context setini birlikte ister: ana
+birleşik kırılganlık, funding ailesi çıkarılmış counterfactual ve OI ailesi çıkarılmış
+counterfactual. Bu girdiler aynı karar saatlerini ve PIT kurallarını korumalıdır:
+
+```bash
+python scripts/run_f0001_evidence.py \
+  --contexts /path/to/combined-contexts \
+  --contexts-without-funding /path/to/without-funding-contexts \
+  --contexts-without-oi /path/to/without-oi-contexts \
+  --binance-bars user_data/data/binance/futures/BTC_USDT_USDT-1h-futures.feather \
+  --coinbase-bars user_data/data/coinbase/spot/BTC_USD-1h-spot.feather
+```
+
+Koşu kirli git ağacında, doğrulanmayan manifestte veya eksik ablation ile durur. Aynı kod ve
+dataset snapshot'ı yeniden koşmak Registry'ye ikinci satır eklemez.
+
 | Manifest | Kapsam | Not |
 |---|---|---|
 | `MANIFEST-20260803` | 8 dosya | S-0001, S-0002, S-0002b koşularının `dataset_snapshot`'ı bu manifeste işaret eder (`89f6dbb390dd…`) |

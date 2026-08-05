@@ -1,4 +1,4 @@
-.PHONY: test lint download-data download-coinbase-spot manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon
+.PHONY: test lint download-data download-coinbase-spot manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon f0001-evidence
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -44,3 +44,9 @@ hourly-once:
 
 hourly-daemon:
 	$(PY) scripts/run_hourly_decision.py --daemon
+
+f0001-evidence:
+	$(PY) scripts/run_f0001_evidence.py --contexts $(CONTEXTS) \
+	  --contexts-without-funding $(CONTEXTS_WITHOUT_FUNDING) \
+	  --contexts-without-oi $(CONTEXTS_WITHOUT_OI) \
+	  --binance-bars $(BINANCE_BARS) --coinbase-bars $(COINBASE_BARS)
