@@ -31,6 +31,11 @@ def data_dir() -> Path:
     return user_dir() / "data" / "binance"
 
 
+def market_data_root() -> Path:
+    """All venue data; ``data_dir`` stays Binance-compatible for existing research code."""
+    return user_dir() / "data"
+
+
 def results_dir() -> Path:
     return user_dir() / "backtest_results"
 
