@@ -1,5 +1,8 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.4**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.5**
+
+> v2.5 (5 Ağu 2026): ADR-0022 ile PIT context ve saatlik venue OHLCV'den provenance bağlı
+> F-0001 event-row üreticisi eklendi. Gerçek veri ölçümü yapılmadı. v2.4 → git geçmişi.
 
 > v2.4 (5 Ağu 2026): ADR-0021 ile F-0001 için train-only Laplace olasılıklı pooled
 > out-of-fold kalibrasyon çekirdeği eklendi. Tetik/etiket üretimi ve gerçek ölçüm yapılmadı.
@@ -297,6 +300,11 @@ sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
    recall lift, Brier skill ve pozitif fold oranı yalnız pooled test tahminlerinden gelir.
    İki venue ayrı kapılardır. Bu çekirdek OHLCV'den tetik/etiket üretmez ve provenance'sız
    hazırlanmış satır gerçek verdict için kullanılamaz.
+
+   `scripts/fragility_event_rows.py`, bu hazırlanmış satırları üretir: direction-null exact-hour
+   context'ten rolling göreli tetik, kesintisiz saatlik venue OHLCV'den yalnız settled geçmişe
+   dayalı +24h genişleme etiketi çıkarır. Cooldown içi saatler false baseline'a dönüştürülmez.
+   İki venue, config ve tüm input gövdeleri artefakt hash'ine bağlanır.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).
