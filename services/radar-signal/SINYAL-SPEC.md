@@ -2,7 +2,8 @@
 **BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.3**
 
 > v2.3 (5 Ağu 2026): F-0001 yönsüz kırılganlık → +24h volatilite genişlemesi hipotezi,
-> sonuç görülmeden `config/fragility_calibration.yaml` ile ön-kayıt edildi. Ölçüm yapılmadı.
+> sonuç görülmeden `config/fragility_calibration.yaml` ile ön-kayıt edildi ve v1.1'de
+> out-of-fold olasılık/Brier formülü sıkılaştırıldı. Ölçüm yapılmadı.
 > v2.2 → git geçmişi.
 
 > v2.2 (5 Ağu 2026): Platform ADR-0004 ile ürün v1 kırılganlık/volatilite uyarısı odağına
