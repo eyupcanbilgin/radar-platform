@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v1.9**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.0**
+
+> v2.0 (5 Ağu 2026): ADR-0019 ile Faz 2 DSR, PBO/CSCV, config-güdümlü ±%20
+> parametre hassasiyeti ve eşleşmiş-fold veri ailesi ablation kapıları eklendi. Reddedilmiş
+> hipotezler geriye dönük yeniden ölçülmedi. v1.9 → git geçmişi.
 
 > v1.9 (5 Ağu 2026): ADR-0018 ile S-0004 (Volatilite Rejimi Koşullandırmalı Trend) hipotezinin
 > sızıntısız Purged Walk-Forward Development ölçüm sonuçları ve REDDEDİLDİ kararı işlendi.
@@ -225,6 +229,22 @@ sayısı deney kayıtlarından gelir; verdict olayları yeni deneme sayılmaz.
    kodlarının sonradan değiştirilmesi onayı derhal geçersiz kılar.
 
 4. **Aşırı-uyum (overfitting) korkulukları:** strateji başına ≤6 serbest parametre; hyperopt sonrası parametre hassasiyet testi (±%20 oynatınca sonuç çökmemeli); tarih aralığı seçerek sonuç güzelleştirme yasak.
+
+   **Faz 2 istatistik kapıları (ADR-0019):** Yeni bir hipotez ailesi Development verdict'i
+   almadan önce `phase2-statistical-gates/v1` raporu üretir. DSR deneme sayısı elle girilmez;
+   Registry'deki yapılandırılmış, etkin ve benzersiz
+   `(hypothesis_id, strategy_version, dataset_snapshot)` kanıt evreninden gelir. Effective
+   `invalid` duplicate satırlar ve eski protokolde `result` gövdesi olmayan koşular bu evrene
+   girmez. DSR getiri matrisi Registry evreniyle tam eşleşmezse değerlendirme durur.
+
+   PBO/CSCV, config'deki çift partition sayısıyla konfigürasyon × zaman/fold net-getiri
+   matrisini kombinatoryal train/test yarımlarında sınar; kombinasyon bütçesi aşılırsa örnekleme
+   yapmaz, fail-loud durur. Hassasiyet planı her ön-kayıtlı pozitif sayısal parametreyi tek tek
+   config'deki göreli delta kadar (varsayılan ±%20) oynatır ve hem `realistic` hem
+   `taker_heavy` performans korunmasını ister. Ablation her veri ailesini aynı fold ve aynı
+   maliyet senaryosunda çıkarıp tam modelle eşleşmiş karşılaştırır; eksik fold sıfır sayılamaz.
+   CLI yalnız hazırlanmış JSON kanıtını okur/stdout raporu üretir, Registry'ye yazmaz ve
+   Development sınırını aşan bundle'ı reddeder.
 
 **Maliyet konfigürasyonu (CR-5):** Tüm maliyet parametreleri `config/costs.yaml`'dadır — komisyon (taker 0.00045 VIP0+BNB, muhafazakâr alternatif 0.0005; maker 0.00018), tek yön kayma (BTCUSDT 0.0002, ETHUSDT 0.00025), funding (`mode: historical` — freqtrade futures modunda tarihsel funding serisi indirilir ve kullanılır; fallback düz 8s 0.0001) ve 5 kademeli stres senaryosu matrisi (optimistic_maker 2 bps → cascade 60 bps; cascade satırı PARK stratejileri açılırsa fill-olasılığı modeliyle zorunlu). Not: funding borsaya ödenmez, taraflar arası transferdir; long-bias stratejide pozitif funding dönemleri maliyet, short-bias'ta gelir olarak tarihsel seriden doğal biçimde gelir. Her backtest koşusu senaryo adını raporuna yazar.
 5. **Kabul/ret kaydı:** sonuç ne olursa olsun `docs/hypotheses/NNNN.md` güncellenir — reddedilen hipotez de kayıttır (yayın yanlılığını kendi içimizde engelliyoruz).

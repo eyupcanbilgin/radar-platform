@@ -30,3 +30,21 @@ baselines:
     fast_period: 20
     slow_period: 50
     signal_mode: "long_short"
+
+statistical_gates:
+  version: "1.0"
+  dsr:
+    confidence_threshold: 0.95
+    min_unique_trials: 2
+  pbo_cscv:
+    partitions: 8
+    max_combinations: 70
+    rejection_threshold: 0.05
+    performance_metric: "mean_net_return"
+  sensitivity:
+    relative_delta: 0.20
+    min_performance_retention_ratio: 0.80
+  ablation:
+    min_mean_contribution: 0.0
+    min_positive_fold_ratio: 0.60
+  required_cost_scenarios: ["realistic", "taker_heavy"]

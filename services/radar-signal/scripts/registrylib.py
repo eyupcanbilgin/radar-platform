@@ -261,3 +261,31 @@ def trials_for_dsr(strategy_family: str, registry_path: Path | None = None) -> i
             "Önce koşuları kaydet (kayıtsız koşu geçersizdir)."
         )
     return n
+
+
+def unique_phase2_trials_for_dsr(registry_path: Path | None = None) -> list[dict]:
+    """Return canonical Phase-2 evidence trials for the global data-mining penalty.
+
+    Old backtests without a structured result are outside the current protocol. Effective
+    ``invalid`` rows (including duplicate reruns) are excluded, then the evidence identity
+    is deduplicated by hypothesis, code SHA and dataset snapshot.
+    """
+    unique: dict[tuple[str, str, str], dict] = {}
+    for row in read_all(registry_path):
+        if _verdict_base(str(row.get("verdict", "invalid"))) == "invalid":
+            continue
+        if row.get("exit_code") != 0 or not isinstance(row.get("result"), dict):
+            continue
+        identity = (
+            str(row.get("hypothesis_id", "")),
+            str(row.get("strategy_version", "")),
+            str(row.get("dataset_snapshot", "")),
+        )
+        if not all(identity):
+            raise ValueError(f"Faz 2 kanıt kimliği eksik: {row.get('experiment_id')}")
+        unique.setdefault(identity, row)
+    return [unique[key] for key in sorted(unique)]
+
+
+def phase2_trial_count_for_dsr(registry_path: Path | None = None) -> int:
+    return len(unique_phase2_trials_for_dsr(registry_path))
