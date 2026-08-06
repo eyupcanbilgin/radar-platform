@@ -213,6 +213,7 @@ def build_evidence(
         "event_row_counts": {
             venue: len(rows) for venue, rows in event_rows["rows_by_venue"].items()
         },
+        "venue_coverage": event_rows["venue_coverage"],
         "calibration": calibration,
         "ablations": ablations,
     }

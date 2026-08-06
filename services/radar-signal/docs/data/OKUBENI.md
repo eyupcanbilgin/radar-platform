@@ -20,6 +20,10 @@ python scripts/data_manifest.py --verify
 BTC-USD saatlik mumları yazar. `user_data/` ham verisi git dışındadır. Yeni manifest
 oluşturulmadan önce eski manifest dosyalarına dokunulmaz.
 
+Coinbase public geçmişi bazı saatlerde hiç mum döndürmeyebilir. İndirici bunları sahte sıfır
+hacimli mumla doldurmaz; eksik saat ve gap sayısını çıktıda bildirir. F-0001 yalnız gap'e
+temas etmeyen kesintisiz trailing/ileri pencereleri kullanır (Signal ADR-0026).
+
 Manifest doğrulandıktan sonra F-0001 kanıt koşusu üç context setini birlikte ister: ana
 birleşik kırılganlık, funding ailesi çıkarılmış counterfactual ve OI ailesi çıkarılmış
 counterfactual. Bu girdiler aynı karar saatlerini ve PIT kurallarını korumalıdır:
@@ -50,7 +54,8 @@ dataset snapshot'ı yeniden koşmak Registry'ye ikinci satır eklemez.
 | Manifest | Kapsam | Not |
 |---|---|---|
 | `MANIFEST-20260803` | 8 dosya | S-0001, S-0002, S-0002b koşularının `dataset_snapshot`'ı bu manifeste işaret eder (`89f6dbb390dd…`) |
-| `MANIFEST-20260804` | 10 dosya | Güncel. `manifest_sha256=6217119a8220…` |
+| `MANIFEST-20260804` | 10 dosya | Tarihsel Binance snapshot'ı. `manifest_sha256=6217119a8220…` |
+| `MANIFEST-20260806` | 4 dosya | F-0001 iki-venue Development girdisi; yalnız BTC 1h ve Locked OOS öncesi (`60deaf799f19…`) |
 
 ## Bilinen sapma — 20260803 manifesti (4 Ağu 2026'da tespit edildi)
 

@@ -173,6 +173,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
     koşusu orkestratörü hazır (Signal ADR-0024; gerçek ölçüm yapılmadı).
   - [x] PIT'ten ana ve iki leave-one-family-out tarihsel context setini hash mühürlü platform
     sözleşmesiyle üret/doğrula (MCP ADR-0010, Signal ADR-0025, Platform ADR-0005).
+  - [x] Venue OHLCV gap'lerini mum uydurmadan segmentle ve coverage'ı evidence'a bağla
+    (Signal ADR-0026; gerçek Coinbase geçmişinde iki gap doğrulandı).
   - [ ] Manifest doğrulanmış gerçek iki-venue girdisiyle F-0001 ölçümünü koş.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

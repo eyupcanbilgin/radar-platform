@@ -1,0 +1,35 @@
+{
+  "files": [
+    {
+      "date_max_utc": "2026-08-03T16:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-funding_rate.feather",
+      "rows": 2838,
+      "sha256": "9df688f75d463bcc1a421ef6a785ab01bb000a8f6bf621e7b883bcc426cdf29e"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-futures.feather",
+      "rows": 22704,
+      "sha256": "dccf7b0fe25720bd5979c79f55d6335b0985e6dc9b6fdeb010bca74b5d0689d3"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-mark.feather",
+      "rows": 22704,
+      "sha256": "6c0e1ddb3a65594d89e1fd4d29896a55ee2f2d93a469e7d11ca875f24766e67f"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/coinbase/spot/BTC_USD-1h-spot.feather",
+      "rows": 22694,
+      "sha256": "48cd4bc5c94bf90cc1387c11aab5c6a9a0207cfb77357f38f899ae0f3d015ec7"
+    }
+  ],
+  "generated_at_utc": "2026-08-06T06:33:15.049505+00:00",
+  "manifest_sha256": "60deaf799f19b167f0d378780fac76c1f3246db703952be096a3403bc346c53f",
+  "scope": "multi_venue_market_data"
+}

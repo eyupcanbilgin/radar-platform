@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.8**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.9**
+
+> v2.9 (6 Ağu 2026): ADR-0026 ile gerçek Coinbase geçmişinde doğrulanan iki venue gap'i
+> mum uydurmadan kesintisiz segmentlere ayrılır; gap'e temas eden etiket pencereleri dışlanır
+> ve coverage evidence'a yazılır. F-0001 hâlâ ölçülmedi. v2.8 → git geçmişi.
 
 > v2.8 (6 Ağu 2026): Signal ADR-0025 ve platform sözleşmesiyle F-0001 runner, ana ve iki
 > ablation context klasörünün `f0001-context-set/v1` variant/sınır/dosya hash manifestini

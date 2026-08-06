@@ -24,6 +24,21 @@ def _ms(value: str) -> int:
     return int(parsed.astimezone(UTC).timestamp() * 1000)
 
 
+def hourly_gaps(timestamps: list[int]) -> list[dict]:
+    gaps = []
+    for left, right in zip(timestamps, timestamps[1:], strict=False):
+        delta = right - left
+        if delta != TIMEFRAME_MS:
+            gaps.append(
+                {
+                    "after_utc": pd.to_datetime(left, unit="ms", utc=True).isoformat(),
+                    "before_utc": pd.to_datetime(right, unit="ms", utc=True).isoformat(),
+                    "missing_hours": delta // TIMEFRAME_MS - 1,
+                }
+            )
+    return gaps
+
+
 def fetch_closed_candles(exchange, *, since_ms: int, until_ms: int) -> pd.DataFrame:
     if until_ms <= since_ms:
         raise ValueError("until, since sonrasında olmalı")
@@ -49,13 +64,17 @@ def fetch_closed_candles(exchange, *, since_ms: int, until_ms: int) -> pd.DataFr
     frame = frame.sort_values("timestamp").reset_index(drop=True)
     if int(frame.iloc[0]["timestamp"]) != since_ms:
         raise ValueError("Coinbase serisinin başlangıcı eksik")
-    gaps = frame["timestamp"].diff().dropna()
-    if not gaps.empty and not (gaps == TIMEFRAME_MS).all():
-        raise ValueError("Coinbase saatlik seride gap var")
+    gap_report = hourly_gaps([int(value) for value in frame["timestamp"]])
     if int(frame.iloc[-1]["timestamp"]) + TIMEFRAME_MS != until_ms:
         raise ValueError("Coinbase serisinin sonu eksik veya açık mum içeriyor")
     frame["date"] = pd.to_datetime(frame.pop("timestamp"), unit="ms", utc=True)
-    return frame[["date", "open", "high", "low", "close", "volume"]]
+    result = frame[["date", "open", "high", "low", "close", "volume"]]
+    result.attrs["coverage"] = {
+        "observed_hours": len(result),
+        "missing_hours": sum(item["missing_hours"] for item in gap_report),
+        "gaps": gap_report,
+    }
+    return result
 
 
 def write_atomic(frame: pd.DataFrame, destination: Path) -> None:
@@ -83,7 +102,11 @@ def main(argv: list[str] | None = None) -> int:
     frame = fetch_closed_candles(exchange, since_ms=_ms(args.start), until_ms=_ms(args.end))
     destination = market_data_root() / "coinbase" / "spot" / "BTC_USD-1h-spot.feather"
     write_atomic(frame, destination)
-    print(f"OK: {destination} · {len(frame)} kapalı mum")
+    coverage = frame.attrs["coverage"]
+    print(
+        f"OK: {destination} · {len(frame)} kapalı mum · "
+        f"{coverage['missing_hours']} eksik saat/{len(coverage['gaps'])} gap"
+    )
     return 0
 
 

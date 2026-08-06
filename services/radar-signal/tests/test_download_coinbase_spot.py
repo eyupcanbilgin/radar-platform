@@ -53,7 +53,6 @@ def test_fetches_exact_closed_range_across_pages():
     ("rows", "until_ms", "message"),
     [
         ([_row(0), _row(0)], 2 * TIMEFRAME_MS, "duplicate"),
-        ([_row(0), _row(2 * TIMEFRAME_MS)], 3 * TIMEFRAME_MS, "gap"),
         ([_row(TIMEFRAME_MS)], 2 * TIMEFRAME_MS, "başlangıcı eksik"),
         ([_row(0)], 2 * TIMEFRAME_MS, "sonu eksik"),
     ],
@@ -71,6 +70,18 @@ def test_rejects_non_progressing_pagination():
             since_ms=0,
             until_ms=301 * TIMEFRAME_MS,
         )
+
+
+def test_preserves_but_explicitly_reports_internal_exchange_gaps():
+    frame = fetch_closed_candles(
+        FakeExchange([_row(0), _row(2 * TIMEFRAME_MS)]),
+        since_ms=0,
+        until_ms=3 * TIMEFRAME_MS,
+    )
+
+    assert len(frame) == 2
+    assert frame.attrs["coverage"]["missing_hours"] == 1
+    assert len(frame.attrs["coverage"]["gaps"]) == 1
 
 
 def test_atomic_write_is_readable_and_idempotent(tmp_path):
