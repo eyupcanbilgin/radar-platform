@@ -10,6 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
+from jsonschema import Draft202012Validator, ValidationError
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
@@ -25,6 +26,12 @@ from scripts.registrylib import latest_manifest_hash, read_all, record_run  # no
 
 DEFAULT_OUTPUT = SERVICE_ROOT / "var" / "f0001-evidence.json"
 STRATEGY = "F0001FragilityCalibration"
+CONTEXT_SET_SCHEMA = SERVICE_ROOT.parents[1] / "contracts" / "f0001-context-set-v1.schema.json"
+EXPECTED_EXCLUSIONS = {
+    "combined": [],
+    "without_funding_stress": ["funding_stress"],
+    "without_oi_buildup": ["oi_buildup"],
+}
 
 
 class F0001EvidenceError(ValueError):
@@ -47,7 +54,11 @@ def _atomic_json(path: Path, payload: dict) -> None:
 
 
 def _load_contexts(path: Path) -> list[dict]:
-    paths = sorted(path.rglob("*.json")) if path.is_dir() else [path]
+    paths = (
+        sorted(item for item in path.rglob("*.json") if item.name != "context-set.json")
+        if path.is_dir()
+        else [path]
+    )
     if not paths or not all(item.is_file() for item in paths):
         raise F0001EvidenceError(f"decision-context girdisi bulunamadı: {path}")
     contexts = []
@@ -55,6 +66,51 @@ def _load_contexts(path: Path) -> list[dict]:
         payload = json.loads(item.read_text(encoding="utf-8"))
         contexts.extend(payload if isinstance(payload, list) else [payload])
     return contexts
+
+
+def _load_context_set(path: Path, *, expected_variant: str, config: dict) -> list[dict]:
+    manifest_path = path / "context-set.json"
+    if not manifest_path.is_file():
+        raise F0001EvidenceError(f"context set manifesti yok: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    schema = json.loads(CONTEXT_SET_SCHEMA.read_text(encoding="utf-8"))
+    try:
+        Draft202012Validator(schema).validate(manifest)
+    except ValidationError as error:
+        raise F0001EvidenceError(f"context set sözleşme ihlali: {error.message}") from error
+    if manifest.get("schema_version") != "f0001-context-set/v1":
+        raise F0001EvidenceError("desteklenmeyen context set şeması")
+    if manifest.get("hypothesis_id") != "F-0001" or manifest.get("variant") != expected_variant:
+        raise F0001EvidenceError(f"context set variant kimliği uyuşmuyor: {expected_variant}")
+    if manifest.get("excluded_features") != EXPECTED_EXCLUSIONS[expected_variant]:
+        raise F0001EvidenceError(f"{expected_variant}: excluded_features sözleşmeyle uyuşmuyor")
+    if manifest.get("start_utc") != config["boundaries"]["development_start_utc"]:
+        raise F0001EvidenceError("context set Development başlangıcı protokolle uyuşmuyor")
+    locked = config["boundaries"]["locked_oos_start_utc"]
+    boundary_matches = (
+        manifest.get("locked_oos_start_utc") == locked
+        and manifest.get("end_exclusive_utc") == locked
+    )
+    if not boundary_matches:
+        raise F0001EvidenceError("context set Locked OOS sınırı protokolle uyuşmuyor")
+    declared = manifest.get("files", [])
+    actual_paths = sorted(item for item in path.rglob("*.json") if item.name != "context-set.json")
+    if len(declared) != len(actual_paths) or manifest.get("context_count") != len(actual_paths):
+        raise F0001EvidenceError("context set dosya sayısı manifestle uyuşmuyor")
+    expected = {entry["file"]: entry["sha256"] for entry in declared}
+    actual = {
+        str(item.relative_to(path)).replace("\\", "/"): hashlib.sha256(
+            item.read_bytes()
+        ).hexdigest()
+        for item in actual_paths
+    }
+    if actual != expected:
+        raise F0001EvidenceError("context set dosya/hash bütünlüğü bozuk")
+    return _load_contexts(path)
+
+
+def _context_set_sha256(path: Path) -> str:
+    return hashlib.sha256((path / "context-set.json").read_bytes()).hexdigest()
 
 
 def _load_hourly_bars(path: Path) -> list[dict]:
@@ -103,17 +159,25 @@ def build_evidence(
     dataset_snapshot: str,
     code_sha: str,
     ablation_contexts: dict[str, list[dict]],
+    context_set_sha256: dict[str, str],
 ) -> dict:
     required_ablations = {"without_funding_stress", "without_oi_buildup"}
     if set(ablation_contexts) != required_ablations:
         raise F0001EvidenceError(
             f"zorunlu leave-one-family-out girdileri eksik: {sorted(required_ablations)}"
         )
+    required_sets = required_ablations | {"combined"}
+    if set(context_set_sha256) != required_sets:
+        raise F0001EvidenceError(f"context set manifest hash'leri eksik: {sorted(required_sets)}")
     context_hours = sorted(context["as_of_utc"] for context in contexts)
     for name, ablation_rows in ablation_contexts.items():
         if sorted(context["as_of_utc"] for context in ablation_rows) != context_hours:
             raise F0001EvidenceError(f"{name}: counterfactual karar saatleri ana girdiyle farklı")
-    provenance = {"dataset_snapshot": dataset_snapshot, "code_sha": code_sha}
+    provenance = {
+        "dataset_snapshot": dataset_snapshot,
+        "code_sha": code_sha,
+        "context_set_sha256": context_set_sha256["combined"],
+    }
     event_rows = build_event_row_bundle(
         contexts=contexts, bars_by_venue=bars_by_venue, config=config, provenance=provenance
     )
@@ -124,7 +188,11 @@ def build_evidence(
             contexts=ablation_contexts[name],
             bars_by_venue=bars_by_venue,
             config=config,
-            provenance={**provenance, "ablation": name},
+            provenance={
+                **provenance,
+                "ablation": name,
+                "context_set_sha256": context_set_sha256[name],
+            },
         )
         ablations[name] = {
             "event_rows_artifact_sha256": bundle["artifact_sha256"],
@@ -139,6 +207,7 @@ def build_evidence(
         "direction": None,
         "dataset_snapshot": dataset_snapshot,
         "code_sha": code_sha,
+        "context_set_sha256": context_set_sha256,
         "status": status,
         "event_rows_artifact_sha256": event_rows["artifact_sha256"],
         "event_row_counts": {
@@ -202,18 +271,32 @@ def main(argv: list[str] | None = None) -> int:
     if snapshot != latest_manifest_hash():
         raise F0001EvidenceError("manifest snapshot Registry çözümlemesiyle uyuşmuyor")
     code_sha = git_commit()
+    config = load_fragility_config()
     evidence = build_evidence(
-        contexts=_load_contexts(args.contexts),
+        contexts=_load_context_set(args.contexts, expected_variant="combined", config=config),
         bars_by_venue={
             "binance_futures": _load_hourly_bars(args.binance_bars),
             "coinbase_spot": _load_hourly_bars(args.coinbase_bars),
         },
-        config=load_fragility_config(),
+        config=config,
         dataset_snapshot=snapshot,
         code_sha=code_sha,
         ablation_contexts={
-            "without_funding_stress": _load_contexts(args.contexts_without_funding),
-            "without_oi_buildup": _load_contexts(args.contexts_without_oi),
+            "without_funding_stress": _load_context_set(
+                args.contexts_without_funding,
+                expected_variant="without_funding_stress",
+                config=config,
+            ),
+            "without_oi_buildup": _load_context_set(
+                args.contexts_without_oi,
+                expected_variant="without_oi_buildup",
+                config=config,
+            ),
+        },
+        context_set_sha256={
+            "combined": _context_set_sha256(args.contexts),
+            "without_funding_stress": _context_set_sha256(args.contexts_without_funding),
+            "without_oi_buildup": _context_set_sha256(args.contexts_without_oi),
         },
     )
     _atomic_json(args.output, evidence)

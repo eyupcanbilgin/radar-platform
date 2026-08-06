@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.7**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.8**
+
+> v2.8 (6 Ağu 2026): Signal ADR-0025 ve platform sözleşmesiyle F-0001 runner, ana ve iki
+> ablation context klasörünün `f0001-context-set/v1` variant/sınır/dosya hash manifestini
+> doğrulamadan ölçüm yapmaz. Gerçek ölçüm yapılmadı. v2.7 → git geçmişi.
 
 > v2.7 (6 Ağu 2026): ADR-0024 ile F-0001 gerçek Development koşusu için manifest
 > doğrulamalı, iki zorunlu leave-one-family-out ablation girdili ve Registry'de mükerrer

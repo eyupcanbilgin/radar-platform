@@ -4,17 +4,22 @@ import copy
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
+from jsonschema import Draft202012Validator
 
 from scripts.fragility_calibration import load_fragility_config
 from scripts.run_f0001_evidence import (
+    _load_context_set,
     _load_contexts,
     _load_hourly_bars,
     _manifest_snapshot,
     _record_once,
     build_evidence,
 )
+
+SERVICE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _synthetic_inputs(hours: int = 480):
@@ -88,6 +93,11 @@ def test_build_evidence_is_directionless_and_deterministic():
             "without_funding_stress": contexts,
             "without_oi_buildup": contexts,
         },
+        "context_set_sha256": {
+            "combined": "a" * 64,
+            "without_funding_stress": "b" * 64,
+            "without_oi_buildup": "c" * 64,
+        },
     }
 
     first = build_evidence(**kwargs)
@@ -95,6 +105,7 @@ def test_build_evidence_is_directionless_and_deterministic():
 
     assert first == second
     assert first["direction"] is None
+    assert first["context_set_sha256"]["combined"] == "a" * 64
     assert first["status"] in {"passed", "rejected", "unavailable"}
     assert first["calibration"]["direction"] is None
     assert set(first["ablations"]) == {"without_funding_stress", "without_oi_buildup"}
@@ -118,6 +129,52 @@ def test_loaders_map_feather_open_time_to_close_time_and_accept_context_director
 
     assert [row["as_of_utc"] for row in _load_contexts(context_dir)] == ["a", "b"]
     assert _load_hourly_bars(feather)[0]["close_at_utc"] == "2024-01-01T01:00:00Z"
+
+
+def test_context_set_manifest_binds_variant_locked_boundary_and_file_hash(tmp_path):
+    root = tmp_path / "combined"
+    context_path = root / "v1" / "00.json"
+    context_path.parent.mkdir(parents=True)
+    context_path.write_text(json.dumps({"as_of_utc": "2024-01-01T00:00:00Z"}), encoding="utf-8")
+    relative = "v1/00.json"
+    manifest = {
+        "schema_version": "f0001-context-set/v1",
+        "hypothesis_id": "F-0001",
+        "variant": "combined",
+        "excluded_features": [],
+        "start_utc": "2024-01-01T00:00:00Z",
+        "locked_oos_start_utc": "2026-08-04T00:00:00Z",
+        "end_exclusive_utc": "2026-08-04T00:00:00Z",
+        "rules_version": "0.3.0",
+        "rules_sha256": "a" * 64,
+        "context_count": 1,
+        "unavailable_count": 0,
+        "files": [
+            {
+                "file": relative,
+                "sha256": hashlib.sha256(context_path.read_bytes()).hexdigest(),
+            }
+        ],
+    }
+    (root / "context-set.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    schema = json.loads(
+        (SERVICE_ROOT.parents[1] / "contracts/f0001-context-set-v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    Draft202012Validator(schema).validate(manifest)
+
+    loaded = _load_context_set(root, expected_variant="combined", config=load_fragility_config())
+    assert loaded[0]["as_of_utc"] == "2024-01-01T00:00:00Z"
+
+    context_path.write_text(json.dumps({"as_of_utc": "changed"}), encoding="utf-8")
+    try:
+        _load_context_set(root, expected_variant="combined", config=load_fragility_config())
+    except ValueError as error:
+        assert "bütünlüğü" in str(error)
+    else:
+        raise AssertionError("context hash sapması kabul edilmemeliydi")
 
 
 def test_manifest_requires_verified_declared_inputs(tmp_path, monkeypatch):

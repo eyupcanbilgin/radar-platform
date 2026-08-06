@@ -22,11 +22,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from btc_radar.core.backfill import backfill_funding, backfill_open_interest, backfill_spot_ohlcv
-from btc_radar.core.config import load_signal_rules
+from btc_radar.core.config import load_f0001_locked_oos, load_signal_rules
 from btc_radar.core.context_producer import collect_derivatives, produce_context
 from btc_radar.core.context_publisher import ExactHourContextPublisher, require_utc_hour
 from btc_radar.core.coverage import collection_coverage
 from btc_radar.core.heartbeat import HeartbeatStore
+from btc_radar.core.research_contexts import generate_f0001_context_sets
 from btc_radar.core.runlock import exclusive_run_lock
 from btc_radar.core.scheduler import (
     DEFAULT_COLLECT_INTERVAL_SECONDS,
@@ -150,6 +151,15 @@ def build_parser() -> argparse.ArgumentParser:
     add_pit_db(publish)
     add_snapshot_db(publish)
     add_context_root(publish)
+
+    research = subparsers.add_parser(
+        "research-contexts", help="F-0001 ana ve ablation tarihsel context setlerini üret"
+    )
+    research.add_argument("--start", type=_parse_as_of, required=True)
+    research.add_argument("--end-exclusive", type=_parse_as_of, required=True)
+    research.add_argument("--output-root", type=Path, required=True)
+    research.add_argument("--snapshot-root", type=Path, required=True)
+    add_pit_db(research)
 
     run = subparsers.add_parser(
         "run", help="saat içi toplama + kapanan saat yayınını zamanlayıcıyla yürüt"
@@ -442,6 +452,17 @@ def _dispatch(argv: Sequence[str] | None) -> int:
         )
     elif args.command == "status":
         payload = _status(args)
+    elif args.command == "research-contexts":
+        with PointInTimeStore(args.pit_db) as pit:
+            payload = generate_f0001_context_sets(
+                start_utc=args.start,
+                end_exclusive_utc=args.end_exclusive,
+                locked_oos_start_utc=load_f0001_locked_oos(),
+                pit_store=pit,
+                snapshot_root=args.snapshot_root,
+                output_root=args.output_root,
+                rules=load_signal_rules(),
+            )
     elif args.command == "run":
         if args.context_root is None:
             parser.error("run için --context-root veya BTC_RADAR_CONTEXT_ROOT zorunlu")
