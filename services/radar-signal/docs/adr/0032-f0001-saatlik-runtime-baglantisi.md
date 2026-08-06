@@ -22,5 +22,5 @@
 
 ## Sonuç
 
-Forward coverage, mevcut paper saat ritmine bağlanmaya hazırdır; gerçek ilk kayıt ön-kayıt
+Forward coverage, mevcut paper saat ritmine opt-in bağlanmıştır; gerçek ilk kayıt ön-kayıt
 başlangıcından önce yapılmamıştır. Bu bağlantı outcome, Registry, alert veya direction açmaz.
