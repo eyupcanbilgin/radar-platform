@@ -2,6 +2,7 @@ version: "1"
 hypothesis_id: "F-0001"
 mode: "trigger_coverage_only"
 observation_start_utc: "2026-08-07T00:00:00Z"
+coverage_grace_seconds: 90
 baseline_variant: "combined"
 baseline_context_set_sha256: "66c45931282083635e2939cf3235b0d38b81ce4016f80450d9076135011a0ba8"
 allow_historical_backfill: false

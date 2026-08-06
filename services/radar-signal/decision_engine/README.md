@@ -93,6 +93,15 @@ python scripts/run_hourly_decision.py --daemon \
 Bu seçenek `--as-of` replay ile kullanılamaz. Başlangıç `config/f0001_forward_observation.yaml`
 otoritesidir; outcome, Registry, alert ve direction üretmez.
 
+Forward defterinin sonuçsuz saat kapsamını ve veri kullanılabilirliğini görmek için:
+
+```bash
+python scripts/f0001_forward_coverage.py
+```
+
+Rapor eksik saatleri ve `unavailable` gözlemleri ayrı blocker olarak gösterir. `--as-of`
+yalnız salt-okunur rapor kesimidir; geçmiş gözlem yazmaz veya outcome açmaz.
+
 Açık tarihsel saat yalnız replay/backfill'dir ve varsayılan olarak production defteri yerine
 `var/hourly-replay.sqlite` kullanır:
 
