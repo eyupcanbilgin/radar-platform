@@ -19,6 +19,11 @@ SERVICE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVICE_ROOT))
 
 from decision_engine.delivery import HourlyDecisionDelivery  # noqa: E402
+from decision_engine.forward_trigger import (  # noqa: E402
+    ForwardTriggerLedger,
+    load_forward_observation_config,
+    observe_forward_context,
+)
 from decision_engine.ledger import DecisionLedger  # noqa: E402
 from decision_engine.runtime import (  # noqa: E402
     DEFAULT_GRACE_SECONDS,
@@ -30,9 +35,12 @@ from decision_engine.sources import (  # noqa: E402
     BinanceUsdMClosedCandleSource,
     JsonDecisionContextSource,
 )
+from enricher.decision_context import DecisionContextV1  # noqa: E402
 from enricher.outbox import Outbox  # noqa: E402
 from enricher.policy import load_lifecycle  # noqa: E402
+from scripts.fragility_calibration import load_fragility_config  # noqa: E402
 from scripts.provenance import git_commit, git_is_dirty  # noqa: E402
+from scripts.run_f0001_evidence import _context_set_sha256, _load_context_set  # noqa: E402
 
 
 def _parse_utc(value: str) -> datetime:
@@ -134,12 +142,72 @@ def build_parser() -> argparse.ArgumentParser:
         "--signal-commit",
         help="git bulunmayan paketli ortam için açık 12-char signal commit",
     )
+    parser.add_argument(
+        "--f0001-baseline-contexts",
+        type=Path,
+        help="canlı modda F-0001 forward tetik gözlemini etkinleştiren mühürlü combined set",
+    )
+    parser.add_argument(
+        "--f0001-trigger-ledger",
+        type=Path,
+        help="varsayılan var/f0001-forward-triggers.sqlite; baseline olmadan kullanılamaz",
+    )
     return parser
 
 
-def _emit(result: RuntimeResult, *, invocation: str) -> None:
+def _emit(
+    result: RuntimeResult,
+    *,
+    invocation: str,
+    forward_observation: dict | None = None,
+) -> None:
     payload = {"invocation": invocation, **result.as_dict()}
+    if forward_observation is not None:
+        payload["f0001_forward_observation"] = forward_observation
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
+
+
+def _load_forward_baseline(path: Path) -> tuple[list[dict], dict, dict]:
+    observation_config = load_forward_observation_config()
+    calibration_config = load_fragility_config()
+    if _context_set_sha256(path) != observation_config["baseline_context_set_sha256"]:
+        raise ValueError("F-0001 forward baseline hash config ile uyuşmuyor")
+    contexts = _load_context_set(
+        path,
+        expected_variant=observation_config["baseline_variant"],
+        config=calibration_config,
+    )
+    return contexts, calibration_config, observation_config
+
+
+def _observe_forward_result(
+    *,
+    result: RuntimeResult,
+    decision_ledger: DecisionLedger,
+    trigger_ledger: ForwardTriggerLedger,
+    baseline_contexts: list[dict],
+    calibration_config: dict,
+    observation_config: dict,
+) -> dict:
+    start = _parse_utc(observation_config["observation_start_utc"])
+    if result.as_of_utc < start:
+        return {"status": "before_start", "recorded": False, "direction": None}
+    row = decision_ledger.get(result.decision.decision_id)
+    if row is None or row["context_payload"] is None:
+        return {
+            "status": "context_unavailable",
+            "recorded": False,
+            "as_of_utc": result.as_of_utc.isoformat(),
+            "direction": None,
+        }
+    context = DecisionContextV1.model_validate(row["context_payload"])
+    return observe_forward_context(
+        ledger=trigger_ledger,
+        baseline_contexts=baseline_contexts,
+        context=context,
+        calibration_config=calibration_config,
+        observation_config=observation_config,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,6 +217,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--as-of yalnız tek-sefer modunda kullanılabilir")
     if args.as_of is not None and args.outbox is not None:
         parser.error("--as-of replay outbox'a yazılamaz; tarihsel bildirim seli engellendi")
+    if args.as_of is not None and args.f0001_baseline_contexts is not None:
+        parser.error("--as-of replay F-0001 forward defterine bağlanamaz")
+    if args.f0001_trigger_ledger is not None and args.f0001_baseline_contexts is None:
+        parser.error("--f0001-trigger-ledger için --f0001-baseline-contexts zorunlu")
 
     try:
         signal_commit = _signal_commit(args.signal_commit)
@@ -156,6 +228,15 @@ def main(argv: list[str] | None = None) -> int:
         context_root = args.context_dir or _default_context_dir()
         outbox_path = args.outbox or _default_db_dir() / "outbox.sqlite"
         delivery_outbox = Outbox() if args.as_of is not None else _outbox(outbox_path)
+        forward = (
+            _load_forward_baseline(args.f0001_baseline_contexts)
+            if args.f0001_baseline_contexts is not None
+            else None
+        )
+        trigger_path = args.f0001_trigger_ledger or (
+            _default_db_dir() / "f0001-forward-triggers.sqlite"
+        )
+        trigger_ledger = ForwardTriggerLedger(trigger_path) if forward is not None else None
         with DecisionLedger(ledger_path) as ledger, delivery_outbox as outbox:
             delivery = HourlyDecisionDelivery(ledger=ledger, outbox=outbox)
             candle_source = BinanceUsdMClosedCandleSource(close_grace_seconds=args.grace_seconds)
@@ -175,7 +256,21 @@ def main(argv: list[str] | None = None) -> int:
                 invocation = "explicit_replay" if args.as_of is not None else "latest_due_once"
                 if args.as_of is None:
                     delivery.enqueue_decision(result.decision.decision_id)
-                _emit(result, invocation=invocation)
+                observation = (
+                    _observe_forward_result(
+                        result=result,
+                        decision_ledger=ledger,
+                        trigger_ledger=trigger_ledger,
+                        baseline_contexts=forward[0],
+                        calibration_config=forward[1],
+                        observation_config=forward[2],
+                    )
+                    if forward is not None and trigger_ledger is not None
+                    else None
+                )
+                _emit(result, invocation=invocation, forward_observation=observation)
+                if trigger_ledger is not None:
+                    trigger_ledger.close()
                 return 0
 
             stop_event = threading.Event()
@@ -189,11 +284,31 @@ def main(argv: list[str] | None = None) -> int:
 
             def enqueue_and_emit(result: RuntimeResult) -> None:
                 delivery.enqueue_decision(result.decision.decision_id)
-                _emit(result, invocation="utc_daemon")
+                observation = (
+                    _observe_forward_result(
+                        result=result,
+                        decision_ledger=ledger,
+                        trigger_ledger=trigger_ledger,
+                        baseline_contexts=forward[0],
+                        calibration_config=forward[1],
+                        observation_config=forward[2],
+                    )
+                    if forward is not None and trigger_ledger is not None
+                    else None
+                )
+                _emit(
+                    result,
+                    invocation="utc_daemon",
+                    forward_observation=observation,
+                )
 
             scheduler.serve_forever(stop_event=stop_event, on_result=enqueue_and_emit)
+            if trigger_ledger is not None:
+                trigger_ledger.close()
             return 0
     except Exception as error:
+        if "trigger_ledger" in locals() and trigger_ledger is not None:
+            trigger_ledger.close()
         payload = {
             "status": "error",
             "error_type": type(error).__name__,

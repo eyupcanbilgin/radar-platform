@@ -10,18 +10,14 @@ sys.path.insert(0, str(SERVICE_ROOT))
 
 from decision_engine.forward_trigger import (  # noqa: E402
     ForwardTriggerLedger,
-    build_forward_observation,
     load_forward_observation_config,
+    observe_forward_context,
 )
 from enricher.decision_context import DecisionContextV1  # noqa: E402
 from scripts.fragility_calibration import load_fragility_config  # noqa: E402
 from scripts.run_f0001_evidence import _context_set_sha256, _load_context_set  # noqa: E402
 
 DEFAULT_LEDGER = SERVICE_ROOT / "var" / "f0001-forward-triggers.sqlite"
-
-
-def _is_exact_context_retry(existing: dict, context: DecisionContextV1) -> bool:
-    return existing["context_payload"] == context.model_dump(mode="json")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,22 +39,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     context = DecisionContextV1.model_validate_json(args.context.read_text(encoding="utf-8"))
     with ForwardTriggerLedger(args.ledger) as ledger:
-        existing = ledger.get(context.as_of_utc)
-        if existing is not None:
-            if not _is_exact_context_retry(existing, context):
-                raise ValueError("aynı saat farklı context ile yeniden gözlenemez")
-            print(json.dumps({"recorded": False, **existing["payload"]}, sort_keys=True))
-            return 0
-        observation = build_forward_observation(
+        result = observe_forward_context(
+            ledger=ledger,
             baseline_contexts=baseline,
-            prior_contexts=ledger.contexts(),
             context=context,
             calibration_config=calibration_config,
             observation_config=observation_config,
-            previous_as_of_utc=ledger.latest_as_of(),
         )
-        recorded = ledger.record(observation, context)
-    print(json.dumps({"recorded": recorded, **observation}, sort_keys=True))
+    print(json.dumps(result, sort_keys=True))
     return 0
 
 

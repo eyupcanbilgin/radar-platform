@@ -82,6 +82,17 @@ UTC daemon:
 .venv\Scripts\python.exe scripts\run_hourly_decision.py --daemon
 ```
 
+F-0001 sonuçsuz forward tetik coverage defterini aynı canlı saat ritmine opt-in bağlamak için
+mühürlü combined Development context seti açıkça verilir:
+
+```bash
+python scripts/run_hourly_decision.py --daemon \
+  --f0001-baseline-contexts /path/to/f0001-contexts/combined
+```
+
+Bu seçenek `--as-of` replay ile kullanılamaz. Başlangıç `config/f0001_forward_observation.yaml`
+otoritesidir; outcome, Registry, alert ve direction üretmez.
+
 Açık tarihsel saat yalnız replay/backfill'dir ve varsayılan olarak production defteri yerine
 `var/hourly-replay.sqlite` kullanır:
 

@@ -185,6 +185,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
     (ADR-0030 ön-kayıt başlangıcı: `2026-08-07T00:00:00Z`; geçmiş backfill yok).
     - [x] Immutable/idempotent defter, exact-hour CLI, gap/null/direction kapıları hazır
       (Signal ADR-0031; gerçek başlangıç öncesi yalnız sentetik test).
+    - [x] Mevcut saatlik paper runtime'a opt-in bağla; replay ve başlangıç öncesi yazımı
+      engelle (Signal ADR-0032).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

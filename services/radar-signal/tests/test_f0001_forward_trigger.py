@@ -10,10 +10,10 @@ from decision_engine.forward_trigger import (
     ForwardTriggerLedger,
     ImmutableTriggerObservationError,
     build_forward_observation,
+    observe_forward_context,
 )
 from enricher.decision_context import DecisionContextV1
 from scripts.fragility_calibration import load_fragility_config
-from scripts.observe_f0001_trigger import _is_exact_context_retry
 
 
 def _payload(as_of: datetime, fragility: float | None = 90.0, *, suffix: str = "0") -> dict:
@@ -115,17 +115,37 @@ def test_records_exact_retry_idempotently_and_rejects_conflict(tmp_path):
 def test_cli_retry_requires_the_entire_context_not_only_content_hash(tmp_path):
     as_of = datetime(2026, 8, 7, tzinfo=UTC)
     context = DecisionContextV1.model_validate(_payload(as_of, suffix="d"))
-    observation = _observation(context)
+    calibration, observation_config = _configs(as_of)
     with ForwardTriggerLedger(tmp_path / "forward.sqlite") as ledger:
-        ledger.record(observation, context, recorded_at_utc=as_of)
-        existing = ledger.get(as_of)
+        first = observe_forward_context(
+            ledger=ledger,
+            baseline_contexts=_baseline(),
+            context=context,
+            calibration_config=calibration,
+            observation_config=observation_config,
+        )
+        retry = observe_forward_context(
+            ledger=ledger,
+            baseline_contexts=_baseline(),
+            context=context,
+            calibration_config=calibration,
+            observation_config=observation_config,
+        )
+        changed_payload = _payload(as_of, suffix="d")
+        changed_payload["snapshot"]["input_digest"] = "c" * 64
+        changed = DecisionContextV1.model_validate(changed_payload)
+        assert changed.snapshot.content_hash == context.snapshot.content_hash
+        with pytest.raises(ImmutableTriggerObservationError, match="farklı context"):
+            observe_forward_context(
+                ledger=ledger,
+                baseline_contexts=_baseline(),
+                context=changed,
+                calibration_config=calibration,
+                observation_config=observation_config,
+            )
 
-    assert _is_exact_context_retry(existing, context)
-    changed_payload = _payload(as_of, suffix="d")
-    changed_payload["snapshot"]["input_digest"] = "c" * 64
-    changed = DecisionContextV1.model_validate(changed_payload)
-    assert changed.snapshot.content_hash == context.snapshot.content_hash
-    assert not _is_exact_context_retry(existing, changed)
+    assert first["recorded"] is True
+    assert retry["recorded"] is False
 
 
 def test_sqlite_update_and_delete_are_blocked(tmp_path):
