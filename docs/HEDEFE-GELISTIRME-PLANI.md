@@ -178,6 +178,9 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   - [x] Manifest doğrulanmış gerçek iki-venue girdisiyle F-0001 ölçümünü koş
     (Signal ADR-0028: 547/venue etiketlenebilir satır fakat 0/30 tetik; `unavailable`,
     Registry `E-20260806-075720-32e7c7`; eşikler değiştirilmedi).
+  - [x] Mühürlü context setlerinden Registry/performans yazmayan F-0001 veri ve tetik
+    readiness raporu üret (Signal ADR-0029; ana/funding-only 10, OI-only 0 context tetiği;
+    `measurement_ready=false`, Locked OOS kapalı, direction null).
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.

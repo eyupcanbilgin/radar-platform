@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.11**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.12**
+
+> v2.12 (6 Ağu 2026): ADR-0029 ile mühürlü üç context setinden config-güdümlü F-0001
+> veri/tetik readiness raporu eklendi. Rapor performans ölçmez, Registry'ye yazmaz, Locked
+> OOS'u açmaz ve direction null kalır. v2.11 → git geçmişi.
 
 > v2.11 (6 Ağu 2026): ADR-0028 ile F-0001 ilk gerçek Development koşusu iki venue'de
 > 547 etiketlenebilir satır fakat 0/30 bağımsız tetik nedeniyle `unavailable` kaydedildi.
