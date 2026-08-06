@@ -181,6 +181,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   - [x] Mühürlü context setlerinden Registry/performans yazmayan F-0001 veri ve tetik
     readiness raporu üret (Signal ADR-0029; ana/funding-only 10, OI-only 0 context tetiği;
     `measurement_ready=false`, Locked OOS kapalı, direction null).
+  - [ ] Sonuç okumayan append-only F-0001 forward tetik coverage defterini işlet
+    (ADR-0030 ön-kayıt başlangıcı: `2026-08-07T00:00:00Z`; geçmiş backfill yok).
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
