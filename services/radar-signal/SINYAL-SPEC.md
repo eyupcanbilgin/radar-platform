@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.12**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.14**
+
+> v2.14 (6 Ağu 2026): ADR-0031 ile ADR-0030'da ön-kayıtlı F-0001 forward tetik coverage
+> gözlemi immutable/idempotent SQLite defteri ve exact-hour CLI olarak uygulandı. İlk gerçek
+> kayıt ön-kayıt başlangıcından önce çalıştırılmadı. v2.13 → git geçmişi.
+
+> v2.13 (6 Ağu 2026): ADR-0030 ile F-0001 sonuçsuz forward tetik coverage gözlemi,
+> `2026-08-07T00:00:00Z` başlangıcıyla koddan önce ön-kayıt edildi. Geçmiş backfill,
+> outcome, Registry, alert ve direction üretimi kapalıdır. v2.12 → git geçmişi.
 
 > v2.12 (6 Ağu 2026): ADR-0029 ile mühürlü üç context setinden config-güdümlü F-0001
 > veri/tetik readiness raporu eklendi. Rapor performans ölçmez, Registry'ye yazmaz, Locked
