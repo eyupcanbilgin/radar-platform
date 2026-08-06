@@ -224,7 +224,7 @@ def _registry_verdict(status: str) -> str:
         return "accepted (Development level)"
     if status == "rejected":
         return "rejected (Development gates failed)"
-    return "pending (unavailable; data/sample blocker)"
+    return "invalid (unavailable evidence; data/sample blocker)"
 
 
 def _record_once(evidence: dict, *, registry_path: Path | None) -> dict:
@@ -234,7 +234,6 @@ def _record_once(evidence: dict, *, registry_path: Path | None) -> dict:
         if row.get("hypothesis_id") == "F-0001"
         and row.get("strategy_version") == evidence["code_sha"]
         and row.get("dataset_snapshot") == evidence["dataset_snapshot"]
-        and not str(row.get("verdict", "")).startswith("invalid")
     ]
     if existing:
         return existing[0]

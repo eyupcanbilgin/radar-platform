@@ -1,5 +1,11 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.10**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.11**
+
+> v2.11 (6 Ağu 2026): ADR-0028 ile F-0001 ilk gerçek Development koşusu iki venue'de
+> 547 etiketlenebilir satır fakat 0/30 bağımsız tetik nedeniyle `unavailable` kaydedildi.
+> Registry'nin kapalı verdict sözlüğünde etkin kayıt `invalid (unavailable evidence)` olur;
+> bu performans reddi değildir. Eşikler değiştirilmedi, Locked OOS açılmadı ve direction
+> null kaldı. v2.10 → git geçmişi.
 
 > v2.10 (6 Ağu 2026): ADR-0027 ile F-0001 event-row adaptörü gerçek
 > `decision-context/v1` alan yerleşimine bağlandı; ilk gerçek girişim metrik ve Registry
