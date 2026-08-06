@@ -8,6 +8,7 @@
 
 import hashlib
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -56,3 +57,15 @@ def weights_hash(path: Path | None = None) -> str:
     """weights.yaml içeriğinin sha256 kısa hash'i — skor izlenebilirliği (SPEC §5.2)."""
     p = path or config_dir() / "weights.yaml"
     return hashlib.sha256(p.read_bytes()).hexdigest()[:12]
+
+
+def load_f0001_locked_oos(path: Path | None = None) -> datetime:
+    """Load the immutable F-0001 research boundary from packaged config."""
+    p = path or config_dir() / "f0001_context_sets.yaml"
+    raw = _load_yaml(p)
+    if raw.get("version") != "1" or raw.get("hypothesis_id") != "F-0001":
+        raise ValueError("desteklenmeyen F-0001 context policy kimliği/sürümü")
+    parsed = datetime.fromisoformat(str(raw["locked_oos_start_utc"]).replace("Z", "+00:00"))
+    if parsed.tzinfo is None or any((parsed.minute, parsed.second, parsed.microsecond)):
+        raise ValueError("F-0001 locked_oos_start_utc timezone-aware tam saat olmalı")
+    return parsed.astimezone(UTC)

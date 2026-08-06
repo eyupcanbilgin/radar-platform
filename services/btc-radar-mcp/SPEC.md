@@ -1,5 +1,9 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.6**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.7**
+
+> v1.7 (6 Ağu 2026): ADR-0010 ile F-0001 için PIT tarihsel ana/iki leave-one-family-out
+> context seti backfill'i ve hash mühürlü `f0001-context-set/v1` manifesti eklendi. Locked
+> OOS config ile kapalı, direction null; gerçek ölçüm yapılmadı. v1.6 → git geçmişi.
 
 > v1.6 (5 Ağu 2026): Platform ADR-0004 ile ürün v1 kırılganlık/volatilite uyarısı odağına
 > alındı. Aktif profil `direction=null`; direction alanı uyumluluk için korunur, ürün özelliği

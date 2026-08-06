@@ -24,6 +24,17 @@ Manifest doğrulandıktan sonra F-0001 kanıt koşusu üç context setini birlik
 birleşik kırılganlık, funding ailesi çıkarılmış counterfactual ve OI ailesi çıkarılmış
 counterfactual. Bu girdiler aynı karar saatlerini ve PIT kurallarını korumalıdır:
 
+Context setleri önce MCP servisinde üretilir; Locked OOS sınırı config'den gelir:
+
+```bash
+btc-radar-producer research-contexts \
+  --start 2024-01-01T00:00:00Z \
+  --end-exclusive 2026-08-04T00:00:00Z \
+  --pit-db /path/to/pit.sqlite \
+  --snapshot-root /path/to/f0001-snapshots \
+  --output-root /path/to/f0001-contexts
+```
+
 ```bash
 python scripts/run_f0001_evidence.py \
   --contexts /path/to/combined-contexts \
