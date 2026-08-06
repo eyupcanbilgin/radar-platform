@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.9**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.10**
+
+> v2.10 (6 Ağu 2026): ADR-0027 ile F-0001 event-row adaptörü gerçek
+> `decision-context/v1` alan yerleşimine bağlandı; ilk gerçek girişim metrik ve Registry
+> kaydı üretmeden fail-closed durmuştu. Ön-kayıt veya ölçüm kuralı değişmedi. v2.9 → git geçmişi.
 
 > v2.9 (6 Ağu 2026): ADR-0026 ile gerçek Coinbase geçmişinde doğrulanan iki venue gap'i
 > mum uydurmadan kesintisiz segmentlere ayrılır; gap'e temas eden etiket pencereleri dışlanır

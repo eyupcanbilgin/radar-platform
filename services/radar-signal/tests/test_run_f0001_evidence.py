@@ -34,9 +34,12 @@ def _synthetic_inputs(hours: int = 480):
         contexts.append(
             {
                 "as_of_utc": timestamp,
-                "data_cutoff_at_utc": timestamp,
-                "snapshot": {"fragility": fragility, "direction": None},
-                "gates": {"directional_decision_allowed": False},
+                "snapshot": {
+                    "data_cutoff_at_utc": timestamp,
+                    "fragility": fragility,
+                    "direction": None,
+                },
+                "data_quality": {"directional_decision_allowed": False},
             }
         )
         change = 0.006 if fragility >= 80 else 0.001
