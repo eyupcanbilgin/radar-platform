@@ -77,6 +77,9 @@ def load_forward_observation_config(path: Path | None = None) -> dict:
     start = datetime.fromisoformat(config["observation_start_utc"].replace("Z", "+00:00"))
     if start.tzinfo is None or any((start.minute, start.second, start.microsecond)):
         raise ValueError("forward observation başlangıcı UTC saat sınırı olmalı")
+    grace_seconds = config.get("coverage_grace_seconds")
+    if not isinstance(grace_seconds, int) or not 0 <= grace_seconds < 3600:
+        raise ValueError("forward coverage grace 0..3599 saniye olmalı")
     baseline_hash = str(config.get("baseline_context_set_sha256", ""))
     if len(baseline_hash) != 64 or any(char not in "0123456789abcdef" for char in baseline_hash):
         raise ValueError("forward observation baseline hash geçersiz")
@@ -156,14 +159,27 @@ def build_forward_observation(
 
 
 class ForwardTriggerLedger:
-    def __init__(self, path: Path | str | None = None):
+    def __init__(self, path: Path | str | None = None, *, read_only: bool = False):
         self.path = Path(path) if path else None
+        if read_only and self.path is None:
+            raise ValueError("read-only forward ledger için path zorunlu")
+        if read_only and not self.path.exists():
+            raise FileNotFoundError(f"forward trigger ledger bulunamadı: {self.path}")
         if self.path:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self.path) if self.path else ":memory:")
+            if not read_only:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+        target = (
+            f"file:{self.path.resolve()}?mode=ro"
+            if read_only and self.path
+            else str(self.path)
+            if self.path
+            else ":memory:"
+        )
+        self._conn = sqlite3.connect(target, uri=read_only)
         self._conn.row_factory = sqlite3.Row
-        self._conn.executescript(_DDL)
-        self._conn.commit()
+        if not read_only:
+            self._conn.executescript(_DDL)
+            self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -270,6 +286,19 @@ class ForwardTriggerLedger:
         return int(
             self._conn.execute("SELECT COUNT(*) FROM f0001_trigger_observations").fetchone()[0]
         )
+
+    def observations_through(self, as_of_utc: datetime) -> list[dict]:
+        """Return integrity-checked observations no later than an exact UTC hour."""
+        if as_of_utc.tzinfo is None or any(
+            (as_of_utc.minute, as_of_utc.second, as_of_utc.microsecond)
+        ):
+            raise ValueError("coverage as_of timezone-aware UTC saat sınırı olmalı")
+        rows = self._conn.execute(
+            "SELECT as_of_utc FROM f0001_trigger_observations "
+            "WHERE as_of_utc <= ? ORDER BY as_of_utc",
+            (iso_utc(as_of_utc),),
+        ).fetchall()
+        return [self.get(datetime.fromisoformat(row[0].replace("Z", "+00:00"))) for row in rows]
 
 
 def observe_forward_context(

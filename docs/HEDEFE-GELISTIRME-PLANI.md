@@ -187,6 +187,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       (Signal ADR-0031; gerçek başlangıç öncesi yalnız sentetik test).
     - [x] Mevcut saatlik paper runtime'a opt-in bağla; replay ve başlangıç öncesi yazımı
       engelle (Signal ADR-0032).
+    - [x] Forward defter için outcome okumayan coverage/status raporu ekle; eksik saat ile
+      unavailable gözlemi ayrı blocker tut (Signal ADR-0033).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

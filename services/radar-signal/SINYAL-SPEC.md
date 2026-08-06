@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.15**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.16**
+
+> v2.16 (6 Ağu 2026): ADR-0033 ile F-0001 forward defteri için outcome okumayan,
+> direction/Registry/alert üretmeyen coverage status raporu eklendi. Eksik saat ve
+> unavailable gözlem ayrı blocker olarak kalır. v2.15 → git geçmişi.
 
 > v2.15 (6 Ağu 2026): ADR-0032 ile F-0001 forward tetik defteri mevcut saatlik paper
 > runtime'a opt-in bağlandı. Replay bağlantısı yasak; başlangıç öncesi veya context eksikken
