@@ -90,3 +90,26 @@ def test_event_bundle_rejects_direction_lookahead_and_missing_venue():
             config=_config(),
             provenance={},
         )
+
+
+def test_venue_gaps_are_segmented_and_reported_without_fabricated_bars():
+    contexts, bars = _inputs()
+    gapped = bars[:200] + bars[205:]
+
+    bundle = build_event_row_bundle(
+        contexts=contexts,
+        bars_by_venue={"binance_futures": bars, "coinbase_spot": gapped},
+        config=_config(),
+        provenance={"dataset_snapshot": "synthetic"},
+    )
+
+    coverage = bundle["venue_coverage"]["coinbase_spot"]
+    assert coverage["missing_hours"] == 5
+    assert coverage["segment_count"] == 2
+    excluded = {
+        (datetime(2024, 1, 1, tzinfo=UTC) + timedelta(hours=index))
+        .isoformat()
+        .replace("+00:00", "Z")
+        for index in range(176, 229)
+    }
+    assert not any(row["as_of_utc"] in excluded for row in bundle["rows_by_venue"]["coinbase_spot"])

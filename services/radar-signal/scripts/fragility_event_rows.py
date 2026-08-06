@@ -83,56 +83,85 @@ def build_venue_labels(bars: list[dict], config: dict) -> dict[datetime, dict]:
             raise FragilityCalibrationError("bar available_at close_at öncesinde")
         parsed.append({**raw, "close_at": close_at, "available_at": available})
     parsed.sort(key=lambda row: row["close_at"])
+    if not parsed:
+        raise FragilityCalibrationError("venue OHLCV boş")
     if len({row["close_at"] for row in parsed}) != len(parsed):
         raise FragilityCalibrationError("duplicate venue bar")
+    segments = [[parsed[0]]]
     for left, right in zip(parsed, parsed[1:], strict=False):
-        if right["close_at"] - left["close_at"] != timedelta(hours=1):
-            raise FragilityCalibrationError("venue OHLCV saatlik ve kesintisiz olmalı")
+        delta = right["close_at"] - left["close_at"]
+        if delta == timedelta(hours=1):
+            segments[-1].append(right)
+            continue
+        if delta <= timedelta(0) or delta % timedelta(hours=1):
+            raise FragilityCalibrationError("venue OHLCV gap tam saat katı olmalı")
+        segments.append([right])
     ratios = []
     by_time = {}
-    for index in range(trailing, len(parsed) - horizon):
-        current = parsed[index]
-        as_of = current["close_at"]
-        before = parsed[index - trailing : index + 1]
-        after = parsed[index : index + horizon + 1]
-        trailing_returns = [
-            math.log(before[i]["close"] / before[i - 1]["close"]) for i in range(1, len(before))
-        ]
-        forward_returns = [
-            math.log(after[i]["close"] / after[i - 1]["close"]) for i in range(1, len(after))
-        ]
-        trailing_rv = math.sqrt(sum(value * value for value in trailing_returns))
-        forward_rv = math.sqrt(sum(value * value for value in forward_returns))
-        if trailing_rv == 0:
-            continue
-        ratio = forward_rv / trailing_rv
-        settled = [
-            item
-            for item in ratios
-            if item["available_at"] <= as_of
-            and item["as_of"]
-            >= as_of - timedelta(days=int(cfg["label_distribution_lookback_days"]))
-        ]
-        label = None
-        if len(settled) >= int(cfg["min_settled_labels"]):
-            percentile = _midrank([item["ratio"] for item in settled], ratio)
-            reference = float(current["close"])
-            excursion = max(
-                max(
-                    abs(float(item["high"]) / reference - 1),
-                    abs(float(item["low"]) / reference - 1),
+    for segment in segments:
+        for index in range(trailing, len(segment) - horizon):
+            current = segment[index]
+            as_of = current["close_at"]
+            before = segment[index - trailing : index + 1]
+            after = segment[index : index + horizon + 1]
+            trailing_returns = [
+                math.log(before[i]["close"] / before[i - 1]["close"]) for i in range(1, len(before))
+            ]
+            forward_returns = [
+                math.log(after[i]["close"] / after[i - 1]["close"]) for i in range(1, len(after))
+            ]
+            trailing_rv = math.sqrt(sum(value * value for value in trailing_returns))
+            forward_rv = math.sqrt(sum(value * value for value in forward_returns))
+            if trailing_rv == 0:
+                continue
+            ratio = forward_rv / trailing_rv
+            settled = [
+                item
+                for item in ratios
+                if item["available_at"] <= as_of
+                and item["as_of"]
+                >= as_of - timedelta(days=int(cfg["label_distribution_lookback_days"]))
+            ]
+            if len(settled) >= int(cfg["min_settled_labels"]):
+                percentile = _midrank([item["ratio"] for item in settled], ratio)
+                reference = float(current["close"])
+                excursion = max(
+                    max(
+                        abs(float(item["high"]) / reference - 1),
+                        abs(float(item["low"]) / reference - 1),
+                    )
+                    for item in after[1:]
                 )
-                for item in after[1:]
+                by_time[as_of] = {
+                    "event": percentile >= float(cfg["expansion_percentile_threshold"]),
+                    "label_available_at": after[-1]["available_at"],
+                    "volatility_expansion_ratio": ratio,
+                    "max_absolute_excursion": excursion,
+                }
+            ratios.append(
+                {"as_of": as_of, "available_at": after[-1]["available_at"], "ratio": ratio}
             )
-            label = {
-                "event": percentile >= float(cfg["expansion_percentile_threshold"]),
-                "label_available_at": after[-1]["available_at"],
-                "volatility_expansion_ratio": ratio,
-                "max_absolute_excursion": excursion,
-            }
-            by_time[as_of] = label
-        ratios.append({"as_of": as_of, "available_at": after[-1]["available_at"], "ratio": ratio})
     return by_time
+
+
+def venue_coverage(bars: list[dict]) -> dict:
+    times = sorted(_utc(row["close_at_utc"]) for row in bars)
+    gaps = []
+    for left, right in zip(times, times[1:], strict=False):
+        if right - left > timedelta(hours=1):
+            gaps.append(
+                {
+                    "after_utc": left.isoformat().replace("+00:00", "Z"),
+                    "before_utc": right.isoformat().replace("+00:00", "Z"),
+                    "missing_hours": int((right - left) / timedelta(hours=1)) - 1,
+                }
+            )
+    return {
+        "observed_hours": len(times),
+        "missing_hours": sum(item["missing_hours"] for item in gaps),
+        "segment_count": len(gaps) + 1 if times else 0,
+        "gaps": gaps,
+    }
 
 
 def build_event_row_bundle(
@@ -173,6 +202,7 @@ def build_event_row_bundle(
         "direction": None,
         "provenance": hashes,
         "rows_by_venue": rows_by_venue,
+        "venue_coverage": {venue: venue_coverage(bars_by_venue[venue]) for venue in required},
     }
     payload["artifact_sha256"] = _hash(payload)
     return payload
