@@ -10,7 +10,8 @@
    SQLite'a append-only yazar. SQL trigger'ları UPDATE, DELETE ve çakışan INSERT'i engeller.
 2. Observation kimliği ve hash'i context snapshot/content hash'i, mühürlü baseline hash'i,
    trigger config hash'i ve sonuçsuz tetik gövdesinden deterministik türetilir. Aynı içerikli
-   retry idempotent, farklı içerikli aynı saat hatadır.
+   retry ancak context payload'ının tamamı da eşitse idempotenttir; yalnız content hash
+   eşitliği yeterli değildir. Farklı içerikli aynı saat hatadır.
 3. `scripts/observe_f0001_trigger.py`, baseline context set manifestini ADR-0030 config
    hash'i ve ADR-0025 sözleşmesiyle doğrular; exact-hour `decision-context/v1` girdisini katı
    Pydantic modeliyle okur.

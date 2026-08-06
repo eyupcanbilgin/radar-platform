@@ -20,6 +20,10 @@ from scripts.run_f0001_evidence import _context_set_sha256, _load_context_set  #
 DEFAULT_LEDGER = SERVICE_ROOT / "var" / "f0001-forward-triggers.sqlite"
 
 
+def _is_exact_context_retry(existing: dict, context: DecisionContextV1) -> bool:
+    return existing["context_payload"] == context.model_dump(mode="json")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-contexts", type=Path, required=True)
@@ -41,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     with ForwardTriggerLedger(args.ledger) as ledger:
         existing = ledger.get(context.as_of_utc)
         if existing is not None:
-            if existing["context_content_hash"] != context.snapshot.content_hash:
+            if not _is_exact_context_retry(existing, context):
                 raise ValueError("aynı saat farklı context ile yeniden gözlenemez")
             print(json.dumps({"recorded": False, **existing["payload"]}, sort_keys=True))
             return 0
