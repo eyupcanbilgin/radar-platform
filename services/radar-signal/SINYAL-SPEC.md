@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.14**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.15**
+
+> v2.15 (6 Ağu 2026): ADR-0032 ile F-0001 forward tetik defteri mevcut saatlik paper
+> runtime'a opt-in bağlandı. Replay bağlantısı yasak; başlangıç öncesi veya context eksikken
+> gözlem uydurulmaz. Outcome/Registry/alert/direction kapalı kalır. v2.14 → git geçmişi.
 
 > v2.14 (6 Ağu 2026): ADR-0031 ile ADR-0030'da ön-kayıtlı F-0001 forward tetik coverage
 > gözlemi immutable/idempotent SQLite defteri ve exact-hour CLI olarak uygulandı. İlk gerçek

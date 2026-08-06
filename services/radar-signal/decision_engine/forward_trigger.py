@@ -270,3 +270,30 @@ class ForwardTriggerLedger:
         return int(
             self._conn.execute("SELECT COUNT(*) FROM f0001_trigger_observations").fetchone()[0]
         )
+
+
+def observe_forward_context(
+    *,
+    ledger: ForwardTriggerLedger,
+    baseline_contexts: list[dict],
+    context: DecisionContextV1,
+    calibration_config: dict,
+    observation_config: dict,
+) -> dict:
+    """Build and append one context, returning an idempotent operator summary."""
+    existing = ledger.get(context.as_of_utc)
+    if existing is not None:
+        if existing["context_payload"] != context.model_dump(mode="json"):
+            raise ImmutableTriggerObservationError(
+                "aynı saat farklı context ile yeniden gözlenemez"
+            )
+        return {"recorded": False, **existing["payload"]}
+    observation = build_forward_observation(
+        baseline_contexts=baseline_contexts,
+        prior_contexts=ledger.contexts(),
+        context=context,
+        calibration_config=calibration_config,
+        observation_config=observation_config,
+        previous_as_of_utc=ledger.latest_as_of(),
+    )
+    return {"recorded": ledger.record(observation, context), **observation}
