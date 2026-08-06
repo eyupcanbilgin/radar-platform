@@ -30,12 +30,14 @@ def build_trigger_rows(contexts: list[dict], config: dict) -> list[dict]:
     seen = set()
     for context in contexts:
         as_of = _utc(context["as_of_utc"])
-        cutoff = _utc(context["data_cutoff_at_utc"])
         snapshot = context["snapshot"]
-        gates = context["gates"]
+        cutoff = _utc(snapshot["data_cutoff_at_utc"])
+        data_quality = context["data_quality"]
         if cutoff > as_of:
             raise FragilityCalibrationError("context look-ahead: data_cutoff > as_of")
-        if snapshot.get("direction") is not None or gates.get("directional_decision_allowed"):
+        if snapshot.get("direction") is not None or data_quality.get(
+            "directional_decision_allowed"
+        ):
             raise FragilityCalibrationError("F-0001 context direction-null/kapalı olmalı")
         if as_of in seen:
             raise FragilityCalibrationError("duplicate context as_of")

@@ -16,6 +16,7 @@ from scripts.run_f0001_evidence import (
     _load_hourly_bars,
     _manifest_snapshot,
     _record_once,
+    _registry_verdict,
     build_evidence,
 )
 
@@ -34,9 +35,12 @@ def _synthetic_inputs(hours: int = 480):
         contexts.append(
             {
                 "as_of_utc": timestamp,
-                "data_cutoff_at_utc": timestamp,
-                "snapshot": {"fragility": fragility, "direction": None},
-                "gates": {"directional_decision_allowed": False},
+                "snapshot": {
+                    "data_cutoff_at_utc": timestamp,
+                    "fragility": fragility,
+                    "direction": None,
+                },
+                "data_quality": {"directional_decision_allowed": False},
             }
         )
         change = 0.006 if fragility >= 80 else 0.001
@@ -222,6 +226,34 @@ def test_registry_deduplicates_same_hypothesis_code_and_dataset(monkeypatch, tmp
         "strategy_version": "abc123def456",
         "dataset_snapshot": "dataset-1",
         "verdict": "rejected",
+    }
+    monkeypatch.setattr("scripts.run_f0001_evidence.read_all", lambda _: [existing])
+    monkeypatch.setattr(
+        "scripts.run_f0001_evidence.record_run",
+        lambda **_: (_ for _ in ()).throw(AssertionError("duplicate kayıt yazılmamalı")),
+    )
+
+    assert _record_once(evidence, registry_path=tmp_path / "registry.jsonl") == existing
+
+
+def test_unavailable_registry_verdict_is_closed_without_performance_rejection():
+    assert _registry_verdict("unavailable") == (
+        "invalid (unavailable evidence; data/sample blocker)"
+    )
+
+
+def test_registry_deduplicates_existing_invalid_evidence(monkeypatch, tmp_path):
+    evidence = {
+        "code_sha": "abc123def456",
+        "dataset_snapshot": "dataset-1",
+        "status": "unavailable",
+    }
+    existing = {
+        "experiment_id": "E-unavailable",
+        "hypothesis_id": "F-0001",
+        "strategy_version": "abc123def456",
+        "dataset_snapshot": "dataset-1",
+        "verdict": "invalid (unavailable evidence; data/sample blocker)",
     }
     monkeypatch.setattr("scripts.run_f0001_evidence.read_all", lambda _: [existing])
     monkeypatch.setattr(

@@ -19,9 +19,12 @@ def _inputs(hours: int = 500):
         contexts.append(
             {
                 "as_of_utc": close_at.isoformat().replace("+00:00", "Z"),
-                "data_cutoff_at_utc": close_at.isoformat().replace("+00:00", "Z"),
-                "snapshot": {"fragility": fragility, "direction": None},
-                "gates": {"directional_decision_allowed": False},
+                "snapshot": {
+                    "data_cutoff_at_utc": close_at.isoformat().replace("+00:00", "Z"),
+                    "fragility": fragility,
+                    "direction": None,
+                },
+                "data_quality": {"directional_decision_allowed": False},
             }
         )
         change = 0.004 if fragility >= 80 else 0.001
@@ -73,7 +76,7 @@ def test_event_bundle_rejects_direction_lookahead_and_missing_venue():
         )
 
     contexts, bars = _inputs()
-    contexts[0]["data_cutoff_at_utc"] = "2024-01-01T01:00:00Z"
+    contexts[0]["snapshot"]["data_cutoff_at_utc"] = "2024-01-01T01:00:00Z"
     with pytest.raises(FragilityCalibrationError, match="look-ahead"):
         build_event_row_bundle(
             contexts=contexts,
