@@ -1,5 +1,9 @@
 # RADAR PLATFORM — DURUM RAPORU
 
+> **⚠️ GEÇERSİZ / TARİHÎ KAYIT.** Bu rapor `c32057f` dönemini anlatır ve o günün
+> fotoğrafı olarak korunmuştur. Güncel durum: [`DURUM-RAPORU-2026-08-05.md`](DURUM-RAPORU-2026-08-05.md).
+> Aradaki 45+ commit bu belgede yoktur; buradaki hiçbir satır bugünkü durumu tarif etmez.
+
 **Tarih:** 4 Ağustos 2026 · **Hazırlayan:** Claude Code (incelemeci rolü) · **Kapsam:** `radar-platform` monorepo
 **Yöntem:** Yalnız tespit. Bu rapor için hiçbir kod/config değiştirilmedi.
 Emin olunmayan satırlar **[?]** ile işaretlidir.
