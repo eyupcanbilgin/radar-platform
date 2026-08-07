@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.20**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.21**
+
+> v2.21 (7 Ağu 2026): ADR-0038 ile macOS renderer venv Python symlink'ini ana
+> interpreter'a çözmekten vazgeçti; plist doğrulanmış venv entrypoint'ini korur. İlk gerçek
+> kurulumda bulunan eksik paket hatası giderildi; karar semantiği değişmedi. v2.20 → git geçmişi.
 
 > v2.20 (7 Ağu 2026): ADR-0037 ile F-0001 coverage raporu atomik son-durum dosyasına
 > yazılabilir oldu ve macOS supervision'a restart-loop yaratmayan periyodik coverage ajanı

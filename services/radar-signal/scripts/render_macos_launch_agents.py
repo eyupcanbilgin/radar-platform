@@ -54,12 +54,14 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
 
 
 def _require_file(path: Path, description: str, *, executable: bool = False) -> Path:
-    resolved = path.expanduser().resolve()
-    if not resolved.is_file():
-        raise FileNotFoundError(f"{description} bulunamadı: {resolved}")
-    if executable and not os.access(resolved, os.X_OK):
-        raise ValueError(f"{description} çalıştırılabilir değil: {resolved}")
-    return resolved
+    # Venv python executables are symlinks. realpath/Path.resolve would replace that
+    # entrypoint with the base interpreter and silently discard the venv's sys.prefix.
+    absolute = Path(os.path.abspath(path.expanduser()))
+    if not absolute.is_file():
+        raise FileNotFoundError(f"{description} bulunamadı: {absolute}")
+    if executable and not os.access(absolute, os.X_OK):
+        raise ValueError(f"{description} çalıştırılabilir değil: {absolute}")
+    return absolute
 
 
 def validate_clean_checkout(checkout_root: Path) -> Path:

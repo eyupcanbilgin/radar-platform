@@ -197,6 +197,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       temiz Python 3.12 import smoke kapısı ekle (Signal ADR-0036).
     - [x] Coverage raporunu atomik son-durum dosyasına yaz ve macOS supervision altında
       restart-loop olmadan periyodik işlet (Signal ADR-0037).
+    - [x] Launchd plist'lerinde venv Python symlink'ini koru; ana interpreter'a çözülüp
+      runtime bağımlılıklarının kaybolmasını engelle (Signal ADR-0038).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
