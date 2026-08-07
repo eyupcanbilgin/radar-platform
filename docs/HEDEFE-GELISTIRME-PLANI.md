@@ -189,6 +189,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       engelle (Signal ADR-0032).
     - [x] Forward defter için outcome okumayan coverage/status raporu ekle; eksik saat ile
       unavailable gözlemi ayrı blocker tut (Signal ADR-0033).
+    - [x] macOS için temiz checkout + ayrı state root kullanan secret-free launchd agent
+      üreticisini ve producer→Signal grace sırasını ekle (Signal ADR-0034; kurulum opt-in).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

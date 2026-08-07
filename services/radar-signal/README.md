@@ -78,6 +78,12 @@ setup henüz olmadığı için bugünkü dürüst çıktı yine `WAIT`tir. Produ
 CLI'dır, scheduler/supervision değildir. Exact-hour inbox, retry/grace, replay ayrımı ve
 işletim sınırları için `decision_engine/README.md` dosyasına bakın.
 
+macOS üzerinde producer + saatlik karar + outbox pump süreçleri için secret içermeyen
+LaunchAgent dosyaları `scripts/render_macos_launch_agents.py` ile üretilir. Araç agent'ları
+kurmaz veya `launchctl` çağırmaz; temiz checkout, ayrı state root, iki açık Python executable'ı
+ve config hash'iyle eşleşen combined F-0001 baseline ister. Kurulum ve rollback adımları
+`docs/MACOS-PAPER-SUPERVISION.md` dosyasındadır.
+
 ---
 
 ## 🧪 Testler ve Doğrulama

@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.16**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.17**
+
+> v2.17 (7 Ağu 2026): ADR-0034 ile macOS launchd için secret-free producer, saatlik
+> Signal ve outbox pump agent üreticisi eklendi. Temiz checkout ve mühürlü baseline zorunlu;
+> producer grace, Signal grace'ten küçük değilse config reddedilir. v2.16 → git geçmişi.
 
 > v2.16 (6 Ağu 2026): ADR-0033 ile F-0001 forward defteri için outcome okumayan,
 > direction/Registry/alert üretmeyen coverage status raporu eklendi. Eksik saat ve

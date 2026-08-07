@@ -1,0 +1,15 @@
+version: "1"
+
+producer:
+  collect_interval_seconds: 300
+  publish_grace_seconds: 90
+  history_limit: 3
+
+signal:
+  decision_grace_seconds: 180
+
+pump:
+  interval_seconds: 5
+
+launchd:
+  throttle_interval_seconds: 10
