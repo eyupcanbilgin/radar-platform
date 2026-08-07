@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+import os
 import plistlib
 from pathlib import Path
 
@@ -93,7 +94,8 @@ def test_plists_are_atomic_private_and_parseable(tmp_path, monkeypatch):
 
     assert len(written) == 3
     for path in written:
-        assert path.stat().st_mode & 0o777 == 0o600
+        if os.name != "nt":
+            assert path.stat().st_mode & 0o777 == 0o600
         payload = plistlib.loads(path.read_bytes())
         assert payload["KeepAlive"] is True
         assert payload["RunAtLoad"] is True
