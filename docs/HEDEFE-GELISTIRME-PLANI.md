@@ -1,6 +1,7 @@
 # RADAR Hedefe Geliştirme Planı
 
-**Durum:** AKTİF · **Yeniden yazıldı:** 8 Ağustos 2026 (ADR-0006) · **Ürün sahibi:** Eyüpcan
+**Durum:** AKTİF · **Yeniden yazıldı:** 8 Ağustos 2026 (ADR-0006, ADR-0007 ile düzeltildi)
+**Ürün sahibi:** Eyüpcan
 **Tek aktif depo:** `radar-platform`
 **Tamamlanmış faz geçmişi:** `docs/PLAN-ARSIV-2026-08.md`
 
@@ -20,46 +21,57 @@ Kârlılık bir yazılım özelliği veya vaat değildir. Sistem gerçek emir g�
 
 | Aile | Kaynak geçmişi | Config ihtiyacı | Bugün kesintisiz elde |
 |---|---|---|---|
-| `funding_stress` | `fundingRate` — 400+ gün çekilebilir | `min_span_days: 45` | **ölç ve buraya yaz** |
-| `oi_buildup` | `openInterestHist` — ~30 gün sert saklama sınırı | `min_span_days: 14` | **ölç ve buraya yaz** |
+| `funding_stress` | `fundingRate` — 2019'a kadar çekilebilir | `min_span_days: 45` | **ölç ve buraya yaz** |
+| `oi_buildup` | canlı `openInterestHist` ~30 gün; **`data.binance.vision` günlük metrics paketleri 2020-09'dan itibaren** | `min_span_days: 14` | **ölç ve buraya yaz** |
 | `spot_close` | backfill + canlı | — | **ölç ve buraya yaz** |
 | `spot_perp_basis` | `live_only` | — | **ölç ve buraya yaz** |
 | `order_book_spread_bps` | `live_only` | — | **ölç ve buraya yaz** |
 
-Bir iş bu tabloyu iyileştirmiyorsa ikincildir. `oi_buildup` için duran her saat **kalıcı**
-kayıptır: saklama penceresinden eski OI ancak biz sakladıysak vardır.
+Bir iş bu tabloyu iyileştirmiyorsa ikincildir.
 
-Kısıtın ürüne etkisi: `fragility_calibration.yaml` iki aileyi de zorunlu tutar ve zincir
-fail-closed olduğu için ince aile düştüğünde derin aile de düşer, context `unavailable`
-olur. Ayrıntılı teşhis ADR-0006'dadır.
+Kısıtın niteliği (ADR-0007): veri **elde edilemez değil, içe aktarılmamıştır.** Doğru iş
+beklemek ve alarm kurmak değil, kaynağı bağlamaktır. Toplayıcı kesintisi kalıcı kayıp
+değildir; ertesi günün paketinden onarılabilir.
+
+Not: `core/components.py` + `core/scoring.py` bir aile düştüğünde diğerinden **kısmi**
+fragility yayımlar; MCP katmanında null olmaz. Rehin alma yalnız F-0001 protokol katmanında,
+`features.required` ve ablation kapısı üzerinden gerçekleşir.
 
 ## 3. Uçuşta olan tek ölçüm
 
-**F-0002 — funding kırılganlığı sonrası volatilite genişlemesi (tek aile).**
+**F-0001 — kaldıraç kırılganlığı sonrası volatilite genişlemesi.** Statü: `VERİ İÇE AKTARIMI
+BEKLİYOR`. Ret değildir; hiçbir kabul/ret metriği üretmemiştir. Eşikleri dokunulmaz.
 
 | Kapı | Durum |
 |---|---|
-| Kart ön-kaydı (`feature/` dalı + PR + bağımsız inceleme) | ☐ |
-| 400 günlük settled funding PIT backfill'i ve coverage kanıtı | ☐ |
-| Ölçüm koşusu (ayrı commit; kart sıkılaştırmasıyla asla aynı commit'te değil) | ☐ |
-| Registry satırı + verdict (ret dahil) | ☐ |
+| `binance_vision_metrics` tarihsel OI içe aktarımı (ADR-0007 madde 4) | ☐ |
+| Çakışma doğrulaması: paket serisi ≡ canlı uç nokta serisi (~30 gün) | ☐ |
+| `f0001_readiness.py` kartından sıkı kapıyı düzelt (ADR-0007 madde 7) | ☐ |
+| Readiness raporu `measurement_ready=true` | ☐ |
+| Ölçüm koşusu + Registry satırı + verdict (ret dahil) | ☐ |
 
 Kurallar: `direction` null kalır; eksik/yetersiz sonuç `unavailable`dır, sakin piyasa
 sayılmaz; eşikler config'de ve göreli yüzdeliktir; Locked OOS kapalıdır; sonuç görülerek
-hiçbir eşik değişmez. Tek aileye düşen hipotez daha zayıf bir iddiadır ve kart bunu açıkça
-taşır.
+hiçbir eşik değişmez. Çakışma doğrulaması geçmeden içe aktarılan veri ölçümde kullanılamaz.
 
-**F-0001:** `ARŞİV — ÖLÇÜLEMEZ` (ADR-0006). Ret değildir; hiçbir kabul/ret metriği
-üretmemiştir. Eşikleri dokunulmaz. Harici meşru tarihsel OI gelirse ayrı kararla açılır.
+**F-0002 (funding-only):** iptal (ADR-0007 madde 3). Gerekçesi birleşik hipotezin ölçülemez
+sanılmasıydı; o gerekçe ortadan kalktı.
 
-## 4. P0 — Toplayıcı sürekliliği
+## 4. P0 — Tarihsel OI içe aktarımı
 
-Bağlayıcı kısıtın tek gerçek kaldıracı. Faz 3'ten öne alındı.
+Bağlayıcı kısıtın tek gerçek kaldıracı.
 
-- [ ] Kesinti bildirimi: toplayıcı durduğunda veya kapsama düştüğünde operatöre alarm.
+- [ ] `binance_vision_metrics` provider + PIT içe aktarımı; yayın-anı semantiği mevcut
+      backfill kalıbını izler (MCP ADR-0005). Yayın gecikmesi ölçülür, varsayılmaz.
+- [ ] 5 dakikalık kovadan saatlik seriye indirgeme kuralı canlı uç noktayla aynı olmalı
+      (saat sınırındaki örnek, ortalama değil); kural config'e yazılır.
+- [ ] Çakışma doğrulaması geçmeden içe aktarım yok.
 - [ ] Bölüm 2 tablosunu veriden türeten tek komut; çıktısı bu dosyaya elle değil raporla girer.
-- [ ] Forward context'lerin neden `unavailable` döndüğünü çalışan runtime'ın PIT'i üzerinde
-      doğrula (teşhis: `oi_buildup` yetersiz-geçmiş kapısı).
+- [ ] Forward context'lerin neden `unavailable` döndüğünü çalışan runtime'ın blocker
+      listesiyle doğrula — **teşhis henüz yok** (ADR-0006'nın teşhisi ADR-0007 ile çürüdü).
+
+Ertelendi (aciliyetini kaybetti, kapsam dışı değil): toplayıcı kesinti bildirimi ve
+barındırma tartışması.
 
 ## 5. Donduruldu
 
@@ -91,15 +103,15 @@ kapsam sayacıdır, ölçüm aleti değildir.
 
 | Sıra | Kapı | Ön koşulu |
 |---|---|---|
-| 1 | Toplayıcı sürekliliği kanıtı | — |
-| 2 | F-0002 ön-kaydı | 1 |
-| 3 | F-0002 Development ölçümü | 2 + funding backfill coverage kanıtı |
+| 1 | Tarihsel OI içe aktarımı | — |
+| 2 | Çakışma doğrulaması + `f0001_readiness.py` onarımı | 1 |
+| 3 | F-0001 Development ölçümü | 2 + readiness `true` |
 | 4 | Uyarı kartını direction üretmeden ledger/outbox hattına bağla | 3 kabul ederse |
 | 5 | Forward paper karantina (min 4 hafta AND 100 bağımsız karar AND 2 rejim) | 4 |
 | 6 | Faz 3 risk kapıları ve kill-switch'ler | 5 |
 | 7 | Kapsam genişletme (ETH replikasyonu → cross-venue → ...) | 6 |
 
-Faz 0'ın açık kalan tek maddesi bu sıralamanın dışında durur ve F-0002 kabul alırsa
+Faz 0'ın açık kalan tek maddesi bu sıralamanın dışında durur ve F-0001 kabul alırsa
 kapatılması zorunludur: incelenen signal commit'ine bağlı bağımsız onay kaydı ve temiz repo
 sonrası denetlenmiş Development reanalysis.
 
