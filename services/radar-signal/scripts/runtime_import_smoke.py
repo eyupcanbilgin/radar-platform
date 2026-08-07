@@ -12,7 +12,7 @@ from decision_engine.context_sets import load_context_set  # noqa: E402
 from decision_engine.runtime import HourlyDecisionRuntime  # noqa: E402
 from decision_engine.sources import BinanceUsdMClosedCandleSource  # noqa: E402
 from enricher.telegram import sender_from_environment  # noqa: E402
-from scripts.pump import build_parser as build_pump_parser  # noqa: E402
+from scripts.pump import main as pump_main  # noqa: E402
 from scripts.run_hourly_decision import build_parser as build_hourly_parser  # noqa: E402
 
 FORBIDDEN_RESEARCH_PACKAGES = ("freqtrade", "numpy", "pandas", "pyarrow")
@@ -25,7 +25,7 @@ def main() -> None:
         HourlyDecisionRuntime,
         BinanceUsdMClosedCandleSource,
         sender_from_environment,
-        build_pump_parser,
+        pump_main,
         build_hourly_parser,
     )
     if not all(callable(symbol) for symbol in runtime_symbols):
