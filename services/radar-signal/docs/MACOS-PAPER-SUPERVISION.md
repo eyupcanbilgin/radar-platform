@@ -10,6 +10,8 @@ açılır.
 1. Çalışma için günlük geliştirme klasöründen ayrı, temiz bir checkout hazırlayın. Runtime
    provenance kapısı untracked dosya dahil kirli checkout'u reddeder.
 2. MCP ve Signal için bağımlılıkları kurulu iki açık Python executable yolu hazırlayın.
+   Renderer `venv/bin/python` symlink yolunu plist'te aynen korur; ana Homebrew interpreter
+   yoluna çözülmüş plist geçersiz kurulum belirtisidir.
 3. Ayrı state root altında mevcut PIT ve mühürlü combined baseline'ı yerleştirin:
 
 ```text

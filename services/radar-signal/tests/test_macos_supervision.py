@@ -33,6 +33,20 @@ def _python(tmp_path: Path, name: str) -> Path:
     return path
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows CI symlink izni garanti değil")
+def test_executable_validation_preserves_venv_symlink(tmp_path):
+    base_python = _python(tmp_path, "base-python")
+    venv_python = tmp_path / "venv/bin/python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(base_python)
+
+    validated = launchd._require_file(venv_python, "Signal Python", executable=True)
+
+    assert validated == venv_python.absolute()
+    assert validated.is_symlink()
+    assert validated != base_python
+
+
 def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path, monkeypatch):
     root = _checkout(tmp_path)
     monkeypatch.setattr(launchd, "validate_clean_checkout", lambda path: path.resolve())
