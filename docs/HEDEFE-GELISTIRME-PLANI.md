@@ -195,6 +195,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       evidence aynı hafif context-set loader'ını kullansın (Signal ADR-0035).
     - [x] macOS paper daemon'ları için araştırma paketlerini dışlayan ayrı runtime lock ve
       temiz Python 3.12 import smoke kapısı ekle (Signal ADR-0036).
+    - [x] Coverage raporunu atomik son-durum dosyasına yaz ve macOS supervision altında
+      restart-loop olmadan periyodik işlet (Signal ADR-0037).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.

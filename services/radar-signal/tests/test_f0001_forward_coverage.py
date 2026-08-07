@@ -11,6 +11,7 @@ import pytest
 from decision_engine.forward_trigger import ForwardTriggerLedger, build_forward_observation
 from enricher.decision_context import DecisionContextV1
 from scripts.f0001_forward_coverage import build_forward_coverage_report
+from scripts.f0001_forward_coverage import main as coverage_main
 from scripts.fragility_calibration import load_fragility_config
 
 CONTEXT_FIXTURE = (
@@ -166,3 +167,35 @@ def test_read_only_ledger_does_not_create_or_change_the_database(tmp_path):
     with ForwardTriggerLedger(path, read_only=True) as ledger:
         assert ledger.count() == 0
     assert path.read_bytes() == before
+
+
+def test_cli_writes_latest_report_atomically(tmp_path, monkeypatch, capsys):
+    start = datetime(2026, 8, 7, tzinfo=UTC)
+    ledger_path = tmp_path / "forward.sqlite"
+    output_path = tmp_path / "status/coverage.json"
+    with ForwardTriggerLedger(ledger_path) as ledger:
+        _record(ledger, start)
+
+    monkeypatch.setattr(
+        "scripts.f0001_forward_coverage.load_forward_observation_config",
+        lambda: _config(start),
+    )
+    assert (
+        coverage_main(
+            [
+                "--ledger",
+                str(ledger_path),
+                "--as-of",
+                "2026-08-07T00:00:00Z",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    printed = json.loads(capsys.readouterr().out)
+    assert written == printed
+    assert written["direction"] is None
+    assert not list(output_path.parent.glob("*.tmp"))

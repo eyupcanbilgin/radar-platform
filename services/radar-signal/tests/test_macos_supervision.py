@@ -18,6 +18,7 @@ def _checkout(tmp_path: Path) -> Path:
         "services/btc-radar-mcp/btc_radar/producer.py",
         "services/radar-signal/scripts/run_hourly_decision.py",
         "services/radar-signal/scripts/pump.py",
+        "services/radar-signal/scripts/f0001_forward_coverage.py",
     ):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,6 +54,7 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
     producer = agents["com.radar.mcp-producer"]["ProgramArguments"]
     signal = agents["com.radar.signal-hourly"]["ProgramArguments"]
     pump = agents["com.radar.signal-pump"]
+    coverage = agents["com.radar.signal-coverage"]
     assert producer[producer.index("--catch-up-hours") + 1] == "0"
     assert int(producer[producer.index("--publish-grace-seconds") + 1]) < int(
         signal[signal.index("--grace-seconds") + 1]
@@ -60,6 +62,15 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
     assert "--f0001-baseline-contexts" in signal
     assert "--f0001-trigger-ledger" in signal
     assert pump["EnvironmentVariables"]["RADAR_SIGNAL_DELIVERY_MODE"] == "console"
+    assert coverage["StartInterval"] == config["coverage"]["interval_seconds"]
+    assert "KeepAlive" not in coverage
+    coverage_args = coverage["ProgramArguments"]
+    assert coverage_args[coverage_args.index("--ledger") + 1].endswith(
+        "f0001-forward-triggers.sqlite"
+    )
+    assert coverage_args[coverage_args.index("--output") + 1].endswith(
+        "f0001-forward-coverage.json"
+    )
     serialized = repr(agents).lower()
     assert "secret" not in serialized
     assert "api_key" not in serialized
@@ -71,6 +82,15 @@ def test_config_rejects_signal_before_producer(tmp_path):
     path = tmp_path / "supervision.yaml"
     path.write_text(yaml.safe_dump(config), encoding="utf-8")
     with pytest.raises(ValueError, match="signal grace"):
+        launchd.load_supervision_config(path)
+
+
+def test_config_rejects_zero_coverage_interval(tmp_path):
+    config = copy.deepcopy(launchd.load_supervision_config())
+    config["coverage"]["interval_seconds"] = 0
+    path = tmp_path / "supervision.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="collect/pump/coverage"):
         launchd.load_supervision_config(path)
 
 
@@ -92,12 +112,16 @@ def test_plists_are_atomic_private_and_parseable(tmp_path, monkeypatch):
     )
     written = launchd.write_launch_agents(tmp_path / "agents", agents)
 
-    assert len(written) == 3
+    assert len(written) == 4
     for path in written:
         if os.name != "nt":
             assert path.stat().st_mode & 0o777 == 0o600
         payload = plistlib.loads(path.read_bytes())
-        assert payload["KeepAlive"] is True
+        if payload["Label"] == "com.radar.signal-coverage":
+            assert "KeepAlive" not in payload
+            assert payload["StartInterval"] == 300
+        else:
+            assert payload["KeepAlive"] is True
         assert payload["RunAtLoad"] is True
         assert Path(payload["StandardOutPath"]).parent.is_dir()
 

@@ -1,4 +1,4 @@
-version: "1"
+version: "2"
 
 producer:
   collect_interval_seconds: 300
@@ -10,6 +10,9 @@ signal:
 
 pump:
   interval_seconds: 5
+
+coverage:
+  interval_seconds: 300
 
 launchd:
   throttle_interval_seconds: 10
