@@ -102,6 +102,11 @@ python scripts/f0001_forward_coverage.py
 Rapor eksik saatleri ve `unavailable` gözlemleri ayrı blocker olarak gösterir. `--as-of`
 yalnız salt-okunur rapor kesimidir; geçmiş gözlem yazmaz veya outcome açmaz.
 
+F-0001 manifest/variant/Locked OOS/dosya hash doğrulaması
+`decision_engine/context_sets.py` içindeki hafif production loader'ındadır. Saatlik runtime
+bu kapı için research evidence modülünü, pandas'ı veya Freqtrade yüzeyini import etmez;
+evidence/readiness CLI'ları aynı loader'ı kullanarak sözleşme sapmasını önler.
+
 Açık tarihsel saat yalnız replay/backfill'dir ve varsayılan olarak production defteri yerine
 `var/hourly-replay.sqlite` kullanır:
 

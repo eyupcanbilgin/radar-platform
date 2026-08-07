@@ -8,6 +8,7 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from decision_engine.context_sets import context_set_sha256, load_context_set  # noqa: E402
 from decision_engine.forward_trigger import (  # noqa: E402
     ForwardTriggerLedger,
     load_forward_observation_config,
@@ -15,7 +16,6 @@ from decision_engine.forward_trigger import (  # noqa: E402
 )
 from enricher.decision_context import DecisionContextV1  # noqa: E402
 from scripts.fragility_calibration import load_fragility_config  # noqa: E402
-from scripts.run_f0001_evidence import _context_set_sha256, _load_context_set  # noqa: E402
 
 DEFAULT_LEDGER = SERVICE_ROOT / "var" / "f0001-forward-triggers.sqlite"
 
@@ -29,10 +29,10 @@ def main(argv: list[str] | None = None) -> int:
 
     observation_config = load_forward_observation_config()
     calibration_config = load_fragility_config()
-    baseline_hash = _context_set_sha256(args.baseline_contexts)
+    baseline_hash = context_set_sha256(args.baseline_contexts)
     if baseline_hash != observation_config["baseline_context_set_sha256"]:
         raise ValueError("forward observation baseline context hash config ile uyuşmuyor")
-    baseline = _load_context_set(
+    baseline = load_context_set(
         args.baseline_contexts,
         expected_variant=observation_config["baseline_variant"],
         config=calibration_config,

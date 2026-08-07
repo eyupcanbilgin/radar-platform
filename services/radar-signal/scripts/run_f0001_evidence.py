@@ -3,18 +3,17 @@
 import argparse
 import hashlib
 import json
-import os
 import sys
-import tempfile
 from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
-from jsonschema import Draft202012Validator, ValidationError
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from decision_engine import context_sets as _context_sets  # noqa: E402
+from decision_engine.jsonio import atomic_json as _atomic_json  # noqa: E402
 from scripts.datapaths import latest_manifest_path, verify_manifest  # noqa: E402
 from scripts.fragility_calibration import (  # noqa: E402
     evaluate_fragility_calibration,
@@ -24,93 +23,16 @@ from scripts.fragility_event_rows import build_event_row_bundle  # noqa: E402
 from scripts.provenance import git_commit, git_is_dirty  # noqa: E402
 from scripts.registrylib import latest_manifest_hash, read_all, record_run  # noqa: E402
 
+_context_set_sha256 = _context_sets.context_set_sha256
+_load_context_set = _context_sets.load_context_set
+_load_contexts = _context_sets.load_contexts
+
 DEFAULT_OUTPUT = SERVICE_ROOT / "var" / "f0001-evidence.json"
 STRATEGY = "F0001FragilityCalibration"
-CONTEXT_SET_SCHEMA = SERVICE_ROOT.parents[1] / "contracts" / "f0001-context-set-v1.schema.json"
-EXPECTED_EXCLUSIONS = {
-    "combined": [],
-    "without_funding_stress": ["funding_stress"],
-    "without_oi_buildup": ["oi_buildup"],
-}
 
 
 class F0001EvidenceError(ValueError):
     pass
-
-
-def _atomic_json(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=path.name, suffix=".tmp", dir=path.parent)
-    os.close(fd)
-    temp_path = Path(temporary)
-    try:
-        temp_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        temp_path.replace(path)
-    finally:
-        temp_path.unlink(missing_ok=True)
-
-
-def _load_contexts(path: Path) -> list[dict]:
-    paths = (
-        sorted(item for item in path.rglob("*.json") if item.name != "context-set.json")
-        if path.is_dir()
-        else [path]
-    )
-    if not paths or not all(item.is_file() for item in paths):
-        raise F0001EvidenceError(f"decision-context girdisi bulunamadı: {path}")
-    contexts = []
-    for item in paths:
-        payload = json.loads(item.read_text(encoding="utf-8"))
-        contexts.extend(payload if isinstance(payload, list) else [payload])
-    return contexts
-
-
-def _load_context_set(path: Path, *, expected_variant: str, config: dict) -> list[dict]:
-    manifest_path = path / "context-set.json"
-    if not manifest_path.is_file():
-        raise F0001EvidenceError(f"context set manifesti yok: {manifest_path}")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    schema = json.loads(CONTEXT_SET_SCHEMA.read_text(encoding="utf-8"))
-    try:
-        Draft202012Validator(schema).validate(manifest)
-    except ValidationError as error:
-        raise F0001EvidenceError(f"context set sözleşme ihlali: {error.message}") from error
-    if manifest.get("schema_version") != "f0001-context-set/v1":
-        raise F0001EvidenceError("desteklenmeyen context set şeması")
-    if manifest.get("hypothesis_id") != "F-0001" or manifest.get("variant") != expected_variant:
-        raise F0001EvidenceError(f"context set variant kimliği uyuşmuyor: {expected_variant}")
-    if manifest.get("excluded_features") != EXPECTED_EXCLUSIONS[expected_variant]:
-        raise F0001EvidenceError(f"{expected_variant}: excluded_features sözleşmeyle uyuşmuyor")
-    if manifest.get("start_utc") != config["boundaries"]["development_start_utc"]:
-        raise F0001EvidenceError("context set Development başlangıcı protokolle uyuşmuyor")
-    locked = config["boundaries"]["locked_oos_start_utc"]
-    boundary_matches = (
-        manifest.get("locked_oos_start_utc") == locked
-        and manifest.get("end_exclusive_utc") == locked
-    )
-    if not boundary_matches:
-        raise F0001EvidenceError("context set Locked OOS sınırı protokolle uyuşmuyor")
-    declared = manifest.get("files", [])
-    actual_paths = sorted(item for item in path.rglob("*.json") if item.name != "context-set.json")
-    if len(declared) != len(actual_paths) or manifest.get("context_count") != len(actual_paths):
-        raise F0001EvidenceError("context set dosya sayısı manifestle uyuşmuyor")
-    expected = {entry["file"]: entry["sha256"] for entry in declared}
-    actual = {
-        str(item.relative_to(path)).replace("\\", "/"): hashlib.sha256(
-            item.read_bytes()
-        ).hexdigest()
-        for item in actual_paths
-    }
-    if actual != expected:
-        raise F0001EvidenceError("context set dosya/hash bütünlüğü bozuk")
-    return _load_contexts(path)
-
-
-def _context_set_sha256(path: Path) -> str:
-    return hashlib.sha256((path / "context-set.json").read_bytes()).hexdigest()
 
 
 def _load_hourly_bars(path: Path) -> list[dict]:

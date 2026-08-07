@@ -8,14 +8,14 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from decision_engine.context_sets import (  # noqa: E402
+    EXPECTED_EXCLUSIONS,
+    context_set_sha256,
+    load_context_set,
+)
+from decision_engine.jsonio import atomic_json  # noqa: E402
 from scripts.fragility_calibration import load_fragility_config  # noqa: E402
 from scripts.fragility_event_rows import build_trigger_rows  # noqa: E402
-from scripts.run_f0001_evidence import (  # noqa: E402
-    EXPECTED_EXCLUSIONS,
-    _atomic_json,
-    _context_set_sha256,
-    _load_context_set,
-)
 
 
 def _variant_readiness(contexts: list[dict], config: dict) -> dict:
@@ -82,14 +82,14 @@ def main(argv: list[str] | None = None) -> int:
     }
     report = build_readiness_report(
         context_sets={
-            variant: _load_context_set(path, expected_variant=variant, config=config)
+            variant: load_context_set(path, expected_variant=variant, config=config)
             for variant, path in paths.items()
         },
-        context_set_sha256={variant: _context_set_sha256(path) for variant, path in paths.items()},
+        context_set_sha256={variant: context_set_sha256(path) for variant, path in paths.items()},
         config=config,
     )
     if args.output:
-        _atomic_json(args.output, report)
+        atomic_json(args.output, report)
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0
 
