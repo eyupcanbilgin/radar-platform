@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.21**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.22**
+
+> v2.22 (7 Ağu 2026): ADR-0039 ile saatlik kart feature ve context veri sağlığını ayrı
+> gösterir; unavailable/eksik context artık feature hazır diye “hazır” sunulmaz. Geçmiş SENT
+> outbox satırları değişmedi, direction null ve WAIT semantiği korundu. v2.21 → git geçmişi.
 
 > v2.21 (7 Ağu 2026): ADR-0038 ile macOS renderer venv Python symlink'ini ana
 > interpreter'a çözmekten vazgeçti; plist doğrulanmış venv entrypoint'ini korur. İlk gerçek

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decision_engine.decision import DecisionCardV1
 from decision_engine.features import FeatureSnapshotV1
 from decision_engine.ledger import DecisionLedger
+from enricher.decision_context import DecisionContextV1
 from enricher.formatting import LEGAL_NOTE, assert_language_safe
 from enricher.outbox import Outbox
 
@@ -15,12 +16,18 @@ def _labels(values: list[str]) -> str:
     return "; ".join(values) if values else "yok"
 
 
-def build_hourly_decision_message(*, decision: DecisionCardV1, feature: FeatureSnapshotV1) -> str:
+def build_hourly_decision_message(
+    *,
+    decision: DecisionCardV1,
+    feature: FeatureSnapshotV1,
+    context: DecisionContextV1 | None,
+) -> str:
     """Render only immutable artifacts so replay and reconciliation are bit-identical."""
     if decision.feature_snapshot_id != feature.snapshot_id:
         raise ValueError("decision yanlış feature snapshot ile formatlanamaz")
     context_id = decision.context_snapshot_id or "yok"
-    health = "hazır" if feature.ready else "kullanılamaz"
+    feature_health = "hazır" if feature.ready else "kullanılamaz"
+    context_health = context.data_quality.status if context is not None else "eksik"
     lines = [
         f"[SAATLİK KARAR] {decision.instrument.symbol} · {decision.instrument.timeframe} · "
         f"{decision.as_of_utc.isoformat().replace('+00:00', 'Z')}",
@@ -28,7 +35,8 @@ def build_hourly_decision_message(*, decision: DecisionCardV1, feature: FeatureS
         f"Kimlik: {decision.decision_id}",
         f"Gerekçeler: {_labels(decision.reasons)}",
         f"Engeller: {_labels(decision.blockers)}",
-        f"Veri sağlığı: {health} · eksikler: {_labels(feature.missing_features)}",
+        f"Veri sağlığı: feature={feature_health} · context={context_health} · "
+        f"feature eksikleri: {_labels(feature.missing_features)}",
         f"Uyarılar: {_labels(decision.warnings)}",
         f"Snapshotlar: feature={feature.snapshot_id} · context={context_id}",
         "Mod: PAPER · real_orders=false · gerçek emir gönderilmez",
@@ -48,7 +56,16 @@ class HourlyDecisionDelivery:
     def enqueue_item(self, item: dict, *, now: datetime | None = None) -> bool:
         decision = DecisionCardV1.model_validate(item["decision_payload"])
         feature = FeatureSnapshotV1.model_validate(item["feature_payload"])
-        body = build_hourly_decision_message(decision=decision, feature=feature)
+        context = (
+            DecisionContextV1.model_validate(item["context_payload"])
+            if item["context_payload"] is not None
+            else None
+        )
+        body = build_hourly_decision_message(
+            decision=decision,
+            feature=feature,
+            context=context,
+        )
         return self.outbox.enqueue(
             signal_id=decision.decision_id,
             kind=HOURLY_DECISION_KIND,

@@ -31,6 +31,7 @@ def test_wait_message_is_first_class_safe_and_deterministic():
         assert "real_orders=false" in body
         assert decision.feature_snapshot_id in body
         assert decision.context_snapshot_id in body
+        assert f"Veri sağlığı: feature=hazır · context={context_at(T0).data_quality.status}" in body
 
 
 def test_blockers_remain_visible_and_do_not_become_neutral_score():
@@ -45,7 +46,23 @@ def test_blockers_remain_visible_and_do_not_become_neutral_score():
         body = outbox.get(signal_id=decision.decision_id, kind=HOURLY_DECISION_KIND)["body"]
         assert "Sonuç: WAIT" in body
         assert "context:missing_required_layer:derivatives" in body
+        assert "Veri sağlığı: feature=hazır · context=unavailable" in body
+        assert "Veri sağlığı: feature=hazır · context=healthy" not in body
         assert "nötr getiri ölçüldüğü anlamına gelmez" in body
+
+
+def test_missing_context_is_not_reported_as_ready():
+    with DecisionLedger() as ledger, Outbox() as outbox:
+        feature = build_feature_snapshot(candles_ending_at(T0), as_of=T0)
+        decision = build_hourly_decision(feature, None, signal_commit=SIGNAL_COMMIT)
+        ledger.record(feature=feature, context=None, decision=decision)
+        HourlyDecisionDelivery(ledger=ledger, outbox=outbox).enqueue_decision(
+            decision.decision_id, now=T0
+        )
+        body = outbox.get(signal_id=decision.decision_id, kind=HOURLY_DECISION_KIND)["body"]
+
+        assert "context:missing" in body
+        assert "Veri sağlığı: feature=hazır · context=eksik" in body
 
 
 def test_reconcile_repairs_ledger_outbox_crash_gap_with_bound():
