@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.19**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.20**
+
+> v2.20 (7 Ağu 2026): ADR-0037 ile F-0001 coverage raporu atomik son-durum dosyasına
+> yazılabilir oldu ve macOS supervision'a restart-loop yaratmayan periyodik coverage ajanı
+> eklendi. Outcome/Registry/alert/backfill kapalı, direction null kaldı. v2.19 → git geçmişi.
 
 > v2.19 (7 Ağu 2026): ADR-0036 ile macOS paper daemon'ları için pandas, NumPy,
 > PyArrow ve Freqtrade içermeyen ayrı, sabitlenmiş runtime lock ve temiz macOS/Python 3.12

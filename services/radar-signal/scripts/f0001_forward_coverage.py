@@ -13,6 +13,7 @@ from decision_engine.forward_trigger import (  # noqa: E402
     ForwardTriggerLedger,
     load_forward_observation_config,
 )
+from decision_engine.jsonio import atomic_json  # noqa: E402
 
 DEFAULT_LEDGER = SERVICE_ROOT / "var" / "f0001-forward-triggers.sqlite"
 
@@ -89,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--as-of", help="varsayılan son due UTC saati; yalnız rapor kesimi")
+    parser.add_argument("--output", type=Path, help="son raporu atomik JSON olarak yaz")
     args = parser.parse_args(argv)
     config = load_forward_observation_config()
     as_of = (
@@ -102,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             observation_config=config,
             as_of_utc=as_of,
         )
+    if args.output:
+        atomic_json(args.output, report)
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0
 

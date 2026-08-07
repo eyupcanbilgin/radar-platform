@@ -17,11 +17,12 @@ DEFAULT_CONFIG = SERVICE_ROOT / "config" / "macos_supervision.yaml"
 
 def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if config.get("version") != "1":
-        raise ValueError("macOS supervision config version=1 olmalı")
+    if config.get("version") != "2":
+        raise ValueError("macOS supervision config version=2 olmalı")
     producer = config["producer"]
     signal = config["signal"]
     pump = config["pump"]
+    coverage = config["coverage"]
     launchd = config["launchd"]
     for field, value in (
         ("producer.collect_interval_seconds", producer["collect_interval_seconds"]),
@@ -29,12 +30,20 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
         ("producer.history_limit", producer["history_limit"]),
         ("signal.decision_grace_seconds", signal["decision_grace_seconds"]),
         ("pump.interval_seconds", pump["interval_seconds"]),
+        ("coverage.interval_seconds", coverage["interval_seconds"]),
         ("launchd.throttle_interval_seconds", launchd["throttle_interval_seconds"]),
     ):
         if not isinstance(value, int) or value < 0:
             raise ValueError(f"{field} negatif olmayan integer olmalı")
-    if producer["collect_interval_seconds"] == 0 or pump["interval_seconds"] == 0:
-        raise ValueError("collect/pump interval sıfır olamaz")
+    if any(
+        value == 0
+        for value in (
+            producer["collect_interval_seconds"],
+            pump["interval_seconds"],
+            coverage["interval_seconds"],
+        )
+    ):
+        raise ValueError("collect/pump/coverage interval sıfır olamaz")
     producer_grace = producer["publish_grace_seconds"]
     decision_grace = signal["decision_grace_seconds"]
     if not producer_grace < decision_grace < 3600:
@@ -58,6 +67,10 @@ def validate_clean_checkout(checkout_root: Path) -> Path:
     _require_file(root / "services/btc-radar-mcp/btc_radar/producer.py", "MCP producer")
     _require_file(root / "services/radar-signal/scripts/run_hourly_decision.py", "Signal runtime")
     _require_file(root / "services/radar-signal/scripts/pump.py", "Signal pump")
+    _require_file(
+        root / "services/radar-signal/scripts/f0001_forward_coverage.py",
+        "Signal coverage reporter",
+    )
     result = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=root,
@@ -114,6 +127,27 @@ def _agent(
     if environment:
         payload["EnvironmentVariables"] = environment
     return payload
+
+
+def _scheduled_agent(
+    *,
+    label: str,
+    arguments: list[str],
+    working_directory: Path,
+    log_root: Path,
+    interval_seconds: int,
+) -> dict:
+    """Build a one-shot recurring agent without a KeepAlive restart loop."""
+    return {
+        "Label": label,
+        "ProgramArguments": arguments,
+        "WorkingDirectory": str(working_directory),
+        "RunAtLoad": True,
+        "StartInterval": interval_seconds,
+        "ProcessType": "Background",
+        "StandardOutPath": str(log_root / f"{label}.stdout.log"),
+        "StandardErrorPath": str(log_root / f"{label}.stderr.log"),
+    }
 
 
 def build_launch_agents(
@@ -208,6 +242,20 @@ def build_launch_agents(
                 "RADAR_SIGNAL_DB_DIR": str(signal_var),
                 "RADAR_SIGNAL_DELIVERY_MODE": delivery_mode,
             },
+        ),
+        "com.radar.signal-coverage": _scheduled_agent(
+            label="com.radar.signal-coverage",
+            arguments=[
+                str(signal_python),
+                str(signal_root / "scripts/f0001_forward_coverage.py"),
+                "--ledger",
+                str(signal_var / "f0001-forward-triggers.sqlite"),
+                "--output",
+                str(signal_var / "f0001-forward-coverage.json"),
+            ],
+            working_directory=signal_root,
+            log_root=log_root,
+            interval_seconds=config["coverage"]["interval_seconds"],
         ),
     }
 

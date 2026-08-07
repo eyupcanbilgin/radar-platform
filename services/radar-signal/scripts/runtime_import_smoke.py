@@ -12,6 +12,7 @@ from decision_engine.context_sets import load_context_set  # noqa: E402
 from decision_engine.runtime import HourlyDecisionRuntime  # noqa: E402
 from decision_engine.sources import BinanceUsdMClosedCandleSource  # noqa: E402
 from enricher.telegram import sender_from_environment  # noqa: E402
+from scripts.f0001_forward_coverage import main as coverage_main  # noqa: E402
 from scripts.pump import main as pump_main  # noqa: E402
 from scripts.run_hourly_decision import build_parser as build_hourly_parser  # noqa: E402
 
@@ -25,6 +26,7 @@ def main() -> None:
         HourlyDecisionRuntime,
         BinanceUsdMClosedCandleSource,
         sender_from_environment,
+        coverage_main,
         pump_main,
         build_hourly_parser,
     )
