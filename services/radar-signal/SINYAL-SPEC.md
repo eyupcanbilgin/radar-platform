@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.17**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.18**
+
+> v2.18 (7 Ağu 2026): ADR-0035 ile F-0001 context-set sözleşme/hash loader'ı araştırma
+> CLI'ından production `decision_engine` modülüne çıkarıldı. Saatlik runtime baseline
+> doğrulamak için pandas/Freqtrade araştırma yüzeyini import etmez. v2.17 → git geçmişi.
 
 > v2.17 (7 Ağu 2026): ADR-0034 ile macOS launchd için secret-free producer, saatlik
 > Signal ve outbox pump agent üreticisi eklendi. Temiz checkout ve mühürlü baseline zorunlu;

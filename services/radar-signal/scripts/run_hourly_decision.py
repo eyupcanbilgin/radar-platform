@@ -18,6 +18,7 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from decision_engine.context_sets import context_set_sha256, load_context_set  # noqa: E402
 from decision_engine.delivery import HourlyDecisionDelivery  # noqa: E402
 from decision_engine.forward_trigger import (  # noqa: E402
     ForwardTriggerLedger,
@@ -40,7 +41,6 @@ from enricher.outbox import Outbox  # noqa: E402
 from enricher.policy import load_lifecycle  # noqa: E402
 from scripts.fragility_calibration import load_fragility_config  # noqa: E402
 from scripts.provenance import git_commit, git_is_dirty  # noqa: E402
-from scripts.run_f0001_evidence import _context_set_sha256, _load_context_set  # noqa: E402
 
 
 def _parse_utc(value: str) -> datetime:
@@ -170,9 +170,9 @@ def _emit(
 def _load_forward_baseline(path: Path) -> tuple[list[dict], dict, dict]:
     observation_config = load_forward_observation_config()
     calibration_config = load_fragility_config()
-    if _context_set_sha256(path) != observation_config["baseline_context_set_sha256"]:
+    if context_set_sha256(path) != observation_config["baseline_context_set_sha256"]:
         raise ValueError("F-0001 forward baseline hash config ile uyuşmuyor")
-    contexts = _load_context_set(
+    contexts = load_context_set(
         path,
         expected_variant=observation_config["baseline_variant"],
         config=calibration_config,
