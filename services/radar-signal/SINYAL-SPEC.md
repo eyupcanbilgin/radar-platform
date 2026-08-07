@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.18**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.19**
+
+> v2.19 (7 Ağu 2026): ADR-0036 ile macOS paper daemon'ları için pandas, NumPy,
+> PyArrow ve Freqtrade içermeyen ayrı, sabitlenmiş runtime lock ve temiz macOS/Python 3.12
+> import smoke kapısı eklendi. Karar ve forward semantiği değişmedi. v2.18 → git geçmişi.
 
 > v2.18 (7 Ağu 2026): ADR-0035 ile F-0001 context-set sözleşme/hash loader'ı araştırma
 > CLI'ından production `decision_engine` modülüne çıkarıldı. Saatlik runtime baseline

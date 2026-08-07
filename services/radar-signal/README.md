@@ -41,6 +41,21 @@ source .venv/bin/activate
 pip install -r requirements.lock
 ```
 
+Yalnız macOS paper daemon'ları için araştırma/Freqtrade paketlerini içermeyen ayrı ortam:
+
+```bash
+brew install python@3.12
+"$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv-runtime
+source .venv-runtime/bin/activate
+python -m pip install -r requirements-runtime.lock
+python scripts/runtime_import_smoke.py
+```
+
+LaunchAgent üretirken Signal Python executable'ı olarak
+`.venv-runtime/bin/python` verilir. Araştırma ve test komutları bu ortamda çalıştırılmaz.
+Python 3.14 kullanılmaz: ccxt'nin zorunlu coincurve bağımlılığı için macOS 3.14 wheel'i
+bulunmadığından runtime Python 3.12'ye sabitlenmiştir.
+
 ### 3. Çevre Değişkenleri (`.env`)
 Örnek `.env.example` dosyasını `.env` adıyla kopyalayın:
 ```bash
