@@ -16,6 +16,21 @@ permissions:
   contents: read
 
 jobs:
+  macos-runtime:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: services/radar-signal
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/radar-signal/requirements-runtime.lock
+      - run: python -m pip install --disable-pip-version-check -r requirements-runtime.lock
+      - run: python scripts/runtime_import_smoke.py
+
   test:
     runs-on: windows-latest
     defaults:

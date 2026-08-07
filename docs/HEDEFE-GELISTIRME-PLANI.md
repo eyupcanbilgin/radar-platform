@@ -193,6 +193,8 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       üreticisini ve producer→Signal grace sırasını ekle (Signal ADR-0034; kurulum opt-in).
     - [x] Canlı baseline doğrulamasını pandas/Freqtrade araştırma modülünden ayır; runtime ve
       evidence aynı hafif context-set loader'ını kullansın (Signal ADR-0035).
+    - [x] macOS paper daemon'ları için araştırma paketlerini dışlayan ayrı runtime lock ve
+      temiz Python 3.12 import smoke kapısı ekle (Signal ADR-0036).
     - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
 - [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
