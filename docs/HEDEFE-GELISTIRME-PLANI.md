@@ -181,7 +181,7 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   - [x] Mühürlü context setlerinden Registry/performans yazmayan F-0001 veri ve tetik
     readiness raporu üret (Signal ADR-0029; ana/funding-only 10, OI-only 0 context tetiği;
     `measurement_ready=false`, Locked OOS kapalı, direction null).
-  - [ ] Sonuç okumayan append-only F-0001 forward tetik coverage defterini işlet
+  - [x] Sonuç okumayan append-only F-0001 forward tetik coverage defterini işlet
     (ADR-0030 ön-kayıt başlangıcı: `2026-08-07T00:00:00Z`; geçmiş backfill yok).
     - [x] Immutable/idempotent defter, exact-hour CLI, gap/null/direction kapıları hazır
       (Signal ADR-0031; gerçek başlangıç öncesi yalnız sentetik test).
@@ -201,9 +201,12 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       runtime bağımlılıklarının kaybolmasını engelle (Signal ADR-0038).
     - [x] Saatlik kartta feature ve context sağlığını ayır; unavailable context'i hazır
       göstermeyi engelle (Signal ADR-0039).
-    - [ ] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle.
+    - [x] Başlangıç sonrasında saatlik gerçek context'leri deftere bağla ve coverage izle
+      (Signal ADR-0040: 11:00–13:00 UTC üç ardışık gerçek satır; üçü de unavailable/null,
+      kurulum öncesi 11 saat backfill edilmeden blocker kaldı).
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
-- [ ] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma.
+- [x] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma
+  (Signal ADR-0040: ilk üç gerçek forward satır `unavailable`, `triggered=null`).
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
 - [ ] Saatlik uyarı kartını direction üretmeden ledger/outbox hattına bağla.
 

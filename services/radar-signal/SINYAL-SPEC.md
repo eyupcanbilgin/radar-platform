@@ -1,5 +1,9 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.22**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.23**
+
+> v2.23 (7 Ağu 2026): ADR-0040 ile macOS forward runtime'ın 11:00–13:00 UTC üç ardışık
+> gerçek gözlemi kaydedildi. Üçü de unavailable/triggered=null; kurulum öncesi 11 saat
+> backfill edilmedi ve blocker kaldı. Performans veya yön iddiası yoktur. v2.22 → git geçmişi.
 
 > v2.22 (7 Ağu 2026): ADR-0039 ile saatlik kart feature ve context veri sağlığını ayrı
 > gösterir; unavailable/eksik context artık feature hazır diye “hazır” sunulmaz. Geçmiş SENT
