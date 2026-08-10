@@ -1,5 +1,11 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.26**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.27**
+
+> v2.27 (11 Ağu 2026): ADR-0048 ile kırılganlık uyarı kartı ledger/outbox hattına bağlandı
+> fakat **kapısı kapalı**. `emit_alerts` config'dedir ve `false`tur; kapalıyken hiçbir şey
+> yayınlanmaz, yalnız sessiz kalma gerekçesi rapora düşer. Kart yön taşımaz ve bunu metinde
+> kelimelerle söyler; `unavailable` gözlem adına konuşmaz; yön taşıyan gözlemde fail-loud.
+> Idempotency `observation_id` üzerindedir. Kartın açılması ayrı bir ürün kararıdır.
 
 > v2.26 (11 Ağu 2026): ADR-0047 ile F-0001 hazırlık projeksiyonu eklendi ve periyodik
 > salt-okunur ajan olarak işletime bağlandı. Bulgu: **bağlayıcı kısıt gözlem sayısı değil

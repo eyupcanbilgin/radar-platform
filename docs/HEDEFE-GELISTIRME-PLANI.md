@@ -245,7 +245,10 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [x] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma
   (Signal ADR-0040: ilk üç gerçek forward satır `unavailable`, `triggered=null`).
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
-- [ ] Saatlik uyarı kartını direction üretmeden ledger/outbox hattına bağla.
+- [x] Saatlik uyarı kartını direction üretmeden ledger/outbox hattına bağla
+  (Signal ADR-0048). Hat bağlı, **kapı kapalı**: `emit_alerts=false`. Kart yön taşımaz
+  ve bunu metinde söyler; `unavailable` gözlem adına konuşmaz.
+  - [ ] Kartı aç: kalibrasyon anlamlı veriyle geçtikten sonra, ayrı ürün kararı.
 
 **Kabul kapısı:** Development ve validation'da veri kapsamı yeterli; kalibrasyon ve
 precision/recall config kapılarını geçen; tek döneme yoğunlaşmayan; baseline uyarı oranını
