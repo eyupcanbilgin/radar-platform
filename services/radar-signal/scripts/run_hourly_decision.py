@@ -25,6 +25,7 @@ from decision_engine.forward_trigger import (  # noqa: E402
     load_forward_observation_config,
     observe_forward_context,
 )
+from decision_engine.fragility_warning import enqueue_fragility_warning  # noqa: E402
 from decision_engine.ledger import DecisionLedger  # noqa: E402
 from decision_engine.runtime import (  # noqa: E402
     DEFAULT_CONTEXT_WAIT_SECONDS,
@@ -198,6 +199,7 @@ def _observe_forward_result(
     baseline_contexts: list[dict],
     calibration_config: dict,
     observation_config: dict,
+    outbox=None,
 ) -> dict:
     start = _parse_utc(observation_config["observation_start_utc"])
     if result.as_of_utc < start:
@@ -211,13 +213,22 @@ def _observe_forward_result(
             "direction": None,
         }
     context = DecisionContextV1.model_validate(row["context_payload"])
-    return observe_forward_context(
+    observation = observe_forward_context(
         ledger=trigger_ledger,
         baseline_contexts=baseline_contexts,
         context=context,
         calibration_config=calibration_config,
         observation_config=observation_config,
     )
+    if outbox is not None and observation.get("recorded"):
+        # Uyarı kartı hattı bağlı ama kapı config'de: `emit_alerts` kapalıyken hiçbir şey
+        # yayınlanmaz, yalnız sessiz kalma gerekçesi rapora yazılır (ADR-0048).
+        observation["fragility_warning"] = enqueue_fragility_warning(
+            observation,
+            outbox=outbox,
+            emit_alerts=bool(observation_config.get("emit_alerts", False)),
+        )
+    return observation
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -275,6 +286,7 @@ def main(argv: list[str] | None = None) -> int:
                         baseline_contexts=forward[0],
                         calibration_config=forward[1],
                         observation_config=forward[2],
+                        outbox=outbox,
                     )
                     if forward is not None and trigger_ledger is not None
                     else None
@@ -303,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
                         baseline_contexts=forward[0],
                         calibration_config=forward[1],
                         observation_config=forward[2],
+                        outbox=outbox,
                     )
                     if forward is not None and trigger_ledger is not None
                     else None
