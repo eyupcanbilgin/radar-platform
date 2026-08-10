@@ -48,7 +48,46 @@ def git_commit() -> str:
     return out.stdout.strip()[:12]
 
 
-def git_is_dirty() -> bool:
+#: Koşunun KENDİSİNİN yazması beklenen append-only kanıt kütükleri.
+#:
+#: Bunları kirlilik saymak bayrağı kendi kendini yenen bir kontrole çevirir: her gerçek
+#: ölçüm Registry'ye satır yazar, dolayısıyla `git_dirty` hiçbir koşuda False olamaz ve
+#: "kanıt üreten koşu temiz ağaçta yapılır" kuralı (ADR-0003, Platform ADR-0004,
+#: CLAUDE.md kural 13) fiilen hiçbir şeyi korumaz.
+#:
+#: 10 Ağustos 2026'da ölçüldü: S-0003, S-0004 ve S-0005 koşularının HEPSİ `git_dirty=true`
+#: kaydetmişti; yalnız `registry/experiments.jsonl` değiştirildiğinde de bayrak True
+#: dönüyordu. Kütükleri hariç tutmak bayrağı asıl işine döndürür — değişmiş kaynak, config
+#: veya hipotez kartı hâlâ kirlilik sayılır.
+EVIDENCE_LOGS: tuple[str, ...] = (
+    "registry/experiments.jsonl",
+    "registry/verdict_events.jsonl",
+)
+
+
+def _porcelain_paths(line: str) -> list[str]:
+    """`git status --porcelain` satırından yol(lar)ı çıkar; rename iki yol taşır."""
+    payload = line[3:].strip()
+    if " -> " in payload:
+        return [part.strip().strip('"') for part in payload.split(" -> ", 1)]
+    return [payload.strip('"')]
+
+
+def _is_evidence_log(path: str, ignore: tuple[str, ...]) -> bool:
+    """Yol muaf kütüklerden biri mi — dizin sınırına saygı göstererek.
+
+    Düz ``endswith`` yetmez: ``evil-registry/experiments.jsonl`` da eşleşir ve muafiyet,
+    korumadan kaçmak için kullanılabilecek bir açığa dönerdi. Eşleşme ya tam yol olmalı ya
+    da bir ``/`` sınırından sonra gelmelidir.
+    """
+    return any(path == suffix or path.endswith(f"/{suffix}") for suffix in ignore)
+
+
+def git_is_dirty(*, ignore: tuple[str, ...] = EVIDENCE_LOGS) -> bool:
+    """Ağaçta, koşunun yazması beklenen kanıt kütükleri DIŞINDA değişiklik var mı.
+
+    ``ignore`` boş verilirse ham git davranışına dönülür; testler bunu kullanır.
+    """
     out = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=normal", "--", "."],
         cwd=REPO,
@@ -56,7 +95,14 @@ def git_is_dirty() -> bool:
         text=True,
         check=True,
     )
-    return bool(out.stdout.strip())
+    for line in out.stdout.splitlines():
+        if not line.strip():
+            continue
+        paths = _porcelain_paths(line)
+        if paths and all(_is_evidence_log(path, ignore) for path in paths):
+            continue
+        return True
+    return False
 
 
 def dataset_snapshot() -> str:
