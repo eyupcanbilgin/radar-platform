@@ -73,6 +73,16 @@ def _porcelain_paths(line: str) -> list[str]:
     return [payload.strip('"')]
 
 
+def _is_evidence_log(path: str, ignore: tuple[str, ...]) -> bool:
+    """Yol muaf kütüklerden biri mi — dizin sınırına saygı göstererek.
+
+    Düz ``endswith`` yetmez: ``evil-registry/experiments.jsonl`` da eşleşir ve muafiyet,
+    korumadan kaçmak için kullanılabilecek bir açığa dönerdi. Eşleşme ya tam yol olmalı ya
+    da bir ``/`` sınırından sonra gelmelidir.
+    """
+    return any(path == suffix or path.endswith(f"/{suffix}") for suffix in ignore)
+
+
 def git_is_dirty(*, ignore: tuple[str, ...] = EVIDENCE_LOGS) -> bool:
     """Ağaçta, koşunun yazması beklenen kanıt kütükleri DIŞINDA değişiklik var mı.
 
@@ -89,7 +99,7 @@ def git_is_dirty(*, ignore: tuple[str, ...] = EVIDENCE_LOGS) -> bool:
         if not line.strip():
             continue
         paths = _porcelain_paths(line)
-        if all(any(path.endswith(suffix) for suffix in ignore) for path in paths):
+        if paths and all(_is_evidence_log(path, ignore) for path in paths):
             continue
         return True
     return False

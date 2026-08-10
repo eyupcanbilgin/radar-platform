@@ -84,3 +84,15 @@ def test_evidence_log_plus_modified_source_is_dirty(repo: Path):
 def test_renamed_source_is_dirty(repo: Path):
     _git(repo, "mv", "scripts/strategy.py", "scripts/renamed.py")
     assert provenance.git_is_dirty() is True
+
+
+def test_lookalike_directory_cannot_borrow_the_exemption(repo: Path):
+    """Muafiyet dizin sınırına saygı gösterir.
+
+    Düz `endswith` ile `evil-registry/experiments.jsonl` de muaf olurdu; muafiyet o zaman
+    korumadan kaçmak için kullanılabilecek bir açığa dönerdi.
+    """
+    sneaky = repo / "evil-registry"
+    sneaky.mkdir()
+    (sneaky / "experiments.jsonl").write_text('{"experiment_id":"E-9"}\n', encoding="utf-8")
+    assert provenance.git_is_dirty() is True
