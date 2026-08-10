@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.24**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.25**
+
+> v2.25 (10 Ağu 2026): ADR-0042 ile kesinti bildirimi eklendi. Alarm duran DURUMA değil duran
+> İLERLEMEYE bakar: coverage `status` kalıcı olarak `degraded` olduğundan ona alarm bağlanmaz.
+> İzlenen koşullar `forward_stalled`, `producer_behind` ve `inputs_unreadable`; okunamayan
+> girdi sessiz "ok" değil kendi başına olaydır. Uyarı saatlik kartla aynı outbox'a
+> `runtime_health_alert` türüyle yazılır; tekrar uyarı, escalation kovaları + outbox
+> idempotency ile engellenir. Yön üretmez, sonuç okumaz, Registry'ye yazmaz, backfill yapmaz.
+> v2.24 → git geçmişi.
 
 > v2.24 (10 Ağu 2026): ADR-0041 ile saatlik daemon, kararı yazmadan önce context yayınını
 > sınırlı süre (`--context-wait-seconds`, varsayılan 240) bekler. Gerekçe: host uyku/uyanması
@@ -330,6 +338,29 @@ Mesaj; karar sonucu, gerekçeler, blocker'lar, veri sağlığı, uyarılar, feat
 kimlikleri, `PAPER`, `real_orders=false` ve yasal notu taşır. `WAIT`, yön ya da nötr getiri
 ölçümü iddiası değildir. Eksik veri blocker olarak görünmeye devam eder; teslimat katmanı
 kararı veya yönü değiştiremez.
+
+### 2.4 Kesinti Bildirimi (ADR-0042)
+
+`scripts/runtime_health_alert.py` periyodik tek-sefer koşar, yalnız yerel durumu okur (ağa
+çıkmaz) ve kesintiyi aynı outbox'a `runtime_health_alert` türüyle yazar. Paralel teslimat
+yolu, ayrı kanal veya yeni secret yoktur; mevcut pump teslim eder.
+
+**Alarm duran duruma değil duran ilerlemeye bakar.** Coverage `status` alanı, kurulum öncesi
+doldurulamaz saatler yüzünden kalıcı olarak `degraded`tır; ona alarm bağlamak her koşuda uyarı
+üretir ve alarmı işlevsiz kılardı. İzlenen koşullar: `forward_stalled` (defter
+`stall_hours`tan uzun süredir ilerlemiyor), `producer_behind` (son yayın due saatin gerisinde)
+ve `inputs_unreadable`. Okunamayan girdi sessiz "ok" değil, kendi başına bir olaydır ve
+değerlendirme orada kesilir.
+
+Tekrar uyarı iki mekanizmayla engellenir: kesinti kimliği `(koşul, son bilinen sağlıklı an)`
+çiftidir ve uyarı yalnız yapılandırılmış escalation eşikleri aşıldığında yenilenir. Gövde,
+yalnız `signal_id`'ye giren alanlardan türer — outbox aynı anahtarı farklı gövdeyle reddeder,
+bu yüzden `now` metne girmez. Koşul temizlenince toparlanma bildirimi çıkar; state taşıyıcısı
+her koşuda atomik yazılan durum dosyasıdır.
+
+Uyarı metni yön, skor veya yatırım tavsiyesi dili içermez ve gözlenen boşluğu taşır: ajan host
+uykudayken koşamadığı için uyarı geç yüzeye çıkabilir, fakat metin kesintiyi küçük göstermez.
+Bu bildirim sessizliği çözer, uykuyu çözmez; eksik saatler backfill edilmez.
 
 ---
 

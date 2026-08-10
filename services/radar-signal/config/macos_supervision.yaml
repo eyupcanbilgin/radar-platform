@@ -19,5 +19,11 @@ pump:
 coverage:
   interval_seconds: 300
 
+health_alert:
+  # Coverage ile aynı ritim: coverage raporu tazelendikçe kesinti değerlendirilsin.
+  # Uyarı eşikleri saat ölçeğinde olduğu için bu aralık uyarı sıklığını belirlemez;
+  # tekrar uyarıyı outbox idempotency ve escalation kovaları engeller (ADR-0042).
+  interval_seconds: 300
+
 launchd:
   throttle_interval_seconds: 10
