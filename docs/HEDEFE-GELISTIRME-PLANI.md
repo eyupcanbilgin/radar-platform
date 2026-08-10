@@ -271,6 +271,10 @@ sapmayı ölçmek.
   - [ ] Freqtrade çıkışına dinamik HMAC üreten yerel signer adaptörünü bağla; imzasız fallback yok.
 - [ ] Stop mesafeli risk bütçesi, toplam açık risk ve BTC/ETH korelasyon limiti ekle.
 - [ ] Günlük/haftalık zarar, maksimum drawdown, stale-data ve manuel pause kill-switch'lerini ekle.
+  - [x] **Manuel pause** (Signal ADR-0049): dosya varlığı teslimatı durdurur; mesaj
+    kaybolmaz, `PENDING` bekler; gerekçe loglanır; belirsizlik durma yönünde çözülür.
+  - [ ] Otomatik tetikleyiciler (zarar, drawdown, stale-data): pozisyon ve sonuç verisi
+    ister; `direction=null` ve kart kapısı kapalıyken ölçülecek bir şey yok.
 - [ ] Paper-sim fill/slippage/latency drift raporu üret.
 
 **Kabul kapısı:** Maliyet sonrası forward beklenti pozitif, drawdown bütçe içinde, teslimat ve

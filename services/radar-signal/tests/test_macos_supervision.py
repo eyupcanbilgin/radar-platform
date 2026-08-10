@@ -84,6 +84,9 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
         == (config["signal"]["context_wait_seconds"])
     )
     assert pump["EnvironmentVariables"]["RADAR_SIGNAL_DELIVERY_MODE"] == "console"
+    # ADR-0049: teslimatı durdurmanın tek yolu daemon'u öldürmek olmamalı.
+    pump_args = pump["ProgramArguments"]
+    assert pump_args[pump_args.index("--pause-file") + 1].endswith("delivery.pause")
     assert coverage["StartInterval"] == config["coverage"]["interval_seconds"]
     assert "KeepAlive" not in coverage
     coverage_args = coverage["ProgramArguments"]

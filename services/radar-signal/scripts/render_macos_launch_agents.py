@@ -253,6 +253,10 @@ def build_launch_agents(
                 str(signal_root / "scripts/pump.py"),
                 "--interval",
                 str(config["pump"]["interval_seconds"]),
+                # Operatör kill-switch'i (ADR-0049): bu dosya oluşturulunca teslimat durur,
+                # mesajlar kuyrukta bekler. Dosya silinince gönderilir.
+                "--pause-file",
+                str(signal_var / "delivery.pause"),
             ],
             working_directory=signal_root,
             log_root=log_root,

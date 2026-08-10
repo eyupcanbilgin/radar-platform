@@ -19,6 +19,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from decision_engine.delivery_pause import read_pause_state  # noqa: E402
 from enricher.ledger import SignalLedger  # noqa: E402
 from enricher.outbox import Outbox  # noqa: E402
 from enricher.pipeline import SignalPipeline  # noqa: E402
@@ -32,6 +33,16 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--interval", type=float, default=5.0)
+    ap.add_argument(
+        "--pause-file",
+        type=Path,
+        default=None,
+        help=(
+            "operatör kill-switch'i: bu dosya VARSA teslimat durur. Mesaj kaybolmaz, "
+            "outbox'ta PENDING bekler; dosya silinince gönderilir. İçeriği gerekçe olarak "
+            "loglanır."
+        ),
+    )
     args = ap.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -54,10 +65,25 @@ def main() -> None:
         ) as ob,
     ):
         pipe = SignalPipeline(ledger=led, outbox=ob, lifecycle=lifecycle)
+        was_paused = False
         while True:
-            stats = pipe.deliver(sender, now=datetime.now(UTC))
-            if any(stats.values()):
-                logger.info("pompa: %s", stats)
+            pause = read_pause_state(args.pause_file)
+            if pause.paused:
+                # Durum değişimini bir kez logla; her turda tekrarlamak logu boğar ve
+                # gerçek olayları görünmez kılar.
+                if not was_paused:
+                    logger.warning(
+                        "pompa DURAKLATILDI (%s) · mesajlar kuyrukta bekliyor, kaybolmuyor",
+                        pause.reason or "gerekçe yazılmamış",
+                    )
+                was_paused = True
+            else:
+                if was_paused:
+                    logger.info("pompa devam ediyor; bekleyen mesajlar gönderilecek")
+                was_paused = False
+                stats = pipe.deliver(sender, now=datetime.now(UTC))
+                if any(stats.values()):
+                    logger.info("pompa: %s", stats)
             if args.once:
                 return
             time.sleep(args.interval)
