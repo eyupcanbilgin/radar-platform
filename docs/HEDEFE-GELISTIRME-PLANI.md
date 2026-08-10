@@ -162,6 +162,14 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   - [x] Purged walk-forward + embargo, iki maliyet senaryosu, üç baseline koşuldu.
   - [ ] DSR, PBO/CSCV ve ±%20 hassasiyet: base reddedildiği için uygulanamadı; kapılar
     hazır ve base'i ayakta kalan ilk ailede doğrudan çalışacak.
+- [x] Dördüncü yönsel aileyi (S-0006, katılım kompozisyonu: spot/perp hacim payı) ön-kayıtla
+  ölç: **REDDEDİLDİ** (Signal ADR-0045). `realistic −%61.63`, `taker_heavy −%78.34`,
+  `p=0.4273`, fold %39.3. Sonuç hipotezin yönüyle ters çıktı; ters çevirme YAPILMADI
+  (ADR-0007 hatası). **Yönsel skor: 4 aile, 4 ret.**
+  - [x] FOMC/CPI adayı Development'ta yalnız 21 olay taşıdığı için ön-kaydedilmeden elendi
+    (örneklem kontrolü; deneme sayacına girmez).
+- [ ] Beşinci aile: mevcut veri yüzeyinde bağımsız mekanizma havuzu daraldı. Order-book
+  likidite asimetrisi yeterli canlı geçmiş biriktiğinde (şu an `ratio≈0.05`) açılabilir.
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
