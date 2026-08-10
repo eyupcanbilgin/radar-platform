@@ -29,6 +29,7 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
         ("producer.publish_grace_seconds", producer["publish_grace_seconds"]),
         ("producer.history_limit", producer["history_limit"]),
         ("signal.decision_grace_seconds", signal["decision_grace_seconds"]),
+        ("signal.context_wait_seconds", signal["context_wait_seconds"]),
         ("pump.interval_seconds", pump["interval_seconds"]),
         ("coverage.interval_seconds", coverage["interval_seconds"]),
         ("launchd.throttle_interval_seconds", launchd["throttle_interval_seconds"]),
@@ -48,6 +49,8 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
     decision_grace = signal["decision_grace_seconds"]
     if not producer_grace < decision_grace < 3600:
         raise ValueError("signal grace, producer grace'ten büyük ve 3600'den küçük olmalı")
+    if not signal["context_wait_seconds"] < 3600:
+        raise ValueError("signal context_wait_seconds 3600'den küçük olmalı")
     if launchd["throttle_interval_seconds"] == 0:
         raise ValueError("launchd throttle sıfır olamaz")
     return config
@@ -220,6 +223,8 @@ def build_launch_agents(
                 str(signal_var / "decision-context"),
                 "--grace-seconds",
                 str(signal["decision_grace_seconds"]),
+                "--context-wait-seconds",
+                str(signal["context_wait_seconds"]),
                 "--f0001-baseline-contexts",
                 str(signal_var / "f0001-contexts/combined"),
                 "--f0001-trigger-ledger",

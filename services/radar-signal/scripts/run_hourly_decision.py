@@ -27,6 +27,7 @@ from decision_engine.forward_trigger import (  # noqa: E402
 )
 from decision_engine.ledger import DecisionLedger  # noqa: E402
 from decision_engine.runtime import (  # noqa: E402
+    DEFAULT_CONTEXT_WAIT_SECONDS,
     DEFAULT_GRACE_SECONDS,
     HourlyDecisionRuntime,
     RuntimeResult,
@@ -137,6 +138,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_GRACE_SECONDS,
         help=f"mum kapanışı sonrası bekleme; varsayılan {DEFAULT_GRACE_SECONDS}",
+    )
+    parser.add_argument(
+        "--context-wait-seconds",
+        type=int,
+        default=DEFAULT_CONTEXT_WAIT_SECONDS,
+        help=(
+            "daemon modunda context henüz yayınlanmamışsa beklenecek üst sınır; "
+            f"varsayılan {DEFAULT_CONTEXT_WAIT_SECONDS}. 0 = bekleme (eski davranış)"
+        ),
     )
     parser.add_argument(
         "--signal-commit",
@@ -250,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
                 runtime,
                 grace_seconds=args.grace_seconds,
                 clock=candle_source.exchange_time,
+                context_wait_seconds=args.context_wait_seconds,
             )
             if not args.daemon:
                 result = scheduler.run_once(as_of_utc=args.as_of)

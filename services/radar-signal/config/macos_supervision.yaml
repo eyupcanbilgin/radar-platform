@@ -7,6 +7,11 @@ producer:
 
 signal:
   decision_grace_seconds: 180
+  # Host uyandığında producer ile Signal aynı anda devam eder ve producer_grace <
+  # decision_grace sıralaması yaşanmaz (ADR-0041). Saat yuvası saat başına tek ve
+  # değişmez olduğundan, context yayınlanmadan yazılan saat kalıcı olarak context'siz
+  # kalır. Bu bütçe dolunca karar yine fail-closed WAIT olarak yazılır. 0 = beklemez.
+  context_wait_seconds: 240
 
 pump:
   interval_seconds: 5
