@@ -277,6 +277,10 @@ Bekleme bütçesi saat sınırından değil, o saatin **ilk kez context'siz gör
 başlar. Yalnız `missing` bekletir: `invalid`/`io_error` artefaktın var ama bozuk olduğunu
 söyler ve fail-closed hemen çalışır. Bütçe dolduğunda karar bugünküyle aynı şekilde
 fail-closed `WAIT` + blocker olarak yazılır; bekleme sınırsız değildir ve saat askıda kalmaz.
+
+Bekleme ayrıca **kendi yuvasını asla aşmaz**: bir sonraki saat due olmadan kesilir. Aksi
+hâlde saat sınırına yakın uyanışta beklenen saat hiç yazılmadan düşerdi — saat kaybetmek,
+saati context'siz yazmaktan daha kötüdür.
 Deterministik çekirdek (`process_hour`, `run_once`) değişmemiştir; `--context-wait-seconds 0`
 eski davranışı birebir geri verir. Bu bekleme bir işletim zamanlama bütçesidir, sinyal eşiği
 değildir ve hiçbir karara girmez.

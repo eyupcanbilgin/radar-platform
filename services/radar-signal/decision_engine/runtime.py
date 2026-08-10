@@ -279,7 +279,18 @@ class UtcHourlyScheduler:
                 if pending_as_of != due:
                     pending_as_of, pending_since = due, now
                 waited = (now - pending_since).total_seconds()
-                if waited < self.context_wait_seconds and self._context_missing(as_of_utc=due):
+                # Bekleme bu yuvayı asla aşamaz.  Bir sonraki saat due olduğu anda `due`
+                # ilerler ve beklenen saat hiç yazılmadan düşerdi; saat kaybetmek, saati
+                # context'siz yazmaktan daha kötüdür.
+                slot_expires_at = due + timedelta(hours=1, seconds=self.grace_seconds)
+                outlives_slot = (
+                    now + timedelta(seconds=self.context_poll_seconds) >= slot_expires_at
+                )
+                if (
+                    waited < self.context_wait_seconds
+                    and not outlives_slot
+                    and self._context_missing(as_of_utc=due)
+                ):
                     # Karar yuvası saat başına tek ve değişmezdir; context yayınlanmadan
                     # yakmak o saati kalıcı olarak context'siz bırakır (ADR-0041).
                     stop_event.wait(timeout=self.context_poll_seconds)

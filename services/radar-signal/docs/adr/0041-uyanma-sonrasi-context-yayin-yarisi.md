@@ -64,20 +64,32 @@ Uykudan uyanışta duvar saati saat sınırının çok ötesindedir (15:00 sın�
 producer o anda yayına yeni başlar. Bütçeyi sınırdan ölçmek onu daha doğarken tüketirdi. Bu
 yüzden bütçe, o saatin **ilk kez context'siz görüldüğü andan** ölçülür.
 
-### 3. Deterministik çekirdek değişmez
+### 3. Bekleme kendi yuvasını asla aşmaz
+
+İnceleme sırasında bulunan kusur: bütçe yalnız süreyle sınırlanırsa, saat sınırına yakın
+uyanışta beklenen saat **hiç yazılmadan** düşebiliyordu. Örnek: 15:00 yuvası ilk kez
+15:59:50'de context'siz görülür; 240 sn'lik bütçe 16:03:50'ye kadar sürer, oysa 16:03:00'da
+`latest_due_hour` 16:00'a ilerler ve 15:00 sessizce kaybolur.
+
+Bu, düzeltilmeye çalışılan kusurdan **daha kötüdür**: eski davranış o saati hiç değilse
+context'siz kaydediyordu. Saat kaybetmek, saati context'siz yazmaktan kötüdür. Bu yüzden
+bekleme, bir sonraki yuva due olmadan (`due + 1 saat + grace`, bir yoklama payı bırakarak)
+kesilir ve saat fail-closed yazılır.
+
+### 4. Deterministik çekirdek değişmez
 
 `HourlyDecisionRuntime.process_hour` ve `run_once` **hiç değişmemiştir**. Bekleme yalnız
 daemon yuva ilerletmesindedir. Replay determinizmi ve tek-sefer koşusu aynen korunur;
 `--context-wait-seconds 0` eski davranışı birebir geri verir.
 
-### 4. Eksik saatler backfill edilmez
+### 5. Eksik saatler backfill edilmez
 
 9 Ağustos 22:00 UTC sonrası oluşan boşluk **doldurulmaz**. ADR-0040 madde 2 aynen geçerlidir:
 kurulum/kesinti öncesi saatler kalıcı missing blocker'dır. Producer `--catch-up-hours 0`
 olarak **kalır**; ürün sahibi kararıdır. Geç üretilmiş bir context'in canlı gözlem sanılması
 riski, kapsama açığından daha ağırdır.
 
-### 5. Bekleme parametreleri zamanlama bütçesidir, sinyal eşiği değildir
+### 6. Bekleme parametreleri zamanlama bütçesidir, sinyal eşiği değildir
 
 `grace_seconds` ile aynı desende modül varsayılanı + CLI bayrağıdır. "Eşikler config'de ve
 göreli yüzdelik" kuralı tetik/skor eşiklerini bağlar; bunlar ölçüm eşiği değil, işletim
@@ -94,6 +106,8 @@ Sentetik regresyon testi (`tests/test_hourly_runtime.py`, sahte saat + sahte con
   değildir; bütçe dolunca saat WAIT + blocker ile yazılır, askıda kalmaz.
 - `test_daemon_does_not_wait_for_a_context_that_exists_but_is_broken` — `invalid` beklemez.
 - `test_context_wait_zero_preserves_previous_immediate_behaviour` — eski davranış korunur.
+- `test_context_wait_never_outlives_its_own_hour_slot` — koruma kapatıldığında scheduler
+  12:00 yuvasını hiç yazmadan 13:00'a geçerek kırmızı olur; yani saat kaybını yakalar.
 - `test_scheduler_rejects_invalid_context_wait_configuration` — sınır doğrulaması.
 
 ## Sonuçlar ve sınırlar

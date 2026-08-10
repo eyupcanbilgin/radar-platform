@@ -669,3 +669,47 @@ def test_scheduler_rejects_invalid_context_wait_configuration():
         UtcHourlyScheduler(object(), context_wait_seconds=3600)
     with pytest.raises(ValueError, match="context_poll_seconds"):
         UtcHourlyScheduler(object(), context_poll_seconds=0)
+
+
+def test_context_wait_never_outlives_its_own_hour_slot(tmp_path: Path):
+    """Bekleme bir sonraki saate taşarsa beklenen saat hiç yazılmadan düşerdi (ADR-0041).
+
+    Saat sınırına ~4 dakika kala uyanma senaryosu: 15:00 yuvası ilk kez 15:59:50'de
+    context'siz görülür.  240 sn'lik bütçe 16:03:50'ye kadar sürerdi; oysa 16:03:00'da
+    `latest_due_hour` 16:00'a ilerler ve 15:00 sessizce kaybolurdu.  Saat kaybetmek,
+    saati context'siz yazmaktan daha kötüdür: bütçe yuva sınırında kesilir.
+    """
+    context_source = _ScriptedContextSource(
+        JsonDecisionContextSource(tmp_path / "contexts"), ready_after=10**6
+    )
+    late = datetime(2026, 8, 4, 12, 59, 50, tzinfo=UTC)  # T0 = 12:00 yuvası
+    clock_state = [late]
+    seen: list = []
+
+    with DecisionLedger() as ledger:
+        runtime = HourlyDecisionRuntime(
+            ledger=ledger,
+            candle_source=StaticCandleSource(fetched_batch()),
+            context_source=context_source,
+            signal_commit=SIGNAL_COMMIT,
+            clock=lambda: clock_state[0],
+        )
+        scheduler = UtcHourlyScheduler(
+            runtime,
+            grace_seconds=180,
+            clock=lambda: clock_state[0],
+            context_wait_seconds=240,
+            context_poll_seconds=5,
+        )
+        scheduler.serve_forever(
+            stop_event=_TickingStopEvent(clock_state, seen), on_result=seen.append
+        )
+
+        # 12:00 yuvası düşmedi: fail-closed da olsa yazıldı.
+        assert len(seen) == 1
+        assert seen[0].as_of_utc == T0
+        assert seen[0].context_status == "missing"
+        assert seen[0].decision.outcome == "WAIT"
+        assert ledger.get_for_period(as_of_utc=T0) is not None
+        # Ve bir sonraki yuva due olmadan işlendi.
+        assert clock_state[0] < T0 + timedelta(hours=1, seconds=180)
