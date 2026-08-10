@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.23**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.24**
+
+> v2.24 (10 Ağu 2026): ADR-0041 ile saatlik daemon, kararı yazmadan önce context yayınını
+> sınırlı süre (`--context-wait-seconds`, varsayılan 240) bekler. Gerekçe: host uyku/uyanması
+> MCP ADR-0006'nın "producer grace < Signal grace ⇒ producer önce yayınlar" garantisini
+> geçersiz kılıyor ve saat yuvası kalıcı olarak context'siz yanıyordu. Bütçe saat sınırından
+> değil, saatin ilk kez context'siz görüldüğü andan ölçülür; bütçe dolunca fail-closed WAIT
+> yazılır. Deterministik çekirdek (`process_hour`/`run_once`) değişmedi; eksik saatler
+> backfill edilmedi, producer `--catch-up-hours 0` kaldı. v2.23 → git geçmişi.
 
 > v2.23 (7 Ağu 2026): ADR-0040 ile macOS forward runtime'ın 11:00–13:00 UTC üç ardışık
 > gerçek gözlemi kaydedildi. Üçü de unavailable/triggered=null; kurulum öncesi 11 saat
@@ -256,6 +264,22 @@ saat fallback'i yoktur. Eksik/bozuk context veya mum erişim hatası saati atlam
 Daemon kodu hazırdır; MCP context producer, process supervision ve kesintisiz işletim kanıtı
 henüz tamamlanmamıştır. Kabul edilmiş yönsel setup olmadığı için sağlıklı runtime çıktısı da
 şimdilik `WAIT/no_directional_setup`tır.
+
+**Context yayın beklemesi (ADR-0041).** Daemon modunda bir saatin kararı yazılmadan önce
+context'in yayınlanması `--context-wait-seconds` (varsayılan 240) kadar, `context_poll_seconds`
+aralığıyla beklenir. Gerekçe: MCP ADR-0006'nın "producer grace (90 sn) < Signal grace (180 sn)
+⇒ producer önce yayınlar" garantisi host uyku/uyanmasından sonra geçersizdir; iki daemon aynı
+anda devam eder ve aradaki tampon hiç yaşanmaz. Karar yuvası saat başına tek ve değişmez
+olduğundan, context yayınlanmadan yazılan saat **kalıcı olarak** context'siz kalır.
+
+Bekleme bütçesi saat sınırından değil, o saatin **ilk kez context'siz görüldüğü andan**
+ölçülür; uykudan uyanışta duvar saati sınırın çok ötesindedir ama producer o anda yayına yeni
+başlar. Yalnız `missing` bekletir: `invalid`/`io_error` artefaktın var ama bozuk olduğunu
+söyler ve fail-closed hemen çalışır. Bütçe dolduğunda karar bugünküyle aynı şekilde
+fail-closed `WAIT` + blocker olarak yazılır; bekleme sınırsız değildir ve saat askıda kalmaz.
+Deterministik çekirdek (`process_hour`, `run_once`) değişmemiştir; `--context-wait-seconds 0`
+eski davranışı birebir geri verir. Bu bekleme bir işletim zamanlama bütçesidir, sinyal eşiği
+değildir ve hiçbir karara girmez.
 
 ### 2.2 Karar Sonuc Değerlendiricisi (Outcome Evaluator)
 

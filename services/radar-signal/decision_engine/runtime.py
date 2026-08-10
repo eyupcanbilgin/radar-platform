@@ -18,6 +18,13 @@ from decision_engine.sources import (
 )
 
 DEFAULT_GRACE_SECONDS = 90
+#: Bir saatin context'i henüz yayınlanmamışsa daemon'un bekleyeceği üst sınır.
+#: ADR-0006 "producer grace < signal grace ⇒ producer önce yayınlar" sıralamasına dayanır;
+#: fakat host uyku/uyanmasından sonra iki daemon aynı anda devam ettiği için o sıralama
+#: geçersizdir (ADR-0041). Bu bütçe sıralamayı uyanma anında yeniden kurar.
+DEFAULT_CONTEXT_WAIT_SECONDS = 240
+#: Bekleme sırasındaki yoklama aralığı; bütçe dolmadan context belirirse hemen ilerlenir.
+DEFAULT_CONTEXT_POLL_SECONDS = 5
 
 
 class ClosedCandleSource(Protocol):
@@ -203,12 +210,40 @@ class UtcHourlyScheduler:
         *,
         grace_seconds: int = DEFAULT_GRACE_SECONDS,
         clock: Callable[[], datetime] | None = None,
+        context_wait_seconds: int = DEFAULT_CONTEXT_WAIT_SECONDS,
+        context_poll_seconds: int = DEFAULT_CONTEXT_POLL_SECONDS,
     ):
         if not 0 <= grace_seconds < 3600:
             raise ValueError("grace_seconds 0..3599 aralığında olmalı")
+        if not 0 <= context_wait_seconds < 3600:
+            raise ValueError("context_wait_seconds 0..3599 aralığında olmalı")
+        if context_poll_seconds <= 0:
+            raise ValueError("context_poll_seconds > 0 olmalı")
         self.runtime = runtime
         self.grace_seconds = grace_seconds
+        self.context_wait_seconds = context_wait_seconds
+        self.context_poll_seconds = context_poll_seconds
         self.clock = clock or (lambda: datetime.now(UTC))
+
+    def _context_missing(self, *, as_of_utc: datetime) -> bool:
+        """Context yalnız "henüz yayınlanmadı" durumundaysa True.
+
+        Yalnız ``missing`` bekletir: bu, "producer henüz yayınlamadı" demektir ve tam olarak
+        düzeltilen yarıştır.  ``invalid``/``io_error`` artefaktın var ama bozuk olduğunu
+        söyler; beklemek onu düzeltmez, fail-closed hemen çalışmalıdır.
+
+        Karar defterinde o saat zaten varsa bekletilmez; ``process_hour`` idempotent döner.
+
+        Yoklamanın tamamı en-iyi-çabadır: "context yalnızca henüz yayınlanmadı" olduğunu
+        kesin saptayamazsak bekletmeyiz.  Davranış o zaman bugünküne iner ve gerçek durumu
+        yetkili okuma (``process_hour``) deftere yazar.
+        """
+        try:
+            if self.runtime.ledger.get_for_period(as_of_utc=as_of_utc) is not None:
+                return False
+            return self.runtime.context_source.read(as_of_utc=as_of_utc).status == "missing"
+        except Exception:
+            return False
 
     def run_once(self, *, as_of_utc: datetime | None = None) -> RuntimeResult:
         now = self.clock()
@@ -231,14 +266,28 @@ class UtcHourlyScheduler:
         on_result: Callable[[RuntimeResult], None],
     ) -> None:
         last_processed_as_of: datetime | None = None
+        # Bekleme bütçesi saat sınırından DEĞİL, o saatin ilk kez context'siz görüldüğü
+        # andan ölçülür.  Host uykudan uyandığında duvar saati sınırın çok ötesindedir ama
+        # producer o anda yayına yeni başlar; sınırdan ölçmek bütçeyi daha doğarken tüketirdi.
+        pending_as_of: datetime | None = None
+        pending_since: datetime | None = None
         while not stop_event.is_set():
             raw_now = self.clock()
             due = latest_due_hour(raw_now, grace_seconds=self.grace_seconds)
             now = raw_now.astimezone(UTC)
             if due != last_processed_as_of:
+                if pending_as_of != due:
+                    pending_as_of, pending_since = due, now
+                waited = (now - pending_since).total_seconds()
+                if waited < self.context_wait_seconds and self._context_missing(as_of_utc=due):
+                    # Karar yuvası saat başına tek ve değişmezdir; context yayınlanmadan
+                    # yakmak o saati kalıcı olarak context'siz bırakır (ADR-0041).
+                    stop_event.wait(timeout=self.context_poll_seconds)
+                    continue
                 result = self.run_once(as_of_utc=due)
                 on_result(result)
                 last_processed_as_of = due
+                pending_as_of = pending_since = None
                 raw_now = self.clock()
                 due = latest_due_hour(raw_now, grace_seconds=self.grace_seconds)
                 now = raw_now.astimezone(UTC)

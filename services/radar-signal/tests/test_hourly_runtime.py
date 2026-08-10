@@ -24,6 +24,7 @@ from decision_engine.sources import (
     CandleDataError,
     CandleNotReadyError,
     CandleTransportError,
+    ContextRead,
     ExchangeClockError,
     JsonDecisionContextSource,
 )
@@ -476,3 +477,195 @@ def test_cli_historical_as_of_uses_separate_replay_ledger_by_default(tmp_path: P
     assert hourly_cli._ledger_path(None, as_of=T0) == tmp_path / "hourly-replay.sqlite"
     explicit = tmp_path / "explicit.sqlite"
     assert hourly_cli._ledger_path(explicit, as_of=T0) == explicit
+
+
+# --- ADR-0041: uyku/uyanma sonrası context yayın yarışı -------------------------------
+#
+# Bu testler TAMAMEN SENTETİKTİR: sahte saat, sahte context kaynağı, bellek içi defter.
+# Ne ağa ne de `user_data/` altındaki runtime verisine dokunurlar.
+
+
+class _ScriptedContextSource:
+    """`missing` döner, `ready_after` yoklamadan sonra gerçek context'e döner."""
+
+    def __init__(self, inner: JsonDecisionContextSource, *, ready_after: int):
+        self.inner = inner
+        self.ready_after = ready_after
+        self.probes = 0
+
+    def path_for(self, *, as_of_utc: datetime) -> Path:
+        return self.inner.path_for(as_of_utc=as_of_utc)
+
+    def read(self, *, as_of_utc: datetime):
+        self.probes += 1
+        if self.probes > self.ready_after:
+            return self.inner.read(as_of_utc=as_of_utc)
+        return ContextRead(context=None, status="missing", path=self.path_for(as_of_utc=as_of_utc))
+
+
+class _TickingStopEvent:
+    """Her `wait` çağrısında sahte saati ilerletir, tek yuva işlenince durur."""
+
+    def __init__(self, clock_state: list[datetime], processed: list, *, limit: int = 1):
+        self.clock_state = clock_state
+        self.processed = processed
+        self.limit = limit
+        self.waits: list[float] = []
+
+    def is_set(self) -> bool:
+        return len(self.processed) >= self.limit
+
+    def wait(self, timeout):
+        self.waits.append(timeout)
+        if not self.is_set():
+            self.clock_state[0] += timedelta(seconds=timeout)
+        return self.is_set()
+
+
+def _wait_scheduler(tmp_path: Path, *, ready_after: int, context_wait_seconds: int = 240):
+    inner = JsonDecisionContextSource(tmp_path / "contexts")
+    write_context(inner, T0, context_payload_at(T0))
+    return _ScriptedContextSource(inner, ready_after=ready_after)
+
+
+def test_daemon_waits_for_late_context_instead_of_burning_the_hour(tmp_path: Path):
+    """Uyanma anında producer henüz yayınlamadıysa saat yuvası yakılmaz (ADR-0041).
+
+    Gerçek olay: 2026-08-10T15:29:49Z'de Signal kararı yazdı, producer 15.json'u
+    15:29:51Z'de yayınladı. İki saniye fark, o saati kalıcı olarak context'siz bıraktı.
+    """
+    context_source = _wait_scheduler(tmp_path, ready_after=3)
+    clock_state = [T0 + timedelta(seconds=90)]
+    seen: list[str] = []
+
+    with DecisionLedger() as ledger:
+        runtime = HourlyDecisionRuntime(
+            ledger=ledger,
+            candle_source=StaticCandleSource(fetched_batch()),
+            context_source=context_source,
+            signal_commit=SIGNAL_COMMIT,
+            clock=lambda: clock_state[0],
+        )
+        scheduler = UtcHourlyScheduler(
+            runtime,
+            grace_seconds=90,
+            clock=lambda: clock_state[0],
+            context_wait_seconds=240,
+            context_poll_seconds=5,
+        )
+        stop = _TickingStopEvent(clock_state, seen)
+        scheduler.serve_forever(stop_event=stop, on_result=lambda r: seen.append(r.context_status))
+
+        # Karar ertelendi ve context yayınlandıktan SONRA, context'iyle birlikte yazıldı.
+        assert seen == ["ready"]
+        assert context_source.probes > 3
+        # Bekleme yoklama aralığıyla yapıldı, saatlik uykuyla değil.
+        assert stop.waits[0] == 5
+        row = ledger.get_for_period(as_of_utc=T0)
+        assert row is not None
+        assert row["context_snapshot_id"]
+
+
+def test_daemon_records_fail_closed_once_the_context_wait_budget_expires(tmp_path: Path):
+    """Bekleme sınırsız değildir: bütçe dolunca saat fail-closed yazılır, askıda kalmaz."""
+    inner = JsonDecisionContextSource(tmp_path / "contexts")  # dosya hiç yazılmıyor
+    context_source = _ScriptedContextSource(inner, ready_after=10**6)
+    clock_state = [T0 + timedelta(seconds=90)]
+    seen: list = []
+
+    with DecisionLedger() as ledger:
+        runtime = HourlyDecisionRuntime(
+            ledger=ledger,
+            candle_source=StaticCandleSource(fetched_batch()),
+            context_source=context_source,
+            signal_commit=SIGNAL_COMMIT,
+            clock=lambda: clock_state[0],
+        )
+        scheduler = UtcHourlyScheduler(
+            runtime,
+            grace_seconds=90,
+            clock=lambda: clock_state[0],
+            context_wait_seconds=30,
+            context_poll_seconds=5,
+        )
+        scheduler.serve_forever(
+            stop_event=_TickingStopEvent(clock_state, seen), on_result=seen.append
+        )
+
+    assert len(seen) == 1
+    result = seen[0]
+    assert result.context_status == "missing"
+    assert result.decision.outcome == "WAIT"
+    # Eksik veri nötr/sakin sayılmaz: blocker yazılır, yön üretilmez.
+    assert result.decision.blockers
+    assert result.decision.outcome != "LONG" and result.decision.outcome != "SHORT"
+
+
+def test_daemon_does_not_wait_for_a_context_that_exists_but_is_broken(tmp_path: Path):
+    """`invalid` beklemez: artefakt var ama bozuk; beklemek düzeltmez, fail-closed hemen çalışır."""
+    root = tmp_path / "contexts"
+    inner = JsonDecisionContextSource(root)
+    path = inner.path_for(as_of_utc=T0)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{ bozuk", encoding="utf-8")
+
+    clock_state = [T0 + timedelta(seconds=90)]
+    seen: list = []
+    with DecisionLedger() as ledger:
+        runtime = HourlyDecisionRuntime(
+            ledger=ledger,
+            candle_source=StaticCandleSource(fetched_batch()),
+            context_source=inner,
+            signal_commit=SIGNAL_COMMIT,
+            clock=lambda: clock_state[0],
+        )
+        scheduler = UtcHourlyScheduler(
+            runtime,
+            grace_seconds=90,
+            clock=lambda: clock_state[0],
+            context_wait_seconds=240,
+            context_poll_seconds=5,
+        )
+        stop = _TickingStopEvent(clock_state, seen)
+        scheduler.serve_forever(stop_event=stop, on_result=seen.append)
+
+    assert len(seen) == 1
+    assert seen[0].context_status in {"invalid", "io_error"}
+    # Hiç beklemeden işlendi: ilk wait yoklama değil, bir sonraki saate kadar olan uyku.
+    assert stop.waits[0] > 5
+
+
+def test_context_wait_zero_preserves_previous_immediate_behaviour(tmp_path: Path):
+    context_source = _ScriptedContextSource(
+        JsonDecisionContextSource(tmp_path / "contexts"), ready_after=10**6
+    )
+    clock_state = [T0 + timedelta(seconds=90)]
+    seen: list = []
+    with DecisionLedger() as ledger:
+        runtime = HourlyDecisionRuntime(
+            ledger=ledger,
+            candle_source=StaticCandleSource(fetched_batch()),
+            context_source=context_source,
+            signal_commit=SIGNAL_COMMIT,
+            clock=lambda: clock_state[0],
+        )
+        scheduler = UtcHourlyScheduler(
+            runtime,
+            grace_seconds=90,
+            clock=lambda: clock_state[0],
+            context_wait_seconds=0,
+        )
+        scheduler.serve_forever(
+            stop_event=_TickingStopEvent(clock_state, seen), on_result=seen.append
+        )
+
+    assert len(seen) == 1
+    assert seen[0].context_status == "missing"
+    assert context_source.probes == 1  # yalnız yetkili okuma; yoklama yapılmadı
+
+
+def test_scheduler_rejects_invalid_context_wait_configuration():
+    with pytest.raises(ValueError, match="context_wait_seconds"):
+        UtcHourlyScheduler(object(), context_wait_seconds=3600)
+    with pytest.raises(ValueError, match="context_poll_seconds"):
+        UtcHourlyScheduler(object(), context_poll_seconds=0)

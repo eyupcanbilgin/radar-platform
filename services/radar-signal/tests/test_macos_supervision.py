@@ -75,6 +75,12 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
     )
     assert "--f0001-baseline-contexts" in signal
     assert "--f0001-trigger-ledger" in signal
+    # ADR-0041: uyanma sonrası grace sıralaması yaşanmadığı için context beklemesi
+    # plist'e açıkça yazılır; varsayılana örtük güvenilmez.
+    assert (
+        int(signal[signal.index("--context-wait-seconds") + 1])
+        == (config["signal"]["context_wait_seconds"])
+    )
     assert pump["EnvironmentVariables"]["RADAR_SIGNAL_DELIVERY_MODE"] == "console"
     assert coverage["StartInterval"] == config["coverage"]["interval_seconds"]
     assert "KeepAlive" not in coverage
