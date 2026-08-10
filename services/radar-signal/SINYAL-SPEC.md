@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.25**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.26**
+
+> v2.26 (11 Ağu 2026): ADR-0047 ile F-0001 hazırlık projeksiyonu eklendi ve periyodik
+> salt-okunur ajan olarak işletime bağlandı. Bulgu: **bağlayıcı kısıt gözlem sayısı değil
+> tetik sayısıdır.** `episode_cooldown_hours=24` tetikleri günde bire indirdiğinden
+> `min_observations=720` saatte en fazla 30 tetik olabilir ve şart tam 30; ADR-0029'un
+> ölçtüğü gerçek oran ~174 saat/tetik. Araç yetersiz örneklemden TARİH üretmez
+> (`insufficient_sample`), tarihsel oranı "forward ölçüm değildir" diye etiketler. Eşikler
+> değiştirilmedi. v2.25 → git geçmişi.
 
 > v2.25 (10 Ağu 2026): ADR-0042 ile kesinti bildirimi eklendi. Alarm duran DURUMA değil duran
 > İLERLEMEYE bakar: coverage `status` kalıcı olarak `degraded` olduğundan ona alarm bağlanmaz.
