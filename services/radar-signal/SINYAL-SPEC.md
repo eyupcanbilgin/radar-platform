@@ -1,5 +1,11 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.27**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.28**
+
+> v2.28 (11 Ağu 2026): ADR-0049 ile operatör teslimat kill-switch'i eklendi. Anahtar bir
+> dosyadır; **varlığı** teslimatı durdurur (içerik ayrıştırılmaz — `false` yazan dosya da
+> durdurur). Duraklatma **tutar, atmaz**: mesajlar `PENDING` kalır ve anahtar kalkınca
+> gönderilir. Belirsizlik durma yönünde çözülür; dosyanın içeriği gerekçe olarak loglanır.
+> Anahtar yalnız teslimatı durdurur, kanıt toplamayı değil.
 
 > v2.27 (11 Ağu 2026): ADR-0048 ile kırılganlık uyarı kartı ledger/outbox hattına bağlandı
 > fakat **kapısı kapalı**. `emit_alerts` config'dedir ve `false`tur; kapalıyken hiçbir şey
