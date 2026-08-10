@@ -11,13 +11,22 @@
 RADAR'ın hedef ürünü şudur:
 
 > Çok kaynaklı piyasa verisini otomatik izleyen; yalnız ölçülmüş bir kurulum oluştuğunda
-> açıklanabilir kırılganlık, volatilite genişlemesi riski, veri güveni ve blocker uyarısı
-> üreten; yön ölçülmedikçe `direction=null`/`WAIT` kalan ve uyarılarının ileri sonuçlarını
-> değişmez bir defterde ölçen kişisel piyasa risk karar-destek sistemi.
+> açıklanabilir BTC/ETH `LONG`, `SHORT` veya `WAIT` kararı üreten, riski sınırlayan ve
+> kararlarının maliyet sonrası sonuçlarını değişmez bir defterde ölçen kişisel trading
+> karar-destek sistemi.
+>
+> Ölçülmüş yönsel kurulum oluşana kadar ürün, aynı zincirden açıklanabilir kırılganlık,
+> volatilite genişlemesi riski, veri güveni ve blocker uyarısı üretir. Bu ara çıktıdır ve
+> kalıcı risk katmanıdır; yönün yerine geçmez.
 
-Kârlılık bir yazılım özelliği veya vaat değildir. Ürün v1'in kanıt koşulu, kırılganlık
-uyarılarının kilitli değerlendirme ve forward paper döneminde kalibre olmasıdır. Sistem
-gerçek emir göndermez ve çıktılar `DENEYSEL/PAPER` etiketi taşır.
+Kârlılık bir yazılım özelliği veya vaat değildir. Kanıt koşulu iki koldadır: yönsel kurulumun
+kilitli OOS ve forward paper ölçümünde kanıtlanması, kırılganlık uyarılarının aynı dönemde
+kalibre olması. Kanıt oluşana kadar `direction=null`/`WAIT` korunur; sistem gerçek emir
+göndermez ve çıktılar `DENEYSEL/PAPER` etiketi taşır.
+
+**Hedef geçmişi:** Platform ADR-0004 (5 Ağu 2026) iki yönsel ailenin reddi üzerine ürün v1'i
+kırılganlık uyarısına daraltmıştı. Platform ADR-0006 (10 Ağu 2026) ürün sahibi kararıyla yönsel
+hedefi geri getirdi; korumalar gevşetilmedi, tarihî retler korundu.
 
 ## 2. Bugünkü Gerçeklik
 
@@ -135,7 +144,7 @@ dışındadır. Her biri daha sonra ayrı ablation ile katkı gösterirse ekleni
 **Kabul kapısı:** Kesintisiz çalışan `veri -> snapshot -> karar -> Telegram -> sonuç` zinciri;
 aynı snapshot'ın 100 replay'inde bit-bit aynı karar; veri eksik/bayatken yönsel karar yok.
 
-### Faz 2 — Kırılganlık uyarısı kalibrasyonu ve araştırma arşivi
+### Faz 2 — Yönsel kurulum arayışı ve kırılganlık uyarısı kalibrasyonu
 
 **Amaç:** Yön iddia etmeden, kırılganlık uyarısının ileri oynaklık ve olumsuz hareket
 riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmayı değiştirmeden korumak.
@@ -143,6 +152,13 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [x] BTC 1h için basit, açıklanabilir yönsel aileleri hipotez kartlarıyla ön-kayıt et
   (S-0003 ve S-0004 ölçüldü; ikisi de Development düzeyinde reddedildi).
 - [x] Yönsel ürün araştırmasını park et; yeniden-açma kapısını tanımla (Platform ADR-0004).
+- [x] Ürün sahibi kararıyla yönsel araştırmayı yeniden aç; Kuzey Yıldızı'nı yönsel hedefe
+  döndür (Platform ADR-0006). Korumalar gevşetilmedi; S-0003/S-0004 retleri korundu.
+- [ ] Üçüncü yönsel aileyi (S-0005, Coinbase premium / bölgesel spot talep) ön-kayıtla ölç.
+  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi.
+  - [ ] Binance spot 1h geçmişini manifest disipliniyle indir ve doğrula.
+  - [ ] Purged walk-forward + embargo, iki maliyet senaryosu, üç baseline, DSR, PBO/CSCV,
+    ±%20 hassasiyet ve dönem/venue kırılganlığıyla tam kapı setini koş.
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
