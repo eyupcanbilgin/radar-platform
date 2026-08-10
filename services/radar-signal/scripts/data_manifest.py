@@ -42,6 +42,34 @@ def file_entry(path: Path) -> dict:
     }
 
 
+def _manifest_target(now: datetime, manifest_hash: str) -> Path:
+    """Yazılacak manifest yolu — mevcut bir manifestin ÜZERİNE asla yazmadan.
+
+    Manifest değişmez kanıttır: Registry satırlarındaki `dataset_snapshot` ona işaret eder.
+    Aynı gün içinde veri eklenip manifest yeniden üretildiğinde dosya adı çakışır ve eski
+    snapshot sessizce kaybolurdu; o an geçmiş koşuların kanıt zinciri yalnız git geçmişinden
+    kurtarılabilir hâle gelir. Depo bu ilkeyi MCP context publisher'da zaten uygular
+    (atomik no-overwrite); manifest de aynı disipline tabidir.
+
+    Çakışma hâlinde saat damgalı ad kullanılır. Sıralama korunur: ``MANIFEST-YYYYMMDD.json``
+    ile ``MANIFEST-YYYYMMDDTHHMMSS.json`` karşılaştırıldığında ``.`` (0x2E) < ``T`` (0x54)
+    olduğundan tarih-only olan önce, saat damgalı olan sonra gelir; `latest_manifest_path()`
+    en yenisini seçmeye devam eder.
+
+    İçerik birebir aynıysa yeniden yazmak zararsızdır ve mevcut yol döner (idempotent).
+    """
+    date_path = OUT_DIR / f"MANIFEST-{now.strftime('%Y%m%d')}.json"
+    if not date_path.exists():
+        return date_path
+    try:
+        existing = json.loads(date_path.read_text(encoding="utf-8")).get("manifest_sha256")
+    except (OSError, ValueError):
+        existing = None
+    if existing == manifest_hash:
+        return date_path
+    return OUT_DIR / f"MANIFEST-{now.strftime('%Y%m%dT%H%M%S')}.json"
+
+
 def run_verify(allow_missing_data: bool) -> None:
     """Manifest ↔ diskteki veri eşleşmesini doğrular.
 
@@ -120,14 +148,13 @@ def main() -> None:
     manifest["manifest_sha256"] = manifest_hash
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(UTC).strftime("%Y%m%d")
-    json_path = OUT_DIR / f"MANIFEST-{stamp}.json"
+    json_path = _manifest_target(datetime.now(UTC), manifest_hash)
     json_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
     )
 
     lines = [
-        f"# Veri Bütünlük Manifesti — {stamp}",
+        f"# Veri Bütünlük Manifesti — {json_path.stem.removeprefix('MANIFEST-')}",
         "",
         f"- Üretim: {manifest['generated_at_utc']}",
         f"- Manifest sha256 (Registry `dataset_snapshot` bu değere işaret eder): `{manifest_hash}`",
@@ -140,7 +167,7 @@ def main() -> None:
             f"| {e['file']} | {e['rows']} | {e['date_min_utc'][:10]} → {e['date_max_utc'][:10]} "
             f"| `{e['sha256'][:16]}` |"
         )
-    md_path = OUT_DIR / f"MANIFEST-{stamp}.md"
+    md_path = json_path.with_suffix(".md")
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"OK: {json_path.name} + {md_path.name} · manifest_sha256={manifest_hash[:16]}...")
 
