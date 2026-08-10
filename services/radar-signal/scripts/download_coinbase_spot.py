@@ -39,13 +39,26 @@ def hourly_gaps(timestamps: list[int]) -> list[dict]:
     return gaps
 
 
-def fetch_closed_candles(exchange, *, since_ms: int, until_ms: int) -> pd.DataFrame:
+def fetch_closed_candles(
+    exchange,
+    *,
+    since_ms: int,
+    until_ms: int,
+    symbol: str = "BTC/USD",
+    venue: str = "Coinbase",
+) -> pd.DataFrame:
+    """Fetch an exact, fully closed hourly range or fail loudly.
+
+    ``symbol``/``venue`` default to the Coinbase spot leg so existing callers are
+    unchanged; the Binance spot downloader reuses this same verified paging and
+    completeness logic instead of copying it (S-0005 needs both legs).
+    """
     if until_ms <= since_ms:
         raise ValueError("until, since sonrasında olmalı")
     rows = []
     cursor = since_ms
     while cursor < until_ms:
-        page = exchange.fetch_ohlcv("BTC/USD", "1h", since=cursor, limit=300)
+        page = exchange.fetch_ohlcv(symbol, "1h", since=cursor, limit=300)
         if not page:
             break
         accepted = [
@@ -54,19 +67,19 @@ def fetch_closed_candles(exchange, *, since_ms: int, until_ms: int) -> pd.DataFr
         rows.extend(accepted)
         next_cursor = int(page[-1][0]) + TIMEFRAME_MS
         if next_cursor <= cursor:
-            raise ValueError("Coinbase pagination ilerlemedi")
+            raise ValueError(f"{venue} pagination ilerlemedi")
         cursor = next_cursor
     frame = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume"])
     if frame.empty:
-        raise ValueError("Coinbase kapalı mum döndürmedi")
+        raise ValueError(f"{venue} kapalı mum döndürmedi")
     if frame["timestamp"].duplicated().any():
-        raise ValueError("Coinbase duplicate mum")
+        raise ValueError(f"{venue} duplicate mum")
     frame = frame.sort_values("timestamp").reset_index(drop=True)
     if int(frame.iloc[0]["timestamp"]) != since_ms:
-        raise ValueError("Coinbase serisinin başlangıcı eksik")
+        raise ValueError(f"{venue} serisinin başlangıcı eksik")
     gap_report = hourly_gaps([int(value) for value in frame["timestamp"]])
     if int(frame.iloc[-1]["timestamp"]) + TIMEFRAME_MS != until_ms:
-        raise ValueError("Coinbase serisinin sonu eksik veya açık mum içeriyor")
+        raise ValueError(f"{venue} serisinin sonu eksik veya açık mum içeriyor")
     frame["date"] = pd.to_datetime(frame.pop("timestamp"), unit="ms", utc=True)
     result = frame[["date", "open", "high", "low", "close", "volume"]]
     result.attrs["coverage"] = {

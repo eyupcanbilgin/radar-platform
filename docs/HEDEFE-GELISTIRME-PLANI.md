@@ -154,11 +154,14 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [x] Yönsel ürün araştırmasını park et; yeniden-açma kapısını tanımla (Platform ADR-0004).
 - [x] Ürün sahibi kararıyla yönsel araştırmayı yeniden aç; Kuzey Yıldızı'nı yönsel hedefe
   döndür (Platform ADR-0006). Korumalar gevşetilmedi; S-0003/S-0004 retleri korundu.
-- [ ] Üçüncü yönsel aileyi (S-0005, Coinbase premium / bölgesel spot talep) ön-kayıtla ölç.
-  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi.
-  - [ ] Binance spot 1h geçmişini manifest disipliniyle indir ve doğrula.
-  - [ ] Purged walk-forward + embargo, iki maliyet senaryosu, üç baseline, DSR, PBO/CSCV,
-    ±%20 hassasiyet ve dönem/venue kırılganlığıyla tam kapı setini koş.
+- [x] Üçüncü yönsel aileyi (S-0005, Coinbase premium / bölgesel spot talep) ön-kayıtla ölç:
+  **REDDEDİLDİ** (Signal ADR-0043). `realistic +%28.97` ve üç baseline'ın üstünde, fakat
+  `taker_heavy −%17.73`, `p=0.2654`, fold tutarlılığı %42.9. Yönsel skor: 3 aile, 3 ret.
+  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi (`be56905`).
+  - [x] Binance spot 1h indirildi ve manifeste bağlandı (22 704 mum, 0 eksik saat).
+  - [x] Purged walk-forward + embargo, iki maliyet senaryosu, üç baseline koşuldu.
+  - [ ] DSR, PBO/CSCV ve ±%20 hassasiyet: base reddedildiği için uygulanamadı; kapılar
+    hazır ve base'i ayakta kalan ilk ailede doğrudan çalışacak.
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
