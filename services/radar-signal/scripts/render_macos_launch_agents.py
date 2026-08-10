@@ -33,6 +33,7 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
         ("pump.interval_seconds", pump["interval_seconds"]),
         ("coverage.interval_seconds", coverage["interval_seconds"]),
         ("health_alert.interval_seconds", config["health_alert"]["interval_seconds"]),
+        ("readiness.interval_seconds", config["readiness"]["interval_seconds"]),
         ("launchd.throttle_interval_seconds", launchd["throttle_interval_seconds"]),
     ):
         if not isinstance(value, int) or value < 0:
@@ -44,6 +45,7 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
             pump["interval_seconds"],
             coverage["interval_seconds"],
             config["health_alert"]["interval_seconds"],
+            config["readiness"]["interval_seconds"],
         )
     ):
         raise ValueError("collect/pump/coverage interval sıfır olamaz")
@@ -81,6 +83,10 @@ def validate_clean_checkout(checkout_root: Path) -> Path:
     _require_file(
         root / "services/radar-signal/scripts/runtime_health_alert.py",
         "Signal health alerter",
+    )
+    _require_file(
+        root / "services/radar-signal/scripts/f0001_readiness_projection.py",
+        "Signal readiness projector",
     )
     result = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
@@ -289,6 +295,22 @@ def build_launch_agents(
             working_directory=signal_root,
             log_root=log_root,
             interval_seconds=config["health_alert"]["interval_seconds"],
+        ),
+        # "Ne zaman ölçülebilir olur?" sorusunun cevabı sürekli taze dursun (ADR-0047).
+        # Salt-okunur: sonuç okumaz, Registry'ye yazmaz, outbox'a dokunmaz.
+        "com.radar.signal-readiness": _scheduled_agent(
+            label="com.radar.signal-readiness",
+            arguments=[
+                str(signal_python),
+                str(signal_root / "scripts/f0001_readiness_projection.py"),
+                "--ledger",
+                str(signal_var / "f0001-forward-triggers.sqlite"),
+                "--output",
+                str(signal_var / "f0001-readiness-projection.json"),
+            ],
+            working_directory=signal_root,
+            log_root=log_root,
+            interval_seconds=config["readiness"]["interval_seconds"],
         ),
     }
 

@@ -19,6 +19,11 @@ pump:
 coverage:
   interval_seconds: 300
 
+readiness:
+  # Hazırlık projeksiyonu (ADR-0047). Saatlik ölçekte değişen bir cevap; sık koşmasına
+  # gerek yok. Salt-okunur: sonuç okumaz, Registry'ye yazmaz.
+  interval_seconds: 900
+
 health_alert:
   # Coverage ile aynı ritim: coverage raporu tazelendikçe kesinti değerlendirilsin.
   # Uyarı eşikleri saat ölçeğinde olduğu için bu aralık uyarı sıklığını belirlemez;

@@ -20,6 +20,7 @@ def _checkout(tmp_path: Path) -> Path:
         "services/radar-signal/scripts/pump.py",
         "services/radar-signal/scripts/f0001_forward_coverage.py",
         "services/radar-signal/scripts/runtime_health_alert.py",
+        "services/radar-signal/scripts/f0001_readiness_projection.py",
     ):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +102,17 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
     assert alert_args[alert_args.index("--outbox") + 1].endswith("outbox.sqlite")
     assert alert_args[alert_args.index("--producer-heartbeat") + 1].endswith("heartbeat.sqlite")
 
+    # ADR-0047: "ne zaman ölçülebilir?" cevabı sürekli taze; salt-okunur ajan.
+    readiness = agents["com.radar.signal-readiness"]
+    readiness_args = readiness["ProgramArguments"]
+    assert readiness["StartInterval"] == config["readiness"]["interval_seconds"]
+    assert "KeepAlive" not in readiness
+    assert readiness_args[readiness_args.index("--output") + 1].endswith(
+        "f0001-readiness-projection.json"
+    )
+    # Sonuç okumaz, Registry'ye yazmaz, outbox'a dokunmaz.
+    assert "--outbox" not in readiness_args
+
     serialized = repr(agents).lower()
     assert "secret" not in serialized
     assert "api_key" not in serialized
@@ -132,24 +144,31 @@ def test_plists_are_atomic_private_and_parseable(tmp_path, monkeypatch):
         "validate_state_root",
         lambda path, _: (path.resolve() / "mcp", path.resolve() / "signal"),
     )
+    config = launchd.load_supervision_config()
     agents = launchd.build_launch_agents(
         checkout_root=root,
         state_root=tmp_path / "state",
         mcp_python=_python(tmp_path, "mcp-python"),
         signal_python=_python(tmp_path, "signal-python"),
         delivery_mode="telegram",
-        config=launchd.load_supervision_config(),
+        config=config,
     )
     written = launchd.write_launch_agents(tmp_path / "agents", agents)
 
-    assert len(written) == 5
+    # Periyodik one-shot ajanlar ve config'deki aralıkları; sabit sayı gömülmez.
+    scheduled = {
+        "com.radar.signal-coverage": config["coverage"]["interval_seconds"],
+        "com.radar.signal-health-alert": config["health_alert"]["interval_seconds"],
+        "com.radar.signal-readiness": config["readiness"]["interval_seconds"],
+    }
+    assert len(written) == 3 + len(scheduled)
     for path in written:
         if os.name != "nt":
             assert path.stat().st_mode & 0o777 == 0o600
         payload = plistlib.loads(path.read_bytes())
-        if payload["Label"] in ("com.radar.signal-coverage", "com.radar.signal-health-alert"):
+        if payload["Label"] in scheduled:
             assert "KeepAlive" not in payload
-            assert payload["StartInterval"] == 300
+            assert payload["StartInterval"] == scheduled[payload["Label"]]
         else:
             assert payload["KeepAlive"] is True
         assert payload["RunAtLoad"] is True

@@ -234,6 +234,14 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
       (Signal ADR-0040: 11:00–13:00 UTC üç ardışık gerçek satır; üçü de unavailable/null,
       kurulum öncesi 11 saat backfill edilmeden blocker kaldı).
 - [ ] Precision/recall, calibration, lead time, false-alarm ve abstention metriklerini raporla.
+  - [x] Hazırlık projeksiyonu aracı (Signal ADR-0047): her şartın mevcut/gerekli değerini,
+    oranı ve bağlayıcı kısıtı defterden raporlar; yetersiz örneklemden TARİH üretmez.
+  - **BAĞLAYICI KISIT GÖZLEM DEĞİL TETİKTİR.** `episode_cooldown_hours=24` tetikleri
+    günde bire indiriyor; `min_observations=720` saatte en fazla 30 tetik olabilir ve
+    şart tam 30. ADR-0029'un ölçtüğü gerçek oran ~174 saat/tetik → 30 tetik ≈ 5 229
+    kullanılabilir gözlem saati ≈ 218 gün. Kalibrasyon takvimi 30 gün değil, ay ölçeğinde.
+  - [ ] Eşiklerin gerçekçiliğini ürün sahibi kararıyla gözden geçir. Eşikler sonucu
+    görüp DEĞİŞTİRİLMEZ; bu ayrı ve bilinçli bir ürün kararıdır.
 - [x] Eksik/yetersiz sonucu `unavailable` tut; sakin veya nötr olay olarak sayma
   (Signal ADR-0040: ilk üç gerçek forward satır `unavailable`, `triggered=null`).
 - [ ] Basis, spread/depth ailelerini yeterli canlı geçmişten sonra ayrı ablation ile değerlendir.
