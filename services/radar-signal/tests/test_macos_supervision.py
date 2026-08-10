@@ -19,6 +19,7 @@ def _checkout(tmp_path: Path) -> Path:
         "services/radar-signal/scripts/run_hourly_decision.py",
         "services/radar-signal/scripts/pump.py",
         "services/radar-signal/scripts/f0001_forward_coverage.py",
+        "services/radar-signal/scripts/runtime_health_alert.py",
     ):
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +92,15 @@ def test_agents_preserve_ordering_direction_null_runtime_and_no_secrets(tmp_path
     assert coverage_args[coverage_args.index("--output") + 1].endswith(
         "f0001-forward-coverage.json"
     )
+    # ADR-0042: kesinti kütüğe yazılmakla kalmaz, operatöre ulaşır.
+    alert = agents["com.radar.signal-health-alert"]
+    alert_args = alert["ProgramArguments"]
+    assert alert["StartInterval"] == config["health_alert"]["interval_seconds"]
+    assert "KeepAlive" not in alert  # periyodik one-shot, restart-loop değil
+    assert alert_args[alert_args.index("--coverage") + 1].endswith("f0001-forward-coverage.json")
+    assert alert_args[alert_args.index("--outbox") + 1].endswith("outbox.sqlite")
+    assert alert_args[alert_args.index("--producer-heartbeat") + 1].endswith("heartbeat.sqlite")
+
     serialized = repr(agents).lower()
     assert "secret" not in serialized
     assert "api_key" not in serialized
@@ -132,12 +142,12 @@ def test_plists_are_atomic_private_and_parseable(tmp_path, monkeypatch):
     )
     written = launchd.write_launch_agents(tmp_path / "agents", agents)
 
-    assert len(written) == 4
+    assert len(written) == 5
     for path in written:
         if os.name != "nt":
             assert path.stat().st_mode & 0o777 == 0o600
         payload = plistlib.loads(path.read_bytes())
-        if payload["Label"] == "com.radar.signal-coverage":
+        if payload["Label"] in ("com.radar.signal-coverage", "com.radar.signal-health-alert"):
             assert "KeepAlive" not in payload
             assert payload["StartInterval"] == 300
         else:

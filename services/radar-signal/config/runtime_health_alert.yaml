@@ -1,0 +1,24 @@
+# Kesinti bildirimi eşikleri (Signal ADR-0042).
+#
+# Bunlar İŞLETİM eşikleridir, sinyal/tetik eşiği DEĞİLDİR: hiçbir karara, skora veya
+# yön üretimine girmezler. "Eşikler göreli yüzdelik olur" kuralı ölçüm eşiklerini bağlar;
+# burada ölçülen şey piyasa değil, bizim sürecimizin ilerleyip ilerlemediğidir.
+#
+# ÖNEMLİ TASARIM KARARI: coverage `status` alanına alarm BAĞLANMAZ. Kurulum öncesi kalıcı
+# eksik saatler yüzünden `status` sürekli `degraded`tır; ona alarm bağlamak her koşuda
+# uyarı üretir ve alarmı değersizleştirirdi. Alarm duran DURUMA değil, duran İLERLEMEYE
+# bakar.
+version: "1"
+
+forward_stall:
+  # Forward defteri kaç saat ilerlemezse kesinti sayılır. Saat başına bir gözlem
+  # beklendiğinden 2, "iki ardışık saat kaçtı" demektir.
+  stall_hours: 2
+
+producer_publish:
+  # Producer'ın yayınladığı son saat, due saatin kaç saat gerisine düşerse kesinti sayılır.
+  max_hours_behind: 1
+
+# Aynı kesinti için tekrar tekrar uyarı üretmemek adına yalnız bu eşikler AŞILDIĞINDA
+# yeni uyarı çıkar. Aradaki koşular idempotenttir (aynı signal_id + aynı gövde).
+escalation_hours: [2, 6, 12, 24, 48]

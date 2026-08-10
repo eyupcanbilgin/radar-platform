@@ -32,6 +32,7 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
         ("signal.context_wait_seconds", signal["context_wait_seconds"]),
         ("pump.interval_seconds", pump["interval_seconds"]),
         ("coverage.interval_seconds", coverage["interval_seconds"]),
+        ("health_alert.interval_seconds", config["health_alert"]["interval_seconds"]),
         ("launchd.throttle_interval_seconds", launchd["throttle_interval_seconds"]),
     ):
         if not isinstance(value, int) or value < 0:
@@ -42,6 +43,7 @@ def load_supervision_config(path: Path = DEFAULT_CONFIG) -> dict:
             producer["collect_interval_seconds"],
             pump["interval_seconds"],
             coverage["interval_seconds"],
+            config["health_alert"]["interval_seconds"],
         )
     ):
         raise ValueError("collect/pump/coverage interval sıfır olamaz")
@@ -75,6 +77,10 @@ def validate_clean_checkout(checkout_root: Path) -> Path:
     _require_file(
         root / "services/radar-signal/scripts/f0001_forward_coverage.py",
         "Signal coverage reporter",
+    )
+    _require_file(
+        root / "services/radar-signal/scripts/runtime_health_alert.py",
+        "Signal health alerter",
     )
     result = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
@@ -263,6 +269,26 @@ def build_launch_agents(
             working_directory=signal_root,
             log_root=log_root,
             interval_seconds=config["coverage"]["interval_seconds"],
+        ),
+        # Coverage'dan SONRA koşar (aynı aralık, ayrı ajan): kesinti kütüğe yazılmakla
+        # kalmasın, operatöre ulaşsın (Signal ADR-0042). Ağa çıkmaz, secret taşımaz.
+        "com.radar.signal-health-alert": _scheduled_agent(
+            label="com.radar.signal-health-alert",
+            arguments=[
+                str(signal_python),
+                str(signal_root / "scripts/runtime_health_alert.py"),
+                "--coverage",
+                str(signal_var / "f0001-forward-coverage.json"),
+                "--outbox",
+                str(signal_var / "outbox.sqlite"),
+                "--status-output",
+                str(signal_var / "runtime-health.json"),
+                "--producer-heartbeat",
+                str(mcp_var / "heartbeat.sqlite"),
+            ],
+            working_directory=signal_root,
+            log_root=log_root,
+            interval_seconds=config["health_alert"]["interval_seconds"],
         ),
     }
 

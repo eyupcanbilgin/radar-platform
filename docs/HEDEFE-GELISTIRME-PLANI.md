@@ -99,7 +99,9 @@ alamıyor.
   - [x] `collect` her koşuda en yeni geçmiş sayfasını da yazıyor; `backfill` sayfalı ve bütçeli.
   - [x] Scheduler, heartbeat ve kesintisiz işletim kanıtı (ADR-0006): iki ritimli tick,
     append-only koşu kütüğü, veriden türeyen kapsama raporu, tek örnek kilidi.
-  - [ ] Kesinti bildirimi (alarm/Telegram operasyon kanalı) — Faz 3.
+  - [x] Kesinti bildirimi — yerel operatör uyarısı (Signal ADR-0042): duran duruma değil duran
+    ilerlemeye alarm; `forward_stalled`, `producer_behind`, `inputs_unreadable`. Uzak/Telegram
+    operasyon kanalı hâlâ Faz 3'tür; makine kapalıysa kimse uyanmaz.
 - [x] `contracts/decision-context/v1` sözleşmesini oluştur ve iki serviste ortak fixture ile
   doğrula.
 - [x] Kapanmış 1h mum için PIT güvenli, versioned `FeatureSnapshot` üret.
