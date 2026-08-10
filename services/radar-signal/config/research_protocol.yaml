@@ -54,3 +54,7 @@ statistical_gates:
     min_worst_group_retention_ratio: 0.50
     min_positive_group_ratio: 0.67
   required_cost_scenarios: ["realistic", "taker_heavy"]
+  # Purged walk-forward fold tutarlılığı. S-0004 ve S-0005 kartlarında ön-kayıtlı olan
+  # değer buydu; S-0004'te koda gömülüydü (eşikler config'de yaşamalı, CLAUDE.md kural 3).
+  # Buraya taşınması bir eşik DEĞİŞİKLİĞİ değildir; aynı sayı kod dışına alınmıştır.
+  min_positive_fold_ratio: 0.60
