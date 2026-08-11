@@ -25,6 +25,7 @@ sys.path.insert(0, str(SERVICE_ROOT))
 from decision_engine.jsonio import atomic_json  # noqa: E402
 from decision_engine.runtime_health import (  # noqa: E402
     ALERT_KIND,
+    CONDITION_COVERAGE_LOW,
     CONDITION_FORWARD_STALLED,
     CONDITION_PRODUCER_BEHIND,
     Incident,
@@ -84,6 +85,43 @@ def _read_producer_publish(path: Path | None, errors: list[str]) -> str | None:
     return row[0] if row else None
 
 
+def _read_recent_forward_hours(path: Path | None, since_utc: datetime, errors: list[str]):
+    """Pencere içinde forward gözlemi taşıyan DISTINCT saat sayısı (ağa çıkmaz, salt-okunur).
+
+    Yetkili kaynak defterin kendisidir; coverage raporu üzerinden okumak, rapor bayatladığında
+    sağlığı bayat sayılarla "iyi" gösterebilirdi.
+    """
+    if path is None:
+        return None
+    if not path.is_file():
+        errors.append(f"forward defteri yok: {path}")
+        return None
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            rows = connection.execute(
+                "SELECT DISTINCT as_of_utc FROM f0001_trigger_observations"
+            ).fetchall()
+    except sqlite3.Error as error:
+        errors.append(f"forward defteri okunamadı: {type(error).__name__}")
+        return None
+    # Karşılaştırma metinde değil zamanda yapılır: defterde bir satır `Z` ekiyle yazılmış
+    # olsaydı metin sıralaması onu sessizce pencerenin dışında sayardı. Defter saat başına
+    # bir satırdır; tam tarama ölçekte sorun değildir.
+    count = 0
+    for (value,) in rows:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(f"forward defterinde ayrıştırılamayan saat: {value!r}")
+            return None
+        if parsed.tzinfo is None:
+            errors.append(f"forward defterinde timezone'suz saat: {value!r}")
+            return None
+        if parsed.astimezone(UTC) >= since_utc:
+            count += 1
+    return count
+
+
 def _previous_incidents(path: Path) -> list[Incident]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -114,6 +152,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--outbox", type=Path, required=True)
     parser.add_argument("--status-output", type=Path, required=True, help="atomik son durum")
     parser.add_argument("--producer-heartbeat", type=Path, default=None)
+    parser.add_argument(
+        "--f0001-trigger-ledger",
+        type=Path,
+        default=None,
+        help="forward defteri; pencere kapsama oranı buradan ölçülür (ADR-0051)",
+    )
+    parser.add_argument(
+        "--observation-start-utc",
+        default=None,
+        help="pencere bu andan öncesine uzatılmaz; kurulum öncesi saatler doldurulamaz",
+    )
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--now", help="test/replay için sabit UTC an")
     args = parser.parse_args(argv)
@@ -130,6 +179,17 @@ def main(argv: list[str] | None = None) -> int:
         errors: list[str] = []
         last_forward = _read_coverage(args.coverage, errors)
         published = _read_producer_publish(args.producer_heartbeat, errors)
+        window_start = latest_due - timedelta(hours=config["window_hours"] - 1)
+        observation_start = (
+            datetime.fromisoformat(args.observation_start_utc.replace("Z", "+00:00")).astimezone(
+                UTC
+            )
+            if args.observation_start_utc
+            else None
+        )
+        if observation_start is not None:
+            window_start = max(window_start, observation_start)
+        recent_hours = _read_recent_forward_hours(args.f0001_trigger_ledger, window_start, errors)
 
         incidents = evaluate(
             now_utc=now,
@@ -138,6 +198,8 @@ def main(argv: list[str] | None = None) -> int:
             producer_published_as_of_utc=published,
             config=config,
             read_errors=errors,
+            recent_forward_hours=recent_hours,
+            observation_start_utc=observation_start,
         )
 
         previous = _previous_incidents(args.status_output)
@@ -169,7 +231,11 @@ def main(argv: list[str] | None = None) -> int:
             for stale in previous:
                 if (stale.condition, stale.since_utc) in active_keys:
                     continue
-                if stale.condition not in (CONDITION_FORWARD_STALLED, CONDITION_PRODUCER_BEHIND):
+                if stale.condition not in (
+                    CONDITION_FORWARD_STALLED,
+                    CONDITION_PRODUCER_BEHIND,
+                    CONDITION_COVERAGE_LOW,
+                ):
                     continue
                 signal_id = stale.recovery_signal_id()
                 created = outbox.enqueue(

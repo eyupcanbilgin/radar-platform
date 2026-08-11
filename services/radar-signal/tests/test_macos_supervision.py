@@ -25,6 +25,13 @@ def _checkout(tmp_path: Path) -> Path:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("# synthetic\n", encoding="utf-8")
+    # Renderer gözlem başlangıcını buradan okur: kapsama penceresi kurulum öncesine
+    # uzatılmamalı (ADR-0051) ve başlangıç tek kaynakta durur.
+    observation = root / "services/radar-signal/config/f0001_forward_observation.yaml"
+    observation.parent.mkdir(parents=True, exist_ok=True)
+    observation.write_text(
+        'observation_start_utc: "2026-08-07T00:00:00Z"\n', encoding="utf-8"
+    )
     return root
 
 

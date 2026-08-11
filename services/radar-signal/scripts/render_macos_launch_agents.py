@@ -185,6 +185,10 @@ def build_launch_agents(
     signal_root = root / "services/radar-signal"
     mcp_var, signal_var = validate_state_root(state_root, signal_root)
     log_root = signal_var / "logs"
+    # Kapsama penceresi gözlem başlangıcından öncesine uzatılmaz; kaynak tek yerde durur.
+    observation_start = yaml.safe_load(
+        (signal_root / "config/f0001_forward_observation.yaml").read_text(encoding="utf-8")
+    )["observation_start_utc"]
     producer = config["producer"]
     signal = config["signal"]
     throttle = config["launchd"]["throttle_interval_seconds"]
@@ -295,6 +299,12 @@ def build_launch_agents(
                 str(signal_var / "runtime-health.json"),
                 "--producer-heartbeat",
                 str(mcp_var / "heartbeat.sqlite"),
+                # Pencere kapsama oranı yetkili kaynaktan ölçülür: defterin kendisi.
+                # Coverage raporu bayatlarsa sağlık bayat sayılarla "iyi" görünürdü (ADR-0051).
+                "--f0001-trigger-ledger",
+                str(signal_var / "f0001-forward-triggers.sqlite"),
+                "--observation-start-utc",
+                observation_start,
             ],
             working_directory=signal_root,
             log_root=log_root,

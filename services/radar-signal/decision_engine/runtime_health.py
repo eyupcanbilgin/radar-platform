@@ -33,6 +33,7 @@ ALERT_KIND = "runtime_health_alert"
 
 CONDITION_FORWARD_STALLED = "forward_stalled"
 CONDITION_PRODUCER_BEHIND = "producer_behind"
+CONDITION_COVERAGE_LOW = "forward_coverage_low"
 CONDITION_INPUTS_UNREADABLE = "inputs_unreadable"
 
 
@@ -48,12 +49,22 @@ def load_alert_config(path: Path) -> dict:
     try:
         stall_hours = raw["forward_stall"]["stall_hours"]
         max_behind = raw["producer_publish"]["max_hours_behind"]
+        window_hours = raw["forward_coverage"]["window_hours"]
+        min_ratio = raw["forward_coverage"]["min_ratio"]
         escalation = raw["escalation_hours"]
     except (KeyError, TypeError) as error:
         raise RuntimeHealthConfigError(f"eksik eşik alanı: {error}") from error
-    for name, value in (("stall_hours", stall_hours), ("max_hours_behind", max_behind)):
+    for name, value in (
+        ("stall_hours", stall_hours),
+        ("max_hours_behind", max_behind),
+        ("window_hours", window_hours),
+    ):
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise RuntimeHealthConfigError(f"{name} >= 1 tam sayı olmalı")
+    if isinstance(min_ratio, bool) or not isinstance(min_ratio, int | float):
+        raise RuntimeHealthConfigError("min_ratio sayı olmalı")
+    if not 0.0 < min_ratio <= 1.0:
+        raise RuntimeHealthConfigError("min_ratio (0, 1] aralığında olmalı")
     if (
         not isinstance(escalation, list)
         or not escalation
@@ -64,6 +75,8 @@ def load_alert_config(path: Path) -> dict:
     return {
         "stall_hours": stall_hours,
         "max_hours_behind": max_behind,
+        "window_hours": window_hours,
+        "min_ratio": float(min_ratio),
         "escalation_hours": list(escalation),
     }
 
@@ -112,6 +125,8 @@ def evaluate(
     producer_published_as_of_utc: str | None,
     config: dict,
     read_errors: list[str],
+    recent_forward_hours: int | None = None,
+    observation_start_utc: datetime | None = None,
 ) -> list[Incident]:
     """Return every active incident.  An empty list means progress is being made.
 
@@ -174,7 +189,61 @@ def evaluate(
                     ),
                 )
             )
+
+    incidents.extend(
+        _coverage_incidents(
+            latest_due_utc=latest_due_utc,
+            recent_forward_hours=recent_forward_hours,
+            observation_start_utc=observation_start_utc,
+            config=config,
+        )
+    )
     return incidents
+
+
+def _coverage_incidents(
+    *,
+    latest_due_utc: datetime,
+    recent_forward_hours: int | None,
+    observation_start_utc: datetime | None,
+    config: dict,
+) -> list[Incident]:
+    """Son pencerede kaç due saatin gözlem ürettiği — anlık boşluk değil, ORAN.
+
+    Neden ayrı bir koşul: 11 Ağustos 2026'da producer üç saatte bir yayınlıyordu ve 109
+    saatin yalnız 9'u kullanılabilir gözleme dönüşmüştü. `forward_stalled` ve
+    `producer_behind` **anlık** boşluğu ölçer; sürekli saat kaybeden bir runtime örnekleme
+    anlarının çoğunda "1 saat geride" görünür ve iki eşiğin de altında kalır. 106 sağlık
+    koşusundan 104'ü "olay yok" dedi. Kesinti yavaş olduğunda görünmüyordu.
+
+    Pencere gözlem başlangıcından öncesine uzatılmaz: kurulum öncesi saatler hiçbir zaman
+    doldurulamaz ve onları beklentiye katmak, bu depoda tekrar tekrar düzeltilen "hiçbir
+    zaman iyi değeri veremeyen gösterge" kusurunu yeniden üretirdi.
+    """
+    if recent_forward_hours is None:
+        return []
+    window_start = latest_due_utc - timedelta(hours=config["window_hours"] - 1)
+    if observation_start_utc is not None:
+        window_start = max(window_start, observation_start_utc)
+    expected = _whole_hours(latest_due_utc - window_start) + 1
+    if expected < 1:
+        return []
+    observed = max(0, min(recent_forward_hours, expected))
+    if observed / expected >= config["min_ratio"]:
+        return []
+    missed = expected - observed
+    return [
+        Incident(
+            condition=CONDITION_COVERAGE_LOW,
+            since_utc=window_start.isoformat().replace("+00:00", "Z"),
+            gap_hours=missed,
+            detail=(
+                f"son {expected} due saatin {observed} tanesinde forward gözlemi var "
+                f"(oran {observed / expected:.2f} < {config['min_ratio']:.2f}); "
+                f"{missed} saat kayıp"
+            ),
+        )
+    ]
 
 
 def render_alert(incident: Incident, *, now_utc: datetime, escalation_hours: list[int]) -> str:
