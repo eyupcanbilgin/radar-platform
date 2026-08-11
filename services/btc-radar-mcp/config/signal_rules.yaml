@@ -25,6 +25,9 @@ collection_metrics:
     expected_period_seconds: 3600
     max_gap_seconds: 10800
     history_mode: backfill_and_live
+    # Kapanmış mumdan türer: içinde bulunduğumuz saatin mumu daha yoktur ve onu beklemek
+    # look-ahead olurdu (ADR-0007). Beklenen sayaç bu yarım saati saymaz (ADR-0012).
+    sampling_mode: closed_bar
   spot_perp_basis:
     expected_period_seconds: 300
     max_gap_seconds: 900

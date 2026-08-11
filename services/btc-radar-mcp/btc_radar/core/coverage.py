@@ -77,6 +77,7 @@ def metric_coverage(
     expected_period_seconds: float,
     tolerated_gap_seconds: float,
     history_mode: str = "unspecified",
+    sampling_mode: str = "snapshot",
 ) -> MetricCoverage:
     """Measure one metric's completeness using only rows knowable at ``as_of``."""
     if expected_period_seconds <= 0:
@@ -90,6 +91,11 @@ def metric_coverage(
     events = [datetime.fromisoformat(row["event_time"]).astimezone(UTC) for row in rows]
 
     expected_samples = int(window_seconds // expected_period_seconds)
+    if sampling_mode == "closed_bar":
+        # İçinde bulunduğumuz periyodun mumu henüz KAPANMADI; onu beklemek look-ahead
+        # olurdu (ADR-0007). Sayaç onu beklentiye katarsa kapanmış-mum metriği kalıcı
+        # olarak "eksik" görünür ve `healthy` bayrağı hiçbir zaman True olamaz (ADR-0012).
+        expected_samples = max(0, expected_samples - 1)
     observed = len(events)
     ratio = round(observed / expected_samples, ROUND_NDIGITS) if expected_samples else 0.0
     complete = observed >= expected_samples
@@ -145,11 +151,17 @@ def collection_coverage(
             spec.expected_period_seconds,
             spec.max_gap_seconds,
             "backfill_and_live",
+            "snapshot",
         )
         for spec in rules.features.values()
     }
     for metric, spec in rules.collection_metrics.items():
-        candidate = (spec.expected_period_seconds, spec.max_gap_seconds, spec.history_mode)
+        candidate = (
+            spec.expected_period_seconds,
+            spec.max_gap_seconds,
+            spec.history_mode,
+            spec.sampling_mode,
+        )
         existing = specs.get(metric)
         if existing is not None and existing[:2] != candidate[:2]:
             raise ValueError(
@@ -166,6 +178,7 @@ def collection_coverage(
             expected_period_seconds=spec[0],
             tolerated_gap_seconds=spec[1],
             history_mode=spec[2],
+            sampling_mode=spec[3],
         )
         for metric, spec in sorted(specs.items())
     ]

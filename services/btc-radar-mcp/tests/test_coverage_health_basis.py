@@ -14,7 +14,7 @@ Measured on the live runtime, 2026-08-11:
     RED spot_perp_basis          ratio=0.090   <- live_only, backfill impossible
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from btc_radar.core.coverage import MetricCoverage
 
@@ -140,3 +140,99 @@ def test_a_broken_feature_still_turns_the_overall_flag_false():
     ]
 
     assert all(item.meets_expectation for item in coverage) is False
+
+
+# --- ADR-0012: kapanmış-mum metriğinde yarım periyot beklentiye girmez ------------------
+
+
+def _store_with_hourly(rows: int, *, metric: str, end: datetime):
+    """Bellek içi PIT'e `rows` adet saatlik gözlem yaz; sonuncusu `end`."""
+    from btc_radar.core.store import PointInTimeStore
+    from btc_radar.models.observation import RawObservation
+
+    store = PointInTimeStore()
+    observations = [
+        RawObservation(
+            timestamp_utc=end - timedelta(hours=index),
+            retrieved_at_utc=end - timedelta(hours=index),
+            available_at_utc=end - timedelta(hours=index),
+            asset="BTC",
+            venue="binance_spot",
+            metric=metric,
+            raw_value=100.0 + index,
+            unit="USDT",
+            source_group="spot",
+            source_url="https://example.invalid",
+            quality=1.0,
+        )
+        for index in range(rows)
+    ]
+    store.append(observations, provider="test")
+    return store
+
+
+def test_closed_bar_metric_is_not_marked_incomplete_for_the_in_progress_period():
+    """Gerçek durum: 11:17'de en yeni kapanmış saatlik mum 10:00'dır.
+
+    Sayaç içinde bulunduğumuz saati beklentiye katarsa metrik KALICI olarak eksik görünür
+    ve `healthy` hiçbir zaman True olamaz.
+    """
+    from btc_radar.core.coverage import metric_coverage
+
+    as_of = datetime(2026, 8, 11, 11, 17, tzinfo=UTC)
+    last_closed = datetime(2026, 8, 11, 10, 0, tzinfo=UTC)
+    window = 24 * 3600.0
+    with _store_with_hourly(24, metric="spot_close", end=last_closed) as store:
+        closed = metric_coverage(
+            store,
+            metric="spot_close",
+            asset="BTC",
+            as_of=as_of,
+            window_seconds=window,
+            expected_period_seconds=3600.0,
+            tolerated_gap_seconds=10800.0,
+            history_mode="backfill_and_live",
+            sampling_mode="closed_bar",
+        )
+        snapshot = metric_coverage(
+            store,
+            metric="spot_close",
+            asset="BTC",
+            as_of=as_of,
+            window_seconds=window,
+            expected_period_seconds=3600.0,
+            tolerated_gap_seconds=10800.0,
+            history_mode="backfill_and_live",
+            sampling_mode="snapshot",
+        )
+
+    # Aynı veri: snapshot sayacı yarım saati bekler ve eksik görür, closed_bar görmez.
+    assert snapshot.expected_samples == closed.expected_samples + 1
+    assert closed.complete is True
+    assert closed.meets_expectation is True
+    assert snapshot.complete is False
+
+
+def test_closed_bar_metric_with_a_real_gap_still_fails():
+    """Muafiyet yalnız YARIM periyoda; gerçek eksik saat hâlâ yakalanır."""
+    from btc_radar.core.coverage import metric_coverage
+
+    as_of = datetime(2026, 8, 11, 11, 17, tzinfo=UTC)
+    last_closed = datetime(2026, 8, 11, 10, 0, tzinfo=UTC)
+    with _store_with_hourly(20, metric="spot_close", end=last_closed) as store:
+        item = metric_coverage(
+            store,
+            metric="spot_close",
+            asset="BTC",
+            as_of=as_of,
+            window_seconds=24 * 3600.0,
+            expected_period_seconds=3600.0,
+            tolerated_gap_seconds=10800.0,
+            history_mode="backfill_and_live",
+            sampling_mode="closed_bar",
+        )
+
+    assert item.observed_samples == 20
+    assert item.expected_samples == 23
+    assert item.complete is False
+    assert item.meets_expectation is False
