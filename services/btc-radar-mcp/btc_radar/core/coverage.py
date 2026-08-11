@@ -42,8 +42,29 @@ class MetricCoverage:
     fresh: bool
     healthy: bool
 
+    @property
+    def meets_expectation(self) -> bool:
+        """Bu metrikten beklenebilecek en iyi durumda mı — geçmişi doldurulabilir mi bilerek.
+
+        ``live_only`` bir metriğin toplama başlamadan önceki ve kesinti sırasındaki
+        boşlukları **yapısal olarak onarılamaz**: uçta geçmiş yoktur, backfill mümkün
+        değildir.  Onları genel sağlık bayrağına katmak, bayrağı aylarca `False` tutar ve
+        her zaman `False` olan bir sağlık göstergesi hiçbir şeyi korumaz — operatöre onu
+        görmezden gelmeyi öğretir.
+
+        ``live_only`` için ölçülebilir tek soru şudur: **hâlâ topluyor mu?**  Bu yüzden
+        beklenti tazeliktir.  ``backfill_and_live`` metrikte ise boşluk gerçek bir kusurdur
+        ve tam sağlık aranır.
+
+        Ayrıntı gizlenmez: ``complete``, ``gap_ok`` ve ``healthy`` alanları raporda aynen
+        durur; değişen yalnız **genel bayrağın neye bakacağıdır**.
+        """
+        if self.history_mode == "live_only":
+            return self.fresh
+        return self.healthy
+
     def as_payload(self) -> dict:
-        return asdict(self)
+        return {**asdict(self), "meets_expectation": self.meets_expectation}
 
 
 def metric_coverage(

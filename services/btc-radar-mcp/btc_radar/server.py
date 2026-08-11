@@ -212,7 +212,7 @@ def _collection_health(rules: SignalRulesConfig) -> dict[str, Any]:
                     pit, rules=rules, as_of=now, window_seconds=HEALTH_COVERAGE_WINDOW_SECONDS
                 )
             report["coverage"] = [item.as_payload() for item in coverage]
-            report["healthy"] = bool(coverage) and all(item.healthy for item in coverage)
+            report["healthy"] = bool(coverage) and all(item.meets_expectation for item in coverage)
     except Exception as error:  # sağlık aracı patlamaz, arızayı raporlar
         logger.exception("toplama sağlığı okunamadı")
         return {

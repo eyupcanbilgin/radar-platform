@@ -1,5 +1,12 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.7**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.8**
+
+> v1.8 (11 Ağu 2026): ADR-0011 ile `healthy` bayrağı metriğin geçmişinin onarılabilir olup
+> olmadığına göre hesaplanır. `live_only` metrikler (basis, order-book spread) için uçta
+> geçmiş yoktur; toplama öncesi boşlukları **yapısal olarak onarılamaz** ve bayrağı aylarca
+> `False` tutuyordu. Onlarda beklenti **tazeliktir**; `backfill_and_live` metriklerde tam
+> sağlık aranmaya devam eder. Ayrıntı (`complete`/`gap_ok`/`healthy`) raporda aynen durur,
+> yanına `meets_expectation` eklenir.
 
 > v1.7 (6 Ağu 2026): ADR-0010 ile F-0001 için PIT tarihsel ana/iki leave-one-family-out
 > context seti backfill'i ve hash mühürlü `f0001-context-set/v1` manifesti eklendi. Locked
@@ -254,7 +261,7 @@ Genel kurallar (hepsi borsa-mcp'den doğrulanmış desenler):
 | 5 | `get_premiums` | `premium: Literal["coinbase","korea","both"]` | Coinbase+Binance, Upbit | Hesaplama formülü yanıt metasında; anlık + kısa trend (son N gözlem) |
 | 6 | `get_sentiment_cycle` | `include_history_days` | Alternative.me, CBBI | İki kaynak tek grupta döner; `independence_group` etiketiyle (çift sayım kuralı araca gömülü) |
 | 7 | `compute_scores` | `horizon: Literal["daily","intraday","macro"]`, `explain: bool` | Tüm önbellek + gerekli taze çekimler | Yön/kırılganlık/güven + rejim + bileşen dökümü + eksik kapsam listesi. Güven<55 ise rejim etiketi "veri yetersiz" (metodoloji §6) |
-| 8 | `get_health` | — | Yerel PIT + heartbeat depoları (ağa çıkmaz) | Sunucu/config kimliği, provider yetenekleri ve **toplama sağlığı**: görev özeti (son başarı, üst üste hata) + 7 günlük kapsama raporu. Depo tanımsızsa `not_configured`, bozuksa `unreadable` (ADR-0006). Önbellek yaşları ve rate-limit sayaçları hâlâ eksik |
+| 8 | `get_health` | — | Yerel PIT + heartbeat depoları (ağa çıkmaz) | Sunucu/config kimliği, provider yetenekleri ve **toplama sağlığı**: görev özeti (son başarı, üst üste hata) + 7 günlük kapsama raporu. Depo tanımsızsa `not_configured`, bozuksa `unreadable` (ADR-0006). Genel `healthy` bayrağı `live_only` metriklerin onarılamaz geçmiş boşluğunu kusur saymaz; onlarda tazelik aranır (ADR-0011). Önbellek yaşları ve rate-limit sayaçları hâlâ eksik |
 
 **Bilinçli sınır:** Araç sayısı 8'de tutulur (borsa-mcp'nin 81→28 konsolidasyon dersinin bir adım ötesi). Yeni ihtiyaç → önce mevcut araca parametre eklemek değerlendirilir, yeni araç son çare.
 
