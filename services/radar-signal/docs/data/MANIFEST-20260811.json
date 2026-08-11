@@ -1,0 +1,63 @@
+{
+  "files": [
+    {
+      "date_max_utc": "2026-08-03T16:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-funding_rate.feather",
+      "rows": 2838,
+      "sha256": "9df688f75d463bcc1a421ef6a785ab01bb000a8f6bf621e7b883bcc426cdf29e",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-futures.feather",
+      "rows": 22704,
+      "sha256": "dccf7b0fe25720bd5979c79f55d6335b0985e6dc9b6fdeb010bca74b5d0689d3",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/futures/BTC_USDT_USDT-1h-mark.feather",
+      "rows": 22704,
+      "sha256": "6c0e1ddb3a65594d89e1fd4d29896a55ee2f2d93a469e7d11ca875f24766e67f",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/binance/spot/BTC_USDT-1h-spot.feather",
+      "rows": 22704,
+      "sha256": "b112d4598731f18f95a60b727fe53a1e53c6bd5bd1039f4a02737a8046d43af0",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/bybit/futures/BTC_USDT_USDT-1h-futures.feather",
+      "rows": 22704,
+      "sha256": "823f8984e4c754eac025c2843dea45fcdd09caf7e92bd32f1fb9ceba6354e5ec",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-03T23:00:00+00:00",
+      "date_min_utc": "2024-01-01T00:00:00+00:00",
+      "file": "user_data/data/coinbase/spot/BTC_USD-1h-spot.feather",
+      "rows": 22694,
+      "sha256": "48cd4bc5c94bf90cc1387c11aab5c6a9a0207cfb77357f38f899ae0f3d015ec7",
+      "time_column": "date"
+    },
+    {
+      "date_max_utc": "2026-08-02T00:00:00+00:00",
+      "date_min_utc": "2022-08-12T00:00:00+00:00",
+      "file": "user_data/data/onchain/bitcoin-data/STH_SOPR-1d.feather",
+      "rows": 1452,
+      "sha256": "6f04891e6b19bb41a32e0f7adbbb997e329b5e200fda8302aa4ddd0849fa96d8",
+      "time_column": "event_time_utc"
+    }
+  ],
+  "generated_at_utc": "2026-08-11T12:02:16.198776+00:00",
+  "manifest_sha256": "568c86f5b8a55b5cd8fa57fc1c8ada2f60aa8c59c2d026c907cd9d9cf855eb5c",
+  "scope": "multi_venue_market_data"
+}

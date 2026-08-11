@@ -1,4 +1,4 @@
-.PHONY: test lint download-data download-coinbase-spot manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon f0001-evidence
+.PHONY: test lint download-data download-coinbase-spot download-onchain-sopr manifest verify backtest lookahead pulse-smoke pulse-reanalysis hourly-once hourly-daemon f0001-evidence
 
 PY=.venv/Scripts/python
 FT=.venv/Scripts/freqtrade
@@ -15,6 +15,12 @@ download-data:
 
 download-coinbase-spot:
 	$(PY) scripts/download_coinbase_spot.py --end 2026-08-04T00:00:00Z
+
+# On-chain günlük seri (ADR-0050). Sınır `available_at` üzerine uygulanır: Locked OOS
+# sınırından önceki güne ait ama sınırdan sonra doğan satır dosyaya giremez.
+# bitcoin-data.com bütçesi 8/saat, 15/gün — her seri tek istektir.
+download-onchain-sopr:
+	$(PY) scripts/download_onchain_daily.py --end 2026-08-04T00:00:00Z
 
 manifest:
 	$(PY) scripts/data_manifest.py
