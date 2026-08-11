@@ -153,3 +153,96 @@ def test_render_still_counts_genuine_failures_alongside_blocks():
 def test_exit_code_policy(fails: int, blocked: int, fail_on_blocked: bool, expected: int):
     """Engellenmiş-ama-erişilebilir 0; gerçek sözleşme kırılması her hâlükârda 1."""
     assert ve.exit_code(fails, blocked, fail_on_blocked) == expected
+
+
+# --- ADR-0013: kanıt kütüğü — engelli koşu kanıt değildir -----------------------------
+
+RUN_AT = "2026-08-11T12:00:00+00:00"
+
+
+def _entry(results, *, full_scope: bool = True) -> str:
+    return ve.evidence_entry(results, run_at=RUN_AT, commit="abc1234", full_scope=full_scope)
+
+
+def test_a_blocked_run_is_refused_as_evidence():
+    """CI'nın her gün ürettiği koşu tam olarak budur; kütüğe girerse kütük anlamını yitirir."""
+    with pytest.raises(ve.EvidenceRefused) as exc:
+        _entry([_result("bybit_oi", ok=True), _result("binance_oi", blocked=True, status=451)])
+
+    assert "binance_oi" in str(exc.value)
+
+
+def test_a_run_with_a_broken_contract_is_refused_as_evidence():
+    with pytest.raises(ve.EvidenceRefused) as exc:
+        _entry([_result("bybit_oi", ok=True), _result("cbbi_latest", detail="alan yok")])
+
+    assert "cbbi_latest" in str(exc.value)
+
+
+def test_a_clean_unblocked_run_is_recorded_with_its_scope():
+    entry = _entry([_result("binance_oi", ok=True, status=200)], full_scope=False)
+
+    assert RUN_AT in entry
+    assert "abc1234" in entry
+    assert "bitcoin-data hariç" in entry
+    assert "| binance_oi | 200 | SPEC:43 |" in entry
+
+
+def test_informational_failures_stay_visible_instead_of_reading_as_all_verified():
+    """warn kaydı engellemez; ama girdi 'hepsi doğrulandı' diye okunmamalı."""
+    entry = _entry(
+        [
+            _result("binance_oi", ok=True, status=200),
+            _result("fx_erapi", required=False, status=500),
+        ]
+    )
+
+    assert "1 warn" in entry
+    assert "fx_erapi (500)" in entry
+
+
+def test_no_raw_market_data_reaches_the_log():
+    """Platform kural 2: ham piyasa verisi Git'e girmez; yanıt gövdesi kaydedilmez."""
+    entry = _entry([_result("binance_oi", ok=True, status=200, sample={"openInterest": "105951"})])
+
+    assert "105951" not in entry
+    assert "openInterest" not in entry
+
+
+def test_recording_appends_and_never_rewrites_earlier_entries(tmp_path):
+    log = tmp_path / "kanit.md"
+    ve.record_evidence(
+        [_result("binance_oi", ok=True, status=200)],
+        str(log),
+        run_at="2026-08-01T00:00:00+00:00",
+        commit="0000001",
+        full_scope=True,
+    )
+    first = log.read_text(encoding="utf-8")
+
+    ve.record_evidence(
+        [_result("bybit_oi", ok=True, status=200)],
+        str(log),
+        run_at=RUN_AT,
+        commit="abc1234",
+        full_scope=True,
+    )
+    second = log.read_text(encoding="utf-8")
+
+    assert second.startswith(first)  # geçmiş girdi bit-bit korunuyor
+    assert "0000001" in second and "abc1234" in second
+    assert second.count("# Endpoint doğrulama kanıt kütüğü") == 1
+
+
+def test_a_refused_run_leaves_no_trace_in_the_log(tmp_path):
+    log = tmp_path / "kanit.md"
+    with pytest.raises(ve.EvidenceRefused):
+        ve.record_evidence(
+            [_result("binance_oi", blocked=True, status=451)],
+            str(log),
+            run_at=RUN_AT,
+            commit="abc1234",
+            full_scope=True,
+        )
+
+    assert not log.exists()

@@ -1,5 +1,11 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.9**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.10**
+
+> v1.10 (11 Ağu 2026): ADR-0013 ile endpoint doğrulaması **kanıt kütüğüne** kaydedilir
+> (`docs/endpoint-verification-log.md`). Günlük CI koşusu coğrafi engelli bir bölgeden
+> çalışır; her gün yeşil görünür ama 28 kontrolün yalnız 10'unu kapsar — Binance/Bybit
+> zinciri o rozetin arkasında **doğrulanmamıştır**. Kütük yalnız engelsiz ve kırıksız
+> koşuları kabul eder (`make smoke-evidence`). İlk girdi: 11 Ağu 2026, 28/28 OK.
 
 > v1.9 (11 Ağu 2026): ADR-0012 ile kapanmış-mum metriklerinde beklenen örneklem sayacı
 > içinde bulunulan yarım periyodu saymaz. `spot_close` gibi `sampling_mode: closed_bar`
@@ -103,7 +109,7 @@ edilmiştir. MCP'nin aktif görevi PIT-güvenli kırılganlık, veri güveni ve 
 Metodolojideki 8 katmanın MVP'de hangi kaynakla karşılandığı. **Doğrulama durumu:** ✅ = ücretsiz/anahtar gerektirmeyen public endpoint bilinen ve yaygın kullanımda; 🔑 = ücretsiz ama kayıt/anahtar gerekli; 💰 = paralı, MVP dışı; ⚠️ = implementasyon sırasında canlı doğrulama zorunlu (endpoint sözleşmesi değişmiş olabilir — Collector geliştirilirken ilk iş smoke test).
 
 ### 2.1 Türevler ve likidasyonlar (%25)
-| Metrik | Kaynak | Endpoint (canlı doğrulandı: 3 Ağu 2026, `scripts/verify_endpoints.py`) | Erişim |
+| Metrik | Kaynak | Endpoint (canlı doğrulandı: 11 Ağu 2026, engellenmemiş ağdan 28/28 OK — `docs/endpoint-verification-log.md`) | Erişim |
 |---|---|---|---|
 | Open Interest (anlık + tarihsel) | Binance Futures | `GET /fapi/v1/openInterest`, `GET /futures/data/openInterestHist` | ✅ |
 | Funding rate (anlık + geçmiş) | Binance Futures | `GET /fapi/v1/premiumIndex`, `GET /fapi/v1/fundingRate` | ✅ |
@@ -297,7 +303,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 
 1. **Birim testler (pytest):** scoring motoru altın-değer testleri (bilinen girdi → beklenen skor), normalizer sayı-parse testleri (TR/EN ayraç, bilimsel gösterim, null), çift-sayım grup testleri.
 2. **Sözleşme testleri:** her provider için kaydedilmiş gerçek yanıt fixture'ları (`tests/fixtures/`); şema değişirse test kırılır (metodoloji §10.2 "tanım sürümü" kontrolünün otomasyonu).
-3. **Canlı smoke test (`make smoke`):** tüm endpoint'lere 1'er istek, alan varlığı + tazelik kontrolü. CI'da günlük cron.
+3. **Canlı smoke test (`make smoke`):** tüm endpoint'lere 1'er istek, alan varlığı + tazelik kontrolü. CI'da günlük cron. CI koşusu coğrafi engelli bölgeden çalışır ve Binance/Bybit zinciri için **kanıt üretmez** (ADR-0009); yeşil rozet 28 kontrolün 10'unu kapsar. Engelsiz kanıt `make smoke-evidence` ile üretilir ve `docs/endpoint-verification-log.md` kütüğüne append-only yazılır — engelli ya da kırık koşu reddedilir (ADR-0013).
 4. **Determinizm testi:** aynı fixture seti → her çalıştırmada bit-bit aynı skor.
 5. **Rate-limit simülasyonu:** 429 senaryosunda önbelleğe düşüş ve güven skoru düşüşünün doğrulanması.
 6. Kod incelemesi: her PR ayrı bir modele (Cursor/Codex) "MCP güvenlik + edge case" promptuyla incelettirilir (yazar ≠ incelemeci).
@@ -326,7 +332,7 @@ d ∈ {−2..+2}, r ∈ {0,1,2}, q,f,u ∈ [0,1]
 |---|---|---|
 | 1 | ~~Endpoint sözleşmeleri değişmiş olabilir~~ **YAPILDI (3 Ağu 2026):** doğrulama scripti yazıldı, 24 kontrol koşuldu, ⚠️ satırlar güncellendi (bkz. §2 tabloları + ADR-0002) | Günlük smoke CI'da sürer (`.github/workflows/mcp-smoke.yml`); Binance uçları runner bölgesinde engelli olduğu için CI koşusu onlar için kanıt üretmez — ADR-0009 |
 | 2 | bitcoin-data.com limiti (15/gün) on-chain kapsamı daraltabilir | Metrik önceliklendirme: STH-SOPR + CDD + netflow ilk üç; kalanlar günde 1 çekim |
-| 3 | Coğrafi erişim kısıtı — geliştirme ağından (TR) **3 Ağu 2026 itibarıyla gözlenmedi** (Binance spot+futures, Bybit, Upbit, Coinbase erişilebilir); ancak **GitHub-hosted runner bölgesinden Binance engellidir** (4 Ağu 2026, koşu 30894903581: CloudFront ülke engeli). Madde açık kalır | Smoke scripti engeli `blocked_in_environment` olarak ayrı raporlar ve CI'yı kırmızıya boyamaz (ADR-0009); Binance kanıtı engellenmemiş ağdan `make smoke` ile üretilir. Provider'lara opsiyonel proxy config; Bybit yedeği |
+| 3 | Coğrafi erişim kısıtı — geliştirme ağından (TR) **3 Ağu 2026 itibarıyla gözlenmedi** (Binance spot+futures, Bybit, Upbit, Coinbase erişilebilir); ancak **GitHub-hosted runner bölgesinden Binance engellidir** (4 Ağu 2026, koşu 30894903581: CloudFront ülke engeli). Madde açık kalır | Smoke scripti engeli `blocked_in_environment` olarak ayrı raporlar ve CI'yı kırmızıya boyamaz (ADR-0009); Binance kanıtı engellenmemiş ağdan `make smoke-evidence` ile üretilir ve kütüğe tarihli olarak yazılır (ADR-0013; ilk kanıt 11 Ağu 2026, 28/28 OK). Provider'lara opsiyonel proxy config; Bybit yedeği |
 | 4 | Skorun aşırı güven yaratması (kullanıcı psikolojisi) | Her `compute_scores` yanıtında invalidasyon + "araştırma aracı" notu; §11.3 dil kuralları skill'e gömülür |
 | 5 | ~~Korea premium için USDKRW kaynağı~~ **YAPILDI:** open.er-api.com birincil, frankfurter.dev yedek — ADR-0002 | Smoke scripti üç adayı izlemeye devam eder |
 | 6 | ~~WS likidasyon toplayıcısı~~ **ÇÖZÜLDÜ (3 Ağu 2026):** bitcoin-data.com hazır likidasyon serisi doğrulandı; WS toplayıcıya MVP'de gerek yok | İhtiyaç doğarsa Faz 2'de ayrı süreç olarak yeniden değerlendirilir |

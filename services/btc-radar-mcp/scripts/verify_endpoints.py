@@ -7,6 +7,7 @@ Kullanım:
     uv run python scripts/verify_endpoints.py --skip-bitcoin-data
     uv run python scripts/verify_endpoints.py --json-out sonuc.json
     uv run python scripts/verify_endpoints.py --fail-on-blocked
+    make smoke-evidence   # engellenmemiş ağdan: doğrula + kanıt kütüğüne ekle
 
 bitcoin-data.com bütçesi: script başına en fazla 5 istek (API limiti 8/saat, 15/gün —
 CLAUDE.md kural 8). Önce OpenAPI dokümanı üzerinden metrik adları keşfedilir; veri
@@ -19,10 +20,12 @@ endpoint'lerine en fazla 3 çağrı yapılır.
 import argparse
 import asyncio
 import json
+import os
 import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -726,6 +729,97 @@ def render(results: list[Result]) -> tuple[str, int, int]:
     return "\n".join(lines), fails_required, len(blocked)
 
 
+EVIDENCE_HEADER = """# Endpoint doğrulama kanıt kütüğü
+
+Günlük `MCP Smoke` iş akışı GitHub-hosted runner'dan koşar ve o bölge Binance/Bybit
+tarafında coğrafi olarak engellidir (ADR-0009). O koşu **yeşil** görünür ama Binance
+zinciri için **kanıt üretmez** — engellenen kontroller `blocked_in_environment` sayılır.
+
+Bu kütük, o boşluğun tek kapatıcısıdır: **engellenmemiş bir ağdan** koşulmuş, hiçbir
+kontrolü engelli olmayan doğrulamaların tarihli kaydı. Yalnız `--record` bayrağı yazar ve
+kapı kapalıdır — engelli ya da kırık bir koşu buraya giremez (ADR-0013).
+
+Kütük **append-only**dir: geçmiş girdi düzeltilmez, yeni koşu sona eklenir. Ham piyasa
+verisi (yanıt gövdeleri) buraya girmez; yalnız kontrol kimliği, HTTP durumu ve SPEC
+referansı tutulur (platform CLAUDE.md kural 2).
+"""
+
+
+class EvidenceRefused(Exception):
+    """Bu koşu kanıt değildir; kütüğe yazılmaz."""
+
+
+def _git_commit() -> str:
+    """Kanıtın hangi kod sürümünde üretildiği. Belirlenemezse uydurulmaz."""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "bilinmiyor"
+    return out.stdout.strip() if out.returncode == 0 and out.stdout.strip() else "bilinmiyor"
+
+
+def evidence_entry(results: list[Result], *, run_at: str, commit: str, full_scope: bool) -> str:
+    """Tek koşunun kanıt girdisi. Yalnız engelsiz ve kırıksız koşu için üretilir.
+
+    Kapı bilinçli olarak kapalıdır. Engelli bir koşuyu kaydetmek, kütüğün tek işlevini —
+    "bu uçlar gerçekten doğrulandı" demeyi — ortadan kaldırırdı; kısmi kayıt, okuyucuya
+    doğrulanmamış bir zinciri doğrulanmış gibi gösterirdi.
+    """
+    blocked = [r for r in results if r.state == "blocked"]
+    if blocked:
+        raise EvidenceRefused(
+            "engelli koşu kanıt değildir; kaydedilmedi. Engellenen kontroller: "
+            + ", ".join(r.check_id for r in blocked)
+        )
+    failed = [r for r in results if r.state == "fail"]
+    if failed:
+        raise EvidenceRefused(
+            "zorunlu kontrol düşmüş bir koşu kanıt değildir; kaydedilmedi. Düşenler: "
+            + ", ".join(r.check_id for r in failed)
+        )
+
+    warns = [r for r in results if r.state == "warn"]
+    scope = "tam (bitcoin-data dâhil)" if full_scope else "bitcoin-data hariç"
+    lines = [
+        f"\n## {run_at} — commit `{commit}`",
+        "",
+        "- **Ağ:** engelli değil — hiçbir kontrol `blocked_in_environment` dönmedi.",
+        f"- **Kapsam:** {len(results)} kontrol, {scope}.",
+        f"- **Sonuç:** {len(results) - len(warns)} OK, 0 zorunlu FAIL, {len(warns)} warn.",
+    ]
+    if warns:
+        # Bilgilendirici kontrol düşmesi kaydı engellemez ama kütükte GÖRÜNÜR kalır;
+        # aksi hâlde girdi "her şey doğrulandı" diye okunurdu.
+        lines.append(
+            "- **warn (bilgilendirici, doğrulanmadı):** "
+            + ", ".join(f"{r.check_id} ({r.status})" for r in warns)
+        )
+    lines += ["", "| check | HTTP | SPEC |", "|---|---|---|"]
+    lines += [f"| {r.check_id} | {r.status or '-'} | {r.spec_ref} |" for r in results]
+    return "\n".join(lines) + "\n"
+
+
+def record_evidence(
+    results: list[Result], path: str, *, run_at: str, commit: str, full_scope: bool
+) -> str:
+    """Girdiyi kütüğün SONUNA ekler; var olan içeriğe dokunmaz."""
+    entry = evidence_entry(results, run_at=run_at, commit=commit, full_scope=full_scope)
+    exists = os.path.exists(path)
+    with open(path, "a", encoding="utf-8") as handle:
+        if not exists:
+            handle.write(EVIDENCE_HEADER)
+        handle.write(entry)
+    return path
+
+
 def exit_code(fails_required: int, blocked: int, fail_on_blocked: bool) -> int:
     """0 = engellenmiş-ama-erişilebilir dâhil temiz; 1 = sözleşme kırılması; 2 = engel.
 
@@ -755,11 +849,34 @@ def main() -> None:
             "koşarken kullanın; GitHub-hosted runner'da engel beklenen durumdur."
         ),
     )
+    ap.add_argument(
+        "--record",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=(
+            "engelsiz ve kırıksız koşuyu kanıt kütüğüne EKLE (append-only). Engelli ya da "
+            "zorunlu kontrolü düşmüş koşu reddedilir; bkz. ADR-0013."
+        ),
+    )
     args = ap.parse_args()
 
     results = asyncio.run(main_async(args.skip_bitcoin_data))
     report, fails, blocked = render(results)
     print(report)
+    if args.record:
+        try:
+            path = record_evidence(
+                results,
+                args.record,
+                run_at=datetime.now(UTC).replace(microsecond=0).isoformat(),
+                commit=_git_commit(),
+                full_scope=not args.skip_bitcoin_data,
+            )
+        except EvidenceRefused as exc:
+            print(f"\nKANIT KAYDEDİLMEDİ: {exc}")
+        else:
+            print(f"\nKanıt kütüğüne eklendi: {path}")
     if args.json_out:
         with open(args.json_out, "w", encoding="utf-8") as f:
             payload = [{**asdict(r), "state": r.state} for r in results]
