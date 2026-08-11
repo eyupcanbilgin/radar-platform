@@ -28,17 +28,32 @@ REPO = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO / "docs" / "data"
 
 
+#: Manifestin aralık kolonunu ararken kabul ettiği adlar, tercih sırasıyla.
+#:
+#: OHLCV dosyaları `date` taşır. On-chain günlük seriler taşımaz ve **taşımamalıdır**:
+#: orada iki ayrı zaman vardır — değerin özetlediği dönemin sonu (`event_time_utc`) ve
+#: değerin kullanılabildiği an (`available_at_utc`). İkisinden birine `date` demek, PIT
+#: filtresini yanlış kolona kuran ilk okuyucuya look-ahead açardı. Manifest bu yüzden
+#: kolonu tanır; dosya kolon adını değiştirmez.
+TIME_COLUMNS = ("date", "event_time_utc")
+
+
 def file_entry(path: Path) -> dict:
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     df = pd.read_feather(path)
-    if "date" not in df.columns:
-        raise ValueError(f"{path.name}: 'date' kolonu yok — beklenmeyen veri formatı")
+    column = next((name for name in TIME_COLUMNS if name in df.columns), None)
+    if column is None:
+        raise ValueError(
+            f"{path.name}: zaman kolonu yok ({' veya '.join(TIME_COLUMNS)}) — "
+            "beklenmeyen veri formatı"
+        )
     return {
         "file": str(path.relative_to(REPO)).replace("\\", "/"),
         "sha256": digest,
         "rows": int(len(df)),
-        "date_min_utc": df["date"].min().isoformat(),
-        "date_max_utc": df["date"].max().isoformat(),
+        "time_column": column,
+        "date_min_utc": df[column].min().isoformat(),
+        "date_max_utc": df[column].max().isoformat(),
     }
 
 

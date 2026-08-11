@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.28**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.29**
+
+> v2.29 (11 Ağu 2026): ADR-0050 ile **on-chain günlük veri yüzeyi** eklendi. Dört yönsel aile
+> reddedildikten sonra beşinci aile fikir değil **veri** eksikliğinden bloke idi: uzun geçmişli
+> yüzeyimiz (perp funding + üç mekân OHLCV) bu dört mekanizmayla tükenmişti. bitcoin-data.com
+> STH-SOPR serisi dört yıl geçmiş taşır ve mekanizma olarak dördüne de bağımsızdır. Satırlar
+> `event_time_utc` ve `available_at_utc` ile ayrı ayrı damgalanır; dosya bilinçli olarak `date`
+> kolonu taşımaz. Yayın gecikmesi 24 saat donduruldu ve sonuca göre daraltılamaz. Bu paket
+> **hipotez değildir**: S-0007 ön-kaydı ayrı commit'tir, `direction` hâlâ null.
 
 > v2.28 (11 Ağu 2026): ADR-0049 ile operatör teslimat kill-switch'i eklendi. Anahtar bir
 > dosyadır; **varlığı** teslimatı durdurur (içerik ayrıştırılmaz — `false` yazan dosya da

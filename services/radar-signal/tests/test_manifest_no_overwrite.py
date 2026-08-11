@@ -77,3 +77,57 @@ def test_unreadable_existing_manifest_is_not_overwritten(out_dir: Path):
 
     assert target.name == "MANIFEST-20260810T210530.json"
     assert broken.read_text(encoding="utf-8") == "{ bozuk"
+
+
+# --- Zaman kolonu: on-chain seriler `date` taşımaz ve taşımamalıdır --------------------
+
+
+@pytest.fixture
+def repo_root(tmp_path: Path, monkeypatch) -> Path:
+    """`file_entry` yolu depo köküne göreli yazar; geçici dizin kök sayılır."""
+    monkeypatch.setattr(data_manifest, "REPO", tmp_path)
+    return tmp_path
+
+
+def _feather(path: Path, frame) -> Path:
+    frame.to_feather(path)
+    return path
+
+
+def test_ohlcv_files_keep_using_their_date_column(repo_root: Path):
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        {"date": pd.to_datetime(["2026-08-01", "2026-08-02"], utc=True), "close": [1.0, 2.0]}
+    )
+    entry = data_manifest.file_entry(_feather(repo_root / "ohlcv.feather", frame))
+
+    assert entry["time_column"] == "date"
+    assert entry["date_min_utc"].startswith("2026-08-01")
+
+
+def test_an_onchain_series_is_indexed_by_its_event_time_not_its_availability(repo_root: Path):
+    """`available_at_utc` kullanılsaydı manifest aralığı veriyi olduğundan yeni gösterirdi."""
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        {
+            "day": ["2026-08-01"],
+            "event_time_utc": pd.to_datetime(["2026-08-02"], utc=True),
+            "available_at_utc": pd.to_datetime(["2026-08-03"], utc=True),
+            "sthSopr": [1.0],
+        }
+    )
+    entry = data_manifest.file_entry(_feather(repo_root / "sopr.feather", frame))
+
+    assert entry["time_column"] == "event_time_utc"
+    assert entry["date_max_utc"].startswith("2026-08-02")
+
+
+def test_a_file_without_any_known_time_column_fails_loudly(repo_root: Path):
+    import pandas as pd
+
+    frame = pd.DataFrame({"value": [1.0]})
+
+    with pytest.raises(ValueError, match="zaman kolonu yok"):
+        data_manifest.file_entry(_feather(repo_root / "bilinmeyen.feather", frame))
