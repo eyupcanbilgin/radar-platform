@@ -1,5 +1,12 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.30**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.31**
+
+> v2.31 (11 Ağu 2026): ADR-0052 ile **S-0007 reddedildi** (zincir üstü sahip kapitülasyonu,
+> STH-SOPR). 387 işlem, `realistic −%36.65`, `taker_heavy −%53.52`, `p=0.4213`, fold %42.9;
+> sekiz ret ölçütü. Sonuç hipotezin TERSİ yönde çıktı ve **ters çevirme yapılmadı** — hem
+> ön-kayıt yasağı hem de çevrilecek kanıt olmaması nedeniyle (`p` şanstan ayırt edilemiyor).
+> **Yönsel skor: 5 aile, 5 ret.** DSR/PBO/±%20 kapıları base reddedildiği için üst üste
+> üçüncü kez çalıştırılamadı; gerçek bir aday üzerindeki davranışları hâlâ gözlenmedi.
 
 > v2.30 (11 Ağu 2026): ADR-0051 ile sağlık dedektörü **pencere kapsama oranını** da ölçer.
 > Mevcut iki koşul anlık boşluğa bakar; üç saatte bir yayınlayan bir runtime örnekleme
