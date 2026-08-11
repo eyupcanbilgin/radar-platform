@@ -19,6 +19,17 @@ producer_publish:
   # Producer'ın yayınladığı son saat, due saatin kaç saat gerisine düşerse kesinti sayılır.
   max_hours_behind: 1
 
+forward_coverage:
+  # Yukarıdaki iki eşik ANLIK boşluğu ölçer. Sürekli saat kaybeden bir runtime örnekleme
+  # anlarının çoğunda "1 saat geride" görünür ve ikisinin de altında kalır: 11 Ağu 2026'da
+  # 109 saatin yalnız 9'u kullanılabilir gözleme dönmüşken 106 sağlık koşusundan 104'ü
+  # "olay yok" dedi. Bu blok ORANI ölçer.
+  #
+  # Pencere gözlem başlangıcından öncesine uzatılmaz; kurulum öncesi saatler doldurulamaz.
+  window_hours: 12
+  # 12 saatin 9'u = 0.75. Altına düşmek üç saatte birden seyrek yayın demektir.
+  min_ratio: 0.75
+
 # Aynı kesinti için tekrar tekrar uyarı üretmemek adına yalnız bu eşikler AŞILDIĞINDA
 # yeni uyarı çıkar. Aradaki koşular idempotenttir (aynı signal_id + aynı gövde).
 escalation_hours: [2, 6, 12, 24, 48]

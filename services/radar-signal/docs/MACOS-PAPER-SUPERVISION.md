@@ -110,6 +110,35 @@ python -m btc_radar.producer status --pit-db ... --heartbeat-db ...   # hours_be
 başına arıza göstergesi **değildir**. Arıza göstergesi `runtime-health.json` içindeki
 `active_incidents`tir.
 
+### Kod güncellemesi: checkout YETMEZ, paketi yeniden kur
+
+Ajanlar checkout'taki script'leri doğrudan çalıştırır **ama** `btc_radar` paketi `venvs/mcp`
+içine ayrıca kurulmuştur. Checkout'u güncelleyip paketi yeniden kurmazsan runtime **yeni
+config'i eski kodla** okur ve fail-loud config doğrulaması onu haklı olarak reddeder:
+
+```
+1 validation error for SignalRulesConfig
+collection_metrics.spot_close.sampling_mode  Extra inputs are not permitted
+```
+
+11 Ağustos 2026'da bu tam olarak yaşandı: producer 6798 kez bu hatayı verdi, saatlerin üçte
+ikisi kayboldu ve `runtime-health.json` yine de `healthy: true` dedi (bkz. ADR-0051).
+
+Güncelleme sırası:
+
+```bash
+git -C "${CHECKOUT_ROOT}" pull --ff-only
+"${STATE_ROOT}/../venvs/mcp/bin/pip" install --no-deps --force-reinstall \
+  "${CHECKOUT_ROOT}/services/btc-radar-mcp"
+launchctl kickstart -k "gui/$(id -u)/com.radar.mcp-producer"
+```
+
+`--no-deps` bilinçlidir: yalnız kendi kodumuz değişir, sabitlenmiş bağımlılık seti korunur
+(ADR-0036). Yeni bir bağımlılık eklendiyse bayrağı kaldır.
+
+**Belirti:** producer stdout kütüğünde `ValidationError` yığılması ve context dizininde
+saat atlamaları (`00.json, 01.json, 04.json, …`).
+
 ### Host uykusu
 
 Runtime, host uyurken **koşmaz**. macOS pilde varsayılan olarak uyur ve bu forward kanıtını

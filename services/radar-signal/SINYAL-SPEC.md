@@ -1,5 +1,13 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.29**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.30**
+
+> v2.30 (11 Ağu 2026): ADR-0051 ile sağlık dedektörü **pencere kapsama oranını** da ölçer.
+> Mevcut iki koşul anlık boşluğa bakar; üç saatte bir yayınlayan bir runtime örnekleme
+> anlarının çoğunda "1 saat geride" görünüp ikisinin de altında kalıyordu — 109 saatin
+> yalnız 9'u kanıta dönerken 106 sağlık koşusundan 104'ü "olay yok" dedi. Yeni koşul son 12
+> saatin en az %75'inde gözlem arar; pencere gözlem başlangıcından öncesine uzatılmaz ve
+> sayım defterin kendisinden okunur. Kök neden runbook'a yazıldı: checkout güncellemesi
+> paketi yeniden kurmayı gerektirir.
 
 > v2.29 (11 Ağu 2026): ADR-0050 ile **on-chain günlük veri yüzeyi** eklendi. Dört yönsel aile
 > reddedildikten sonra beşinci aile fikir değil **veri** eksikliğinden bloke idi: uzun geçmişli

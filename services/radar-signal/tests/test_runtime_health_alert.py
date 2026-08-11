@@ -11,6 +11,7 @@ import yaml
 
 from decision_engine.runtime_health import (
     ALERT_KIND,
+    CONDITION_COVERAGE_LOW,
     CONDITION_FORWARD_STALLED,
     CONDITION_INPUTS_UNREADABLE,
     CONDITION_PRODUCER_BEHIND,
@@ -25,7 +26,13 @@ from scripts import runtime_health_alert as cli
 
 NOW = datetime(2026, 8, 10, 15, 35, tzinfo=UTC)
 DUE = datetime(2026, 8, 10, 15, 0, tzinfo=UTC)
-CONFIG = {"stall_hours": 2, "max_hours_behind": 1, "escalation_hours": [2, 6, 12, 24, 48]}
+CONFIG = {
+    "stall_hours": 2,
+    "max_hours_behind": 1,
+    "window_hours": 12,
+    "min_ratio": 0.75,
+    "escalation_hours": [2, 6, 12, 24, 48],
+}
 
 
 def _iso(value: datetime) -> str:
@@ -37,6 +44,7 @@ def _write_config(tmp_path: Path, **overrides) -> Path:
         "version": "1",
         "forward_stall": {"stall_hours": 2},
         "producer_publish": {"max_hours_behind": 1},
+        "forward_coverage": {"window_hours": 12, "min_ratio": 0.75},
         "escalation_hours": [2, 6, 12, 24, 48],
     }
     payload.update(overrides)
@@ -275,3 +283,147 @@ def test_alert_body_carries_no_direction_or_trading_language(tmp_path: Path):
 def test_config_is_fail_loud(tmp_path: Path, override):
     with pytest.raises(RuntimeHealthConfigError):
         load_alert_config(_write_config(tmp_path, **override))
+
+
+# --- ADR-0051: yavaş kesinti — anlık boşluk değil, pencere ORANI --------------------------
+
+OBSERVATION_START = datetime(2026, 8, 7, tzinfo=UTC)
+
+
+def _evaluate_coverage(recent_hours, *, due=DUE, start=OBSERVATION_START, config=CONFIG):
+    return evaluate(
+        now_utc=NOW,
+        latest_due_utc=due,
+        last_forward_observation_utc=_iso(due),  # anlık boşluk YOK
+        producer_published_as_of_utc=_iso(due),  # producer da geride DEĞİL
+        config=config,
+        read_errors=[],
+        recent_forward_hours=recent_hours,
+        observation_start_utc=start,
+    )
+
+
+def test_the_slow_outage_that_both_instantaneous_checks_missed():
+    """11 Ağu 2026'nın gerçek tablosu: 12 saatin 4'ü kaydedilmiş, iki eşik de sessiz.
+
+    `forward_stalled` ve `producer_behind` o anda temiz: son gözlem ve son yayın due saatin
+    kendisi. Yine de runtime saatlerin üçte ikisini kaybediyor.
+    """
+    incidents = _evaluate_coverage(4)
+
+    assert [item.condition for item in incidents] == [CONDITION_COVERAGE_LOW]
+    assert incidents[0].gap_hours == 8
+    assert "4" in incidents[0].detail and "12" in incidents[0].detail
+
+
+def test_a_runtime_at_the_floor_is_not_an_incident():
+    """Tam eşik (9/12 = 0.75) olay değildir; eşik aşılmadıkça uyarı üretilmez."""
+    assert _evaluate_coverage(9) == []
+
+
+def test_one_hour_below_the_floor_is_an_incident():
+    assert [item.condition for item in _evaluate_coverage(8)] == [CONDITION_COVERAGE_LOW]
+
+
+def test_the_window_never_reaches_before_observation_start():
+    """Kurulum öncesi saatler doldurulamaz; onları beklentiye katmak kalıcı alarm üretirdi.
+
+    Başlangıçtan yalnız 4 saat sonra pencere 12 değil 5 saattir ve 5/5 tamdır.
+    """
+    due = OBSERVATION_START + timedelta(hours=4)
+
+    assert _evaluate_coverage(5, due=due) == []
+
+
+def test_a_ledger_that_cannot_be_read_produces_no_false_healthy_signal():
+    """Sayı yoksa oran uydurulmaz; okunamayan girdi zaten `inputs_unreadable` üretir."""
+    assert _evaluate_coverage(None) == []
+
+
+def test_more_rows_than_hours_cannot_manufacture_health():
+    """Beklenenden çok satır oranı 1'in üstüne çıkarmaz; olay yokluğu doğru kalır."""
+    assert _evaluate_coverage(99) == []
+
+
+def test_the_incident_is_keyed_on_the_window_so_it_does_not_respam_each_run():
+    first = _evaluate_coverage(4)[0]
+    second = _evaluate_coverage(4)[0]
+
+    assert first.signal_id(CONFIG["escalation_hours"]) == second.signal_id(
+        CONFIG["escalation_hours"]
+    )
+
+
+def test_config_rejects_a_ratio_outside_the_unit_interval(tmp_path: Path):
+    path = _write_config(tmp_path, forward_coverage={"window_hours": 12, "min_ratio": 1.5})
+
+    with pytest.raises(RuntimeHealthConfigError, match="min_ratio"):
+        load_alert_config(path)
+
+
+def test_config_rejects_a_missing_coverage_block(tmp_path: Path):
+    payload = {
+        "version": "1",
+        "forward_stall": {"stall_hours": 2},
+        "producer_publish": {"max_hours_behind": 1},
+        "escalation_hours": [2],
+    }
+    path = tmp_path / "eksik.yaml"
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    with pytest.raises(RuntimeHealthConfigError, match="eksik eşik alanı"):
+        load_alert_config(path)
+
+
+def test_the_shipped_config_carries_the_coverage_thresholds():
+    config = load_alert_config(Path("config/runtime_health_alert.yaml"))
+
+    assert config["window_hours"] >= 1
+    assert 0.0 < config["min_ratio"] <= 1.0
+
+
+def _ledger(tmp_path: Path, hours: list[datetime]) -> Path:
+    path = tmp_path / "f0001.sqlite"
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE f0001_trigger_observations (as_of_utc TEXT)")
+        connection.executemany(
+            "INSERT INTO f0001_trigger_observations VALUES (?)",
+            [(hour,) for hour in hours],
+        )
+    return path
+
+
+def test_the_reader_counts_hours_by_time_not_by_string_shape(tmp_path: Path):
+    """`Z` ekli bir satır metin sıralamasında pencerenin dışına düşerdi."""
+    since = datetime(2026, 8, 10, 4, tzinfo=UTC)
+    path = _ledger(
+        tmp_path,
+        [
+            "2026-08-10T04:00:00+00:00",
+            "2026-08-10T05:00:00Z",  # aynı pencere, farklı yazım
+            "2026-08-10T03:00:00+00:00",  # pencere dışı
+        ],
+    )
+    errors: list[str] = []
+
+    assert cli._read_recent_forward_hours(path, since, errors) == 2
+    assert errors == []
+
+
+def test_an_unparseable_hour_is_reported_instead_of_silently_undercounted(tmp_path: Path):
+    path = _ledger(tmp_path, ["bozuk"])
+    errors: list[str] = []
+
+    assert cli._read_recent_forward_hours(path, datetime(2026, 8, 10, tzinfo=UTC), errors) is None
+    assert errors and "ayrıştırılamayan" in errors[0]
+
+
+def test_a_missing_ledger_is_an_error_not_a_zero(tmp_path: Path):
+    errors: list[str] = []
+
+    result = cli._read_recent_forward_hours(
+        tmp_path / "yok.sqlite", datetime(2026, 8, 10, tzinfo=UTC), errors
+    )
+
+    assert result is None
+    assert errors and "forward defteri yok" in errors[0]
