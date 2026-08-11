@@ -168,8 +168,17 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   (ADR-0007 hatası). **Yönsel skor: 4 aile, 4 ret.**
   - [x] FOMC/CPI adayı Development'ta yalnız 21 olay taşıdığı için ön-kaydedilmeden elendi
     (örneklem kontrolü; deneme sayacına girmez).
-- [ ] Beşinci aile: mevcut veri yüzeyinde bağımsız mekanizma havuzu daraldı. Order-book
-  likidite asimetrisi yeterli canlı geçmiş biriktiğinde (şu an `ratio≈0.05`) açılabilir.
+- [ ] Beşinci aile (S-0007, zincir üstü sahip kapitülasyonu: STH-SOPR): **ön-kayıtlı,
+  ölçülmedi**. Tıkanıklık fikir değil veri yüzeyiydi — uzun geçmişli yüzey (perp funding +
+  üç mekân OHLCV) dört aileyle tükenmişti; kısa geçmişli adaylar (`/futures/data/` taker ve
+  long/short oranları) uçta yalnız 30 gün taşıdığı için ön-kayıt edilmeden elendi.
+  bitcoin-data.com STH-SOPR serisi dört yıl geçmiş taşır ve mekanizma olarak dördüne de
+  bağımsızdır (Signal ADR-0050).
+  - [x] On-chain günlük veri yüzeyi, PIT `available_at` damgası ve manifest bağlantısı hazır.
+  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi (`docs/hypotheses/S-0007.md`).
+  - [ ] Sinyali kartta yazıldığı gibi uygula ve sekiz kapıyla ölç; sonucu Registry'ye yaz.
+- [ ] Order-book likidite asimetrisi: yeterli canlı geçmiş biriktiğinde açılabilir
+  (`ratio≈0.09`, canlı birikim gerekiyor).
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
   - [x] Protokol ve CLI hazır (Signal ADR-0014): deterministik fold planı, label horizon'a
     göre purge, train-test arası ≥1 gün embargo, locked OOS varsayılan olarak kapalı.
