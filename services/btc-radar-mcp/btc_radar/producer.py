@@ -407,7 +407,9 @@ def _status(args: argparse.Namespace) -> dict:
                 ),
             },
             "coverage": [item.as_payload() for item in coverage],
-            "healthy": all(item.healthy for item in coverage) and coverage != [],
+            # live_only metriklerin geçmiş boşluğu onarılamaz; bayrak onlardan tazelik bekler
+            # (MCP ADR-0011). Ayrıntı raporda aynen durur.
+            "healthy": all(item.meets_expectation for item in coverage) and coverage != [],
         }
 
 
