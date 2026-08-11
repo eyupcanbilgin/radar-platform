@@ -1,5 +1,11 @@
 # SPEC.md — BTC Radar MCP
-**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.8**
+**Bitcoin Merkezli Kripto Piyasa Analiz MCP Sunucusu — Teknik Şartname v1.9**
+
+> v1.9 (11 Ağu 2026): ADR-0012 ile kapanmış-mum metriklerinde beklenen örneklem sayacı
+> içinde bulunulan yarım periyodu saymaz. `spot_close` gibi `sampling_mode: closed_bar`
+> metrikler o mumu tanım gereği taşıyamaz (look-ahead yasağı) ve sayaç bunu görmezse
+> kalıcı olarak "eksik" görünürlerdi. Tolerans değildir: gerçek eksik saat hâlâ kusurdur.
+> Bu, ADR-0011'in "healthy ulaşılabilir bir hedeftir" iddiasını doğru hâle getirir.
 
 > v1.8 (11 Ağu 2026): ADR-0011 ile `healthy` bayrağı metriğin geçmişinin onarılabilir olup
 > olmadığına göre hesaplanır. `live_only` metrikler (basis, order-book spread) için uçta

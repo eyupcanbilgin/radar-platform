@@ -105,6 +105,12 @@ class CollectionMetricSpec(BaseModel):
     expected_period_seconds: float = Field(gt=0.0)
     max_gap_seconds: float = Field(gt=0.0)
     history_mode: Literal["backfill_and_live", "live_only"]
+    #: Örneğin ne zaman var olabildiği. ``snapshot`` metrik (anlık OI gibi) içinde
+    #: bulunduğumuz periyodun örneğini taşıyabilir; ``closed_bar`` metrik (kapanmış mumdan
+    #: türeyen spot close gibi) **tanım gereği taşıyamaz** — periyot kapanana kadar mum
+    #: yoktur ve onu beklemek look-ahead olurdu (ADR-0007). Beklenen örneklem sayısı bu
+    #: ayrımı görmezse kapanmış-mum metriği kalıcı olarak "eksik" görünür (ADR-0012).
+    sampling_mode: Literal["snapshot", "closed_bar"] = "snapshot"
 
 
 class RuleSpec(BaseModel):
