@@ -28,6 +28,7 @@ from decision_engine.runtime_health import (  # noqa: E402
     CONDITION_COVERAGE_LOW,
     CONDITION_FORWARD_STALLED,
     CONDITION_PRODUCER_BEHIND,
+    CONDITION_PRODUCER_FAILING,
     Incident,
     build_report,
     evaluate,
@@ -83,6 +84,58 @@ def _read_producer_publish(path: Path | None, errors: list[str]) -> str | None:
         errors.append(f"producer heartbeat okunamadı: {type(error).__name__}")
         return None
     return row[0] if row else None
+
+
+def _read_producer_failure(path: Path | None, errors: list[str]):
+    """Producer heartbeat'inde SÜREN hata serisini oku: hangi görev, hangi hata, kaç kez.
+
+    Yetkili kaynak heartbeat'tir. `latest_success_as_of` yalnız "ne zaman başardı" der;
+    kesintinin SEBEBİ detail alanındadır ve bugüne kadar hiçbir alarma ulaşmıyordu.
+    """
+    if path is None:
+        return None
+    if not path.is_file():
+        return None  # eksikliği zaten _read_producer_publish bildiriyor
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                "SELECT task, status, finished_at, detail FROM heartbeats "
+                "WHERE status IN ('ok','error') ORDER BY finished_at DESC, id DESC LIMIT 500"
+            ).fetchall()
+    except sqlite3.Error as error:
+        errors.append(f"producer heartbeat detayı okunamadı: {type(error).__name__}")
+        return None
+
+    streaks: dict[str, dict] = {}
+    closed: set[str] = set()
+    for row in rows:
+        task = row["task"]
+        if task in closed:
+            continue
+        if row["status"] == "ok":
+            closed.add(task)  # bu görevin serisi bitti; daha eskiye bakma
+            continue
+        try:
+            detail = json.loads(row["detail"]) if row["detail"] else {}
+        except ValueError:
+            detail = {}
+        entry = streaks.setdefault(
+            task,
+            {
+                "task": task,
+                "consecutive": 0,
+                "error_type": detail.get("error_type", "?"),
+                "error": detail.get("error", ""),
+            },
+        )
+        entry["consecutive"] += 1
+        # `since` en ESKİ hataya kayar: alarm kesintinin başlangıcını göstermeli.
+        entry["since_utc"] = row["finished_at"]
+
+    if not streaks:
+        return None
+    return max(streaks.values(), key=lambda item: item["consecutive"])
 
 
 def _read_recent_forward_hours(path: Path | None, since_utc: datetime, errors: list[str]):
@@ -190,6 +243,7 @@ def main(argv: list[str] | None = None) -> int:
         if observation_start is not None:
             window_start = max(window_start, observation_start)
         recent_hours = _read_recent_forward_hours(args.f0001_trigger_ledger, window_start, errors)
+        producer_failure = _read_producer_failure(args.producer_heartbeat, errors)
 
         incidents = evaluate(
             now_utc=now,
@@ -200,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
             read_errors=errors,
             recent_forward_hours=recent_hours,
             observation_start_utc=observation_start,
+            producer_failure=producer_failure,
         )
 
         previous = _previous_incidents(args.status_output)
@@ -235,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
                     CONDITION_FORWARD_STALLED,
                     CONDITION_PRODUCER_BEHIND,
                     CONDITION_COVERAGE_LOW,
+                    CONDITION_PRODUCER_FAILING,
                 ):
                     continue
                 signal_id = stale.recovery_signal_id()

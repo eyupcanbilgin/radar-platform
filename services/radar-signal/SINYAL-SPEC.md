@@ -1,5 +1,12 @@
 # SINYAL-SPEC.md — Radar Signal
-**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.31**
+**BTC & ETH Intraday Sinyal Servisi — Teknik Şartname v2.32**
+
+> v2.32 (11 Ağu 2026): ADR-0053 ile sağlık dedektörüne `producer_failing` koşulu eklendi.
+> Toplayıcı döngüsü her hatayı yutar — geçici ağ hatası için doğru — ama şema hatası
+> **kalıcıdır**: bugün 6798 özdeş `ValidationError` birikti ve hiçbiri teşhis olarak yüzeye
+> çıkmadı. Üç kez üst üste aynı hata artık olaydır ve alarm görevi, hata tipini, tekrar
+> sayısını ve "ilk bakılacak yer sürüm ayrışmasıdır" yönlendirmesini taşır. Olay kesintinin
+> **başlangıcına** çapalanır. Producer'ın döngüsü değişmedi; değişen tek şey görünürlük.
 
 > v2.31 (11 Ağu 2026): ADR-0052 ile **S-0007 reddedildi** (zincir üstü sahip kapitülasyonu,
 > STH-SOPR). 387 işlem, `realistic −%36.65`, `taker_heavy −%53.52`, `p=0.4213`, fold %42.9;

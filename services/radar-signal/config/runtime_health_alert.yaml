@@ -19,6 +19,13 @@ producer_publish:
   # Producer'ın yayınladığı son saat, due saatin kaç saat gerisine düşerse kesinti sayılır.
   max_hours_behind: 1
 
+producer_failure:
+  # Producer toplayıcı döngüsü her hatayı yutar — geçici ağ hatası için doğru davranış.
+  # Ama ŞEMA hatası kalıcıdır: 11 Ağu 2026'da kurulu paket config'in yeni alanını
+  # tanımadı ve stdout'ta 6798 özdeş ValidationError birikti. Tekrar eden özdeş hata
+  # geçici değildir; bu eşik onu alarma ADIYLA taşır.
+  min_consecutive_failures: 3
+
 forward_coverage:
   # Yukarıdaki iki eşik ANLIK boşluğu ölçer. Sürekli saat kaybeden bir runtime örnekleme
   # anlarının çoğunda "1 saat geride" görünür ve ikisinin de altında kalır: 11 Ağu 2026'da
