@@ -175,8 +175,12 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
   bitcoin-data.com STH-SOPR serisi dört yıl geçmiş taşır ve mekanizma olarak dördüne de
   bağımsızdır (Signal ADR-0050).
   - [x] On-chain günlük veri yüzeyi, PIT `available_at` damgası ve manifest bağlantısı hazır.
-  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi (`docs/hypotheses/S-0007.md`).
-  - [ ] Sinyali kartta yazıldığı gibi uygula ve sekiz kapıyla ölç; sonucu Registry'ye yaz.
+  - [x] Hipotez kartı ölçümden ÖNCE ayrı commit'le ön-kaydedildi (`37553b5`).
+  - [x] Sinyal kartta yazıldığı gibi uygulandı ve ölçüldü: **REDDEDİLDİ** (Signal ADR-0052).
+    387 işlem, `realistic −%36.65`, `taker_heavy −%53.52`, `p=0.4213`, fold %42.9; sekiz ret
+    ölçütü. Temiz ağaç (`git_dirty: False`), Registry `E-20260811-133935-762246`.
+    Sonuç hipotezin TERSİ yönde çıktı; **ters çevirme YAPILMADI** — hem ön-kayıt yasağı hem
+    de çevrilecek kanıt olmaması (`p` şanstan ayırt edilemiyor). **Yönsel skor: 5 aile, 5 ret.**
 - [ ] Order-book likidite asimetrisi: yeterli canlı geçmiş biriktiğinde açılabilir
   (`ratio≈0.09`, canlı birikim gerekiyor).
 - [ ] Her aileyi önce ham nabız, sonra purged walk-forward + embargo ile değerlendir.
@@ -188,6 +192,9 @@ riskiyle ilişkisini sızıntısız ölçmek; reddedilmiş yönsel araştırmay�
 - [ ] DSR'a ek olarak PBO/CSCV veya White Reality Check uygula.
   - [x] Registry-güdümlü DSR + PBO/CSCV altyapısı ve sentetik kabul testleri (ADR-0019).
   - [ ] Sonraki ön-kayıtlı hipotezin Development raporuna iki kapıyı da uygula.
+    **Üst üste üçüncü kez (S-0005, S-0006, S-0007) base reddedildiği için çalıştırılamadı;**
+    kapılar kurulu ve sentetik testlerle korunuyor ama gerçek bir aday üzerindeki davranışları
+    hâlâ gözlenmedi.
 - [ ] ±%20 parametre hassasiyeti ve dönem/venue kırılganlığını raporla.
   - [x] Config-güdümlü ±%20 parametre hassasiyet kapısı hazır (ADR-0019).
   - [x] Göreli dönem/venue kırılganlık kapısı ve sentetik kabul testleri hazır (ADR-0020).
