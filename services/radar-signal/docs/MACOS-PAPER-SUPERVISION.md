@@ -139,6 +139,10 @@ launchctl kickstart -k "gui/$(id -u)/com.radar.mcp-producer"
 **Belirti:** producer stdout kütüğünde `ValidationError` yığılması ve context dizininde
 saat atlamaları (`00.json, 01.json, 04.json, …`).
 
+Artık bunu kazmadan görürsün: üç kez üst üste aynı hata `runtime-health.json` içinde
+`producer_failing` olayı üretir ve metin hata tipini, tekrar sayısını ve "ilk bakılacak yer
+sürüm ayrışmasıdır" yönlendirmesini taşır (ADR-0053).
+
 ### Host uykusu
 
 Runtime, host uyurken **koşmaz**. macOS pilde varsayılan olarak uyur ve bu forward kanıtını

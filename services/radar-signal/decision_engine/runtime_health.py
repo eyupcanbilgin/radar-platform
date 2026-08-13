@@ -34,6 +34,7 @@ ALERT_KIND = "runtime_health_alert"
 CONDITION_FORWARD_STALLED = "forward_stalled"
 CONDITION_PRODUCER_BEHIND = "producer_behind"
 CONDITION_COVERAGE_LOW = "forward_coverage_low"
+CONDITION_PRODUCER_FAILING = "producer_failing"
 CONDITION_INPUTS_UNREADABLE = "inputs_unreadable"
 
 
@@ -51,6 +52,7 @@ def load_alert_config(path: Path) -> dict:
         max_behind = raw["producer_publish"]["max_hours_behind"]
         window_hours = raw["forward_coverage"]["window_hours"]
         min_ratio = raw["forward_coverage"]["min_ratio"]
+        min_failures = raw["producer_failure"]["min_consecutive_failures"]
         escalation = raw["escalation_hours"]
     except (KeyError, TypeError) as error:
         raise RuntimeHealthConfigError(f"eksik eşik alanı: {error}") from error
@@ -58,6 +60,7 @@ def load_alert_config(path: Path) -> dict:
         ("stall_hours", stall_hours),
         ("max_hours_behind", max_behind),
         ("window_hours", window_hours),
+        ("min_consecutive_failures", min_failures),
     ):
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise RuntimeHealthConfigError(f"{name} >= 1 tam sayı olmalı")
@@ -77,6 +80,7 @@ def load_alert_config(path: Path) -> dict:
         "max_hours_behind": max_behind,
         "window_hours": window_hours,
         "min_ratio": float(min_ratio),
+        "min_consecutive_failures": min_failures,
         "escalation_hours": list(escalation),
     }
 
@@ -127,6 +131,7 @@ def evaluate(
     read_errors: list[str],
     recent_forward_hours: int | None = None,
     observation_start_utc: datetime | None = None,
+    producer_failure: dict | None = None,
 ) -> list[Incident]:
     """Return every active incident.  An empty list means progress is being made.
 
@@ -191,6 +196,13 @@ def evaluate(
             )
 
     incidents.extend(
+        _producer_failure_incidents(
+            latest_due_utc=latest_due_utc,
+            producer_failure=producer_failure,
+            config=config,
+        )
+    )
+    incidents.extend(
         _coverage_incidents(
             latest_due_utc=latest_due_utc,
             recent_forward_hours=recent_forward_hours,
@@ -199,6 +211,46 @@ def evaluate(
         )
     )
     return incidents
+
+
+def _producer_failure_incidents(
+    *, latest_due_utc: datetime, producer_failure: dict | None, config: dict
+) -> list[Incident]:
+    """Producer üst üste aynı hatayı alıyorsa bunu ADIYLA söyle.
+
+    11 Ağustos 2026'da producer stdout kütüğünde **6798** özdeş `ValidationError` birikmişti
+    (kurulu paket, config'in tanıttığı yeni alanı tanımıyordu) ve saatlerin üçte ikisi
+    kayboldu. Toplayıcı döngüsü her hatayı yutar — geçici ağ hatası için doğru davranış — ama
+    şema hatası **kalıcıdır**: 6798 kez denemek onu düzeltmez.
+
+    `producer_behind` o gün yalnız aralıklı ateşledi (producer üç saatte bir yayın
+    yapabiliyordu) ve ateşlediğinde de yalnız "geride" dedi. Operatör sebebi bulmak için
+    stdout kazmak zorunda kaldı. Bu koşul sebebi alarmın içine koyar.
+    """
+    if not producer_failure:
+        return []
+    consecutive = int(producer_failure.get("consecutive", 0))
+    if consecutive < config["min_consecutive_failures"]:
+        return []
+    since = producer_failure.get("since_utc")
+    if not since:
+        return []
+    started = _parse_utc(since)
+    task = producer_failure.get("task", "?")
+    error_type = producer_failure.get("error_type", "?")
+    message = " ".join(str(producer_failure.get("error", "")).split())[:200]
+    return [
+        Incident(
+            condition=CONDITION_PRODUCER_FAILING,
+            since_utc=started.isoformat().replace("+00:00", "Z"),
+            gap_hours=max(0, _whole_hours(latest_due_utc - started)),
+            detail=(
+                f"producer '{task}' görevi {consecutive} kez ÜST ÜSTE aynı hatayı aldı: "
+                f"{error_type} — {message}. Tekrar eden özdeş hata geçici değildir; "
+                "kurulu paket ile checkout arasındaki sürüm ayrışması ilk bakılacak yerdir."
+            ),
+        )
+    ]
 
 
 def _coverage_incidents(

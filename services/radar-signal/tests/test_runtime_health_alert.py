@@ -15,6 +15,7 @@ from decision_engine.runtime_health import (
     CONDITION_FORWARD_STALLED,
     CONDITION_INPUTS_UNREADABLE,
     CONDITION_PRODUCER_BEHIND,
+    CONDITION_PRODUCER_FAILING,
     Incident,
     RuntimeHealthConfigError,
     evaluate,
@@ -31,6 +32,7 @@ CONFIG = {
     "max_hours_behind": 1,
     "window_hours": 12,
     "min_ratio": 0.75,
+    "min_consecutive_failures": 3,
     "escalation_hours": [2, 6, 12, 24, 48],
 }
 
@@ -45,6 +47,7 @@ def _write_config(tmp_path: Path, **overrides) -> Path:
         "forward_stall": {"stall_hours": 2},
         "producer_publish": {"max_hours_behind": 1},
         "forward_coverage": {"window_hours": 12, "min_ratio": 0.75},
+        "producer_failure": {"min_consecutive_failures": 3},
         "escalation_hours": [2, 6, 12, 24, 48],
     }
     payload.update(overrides)
@@ -60,18 +63,38 @@ def _write_coverage(tmp_path: Path, last_observation: str | None, **extra) -> Pa
     return path
 
 
-def _write_heartbeat(tmp_path: Path, published_as_of: str | None) -> Path:
-    """Aynı tmp_path'te tekrar çağrılabilir olmalı: CLI testleri iki kez koşuyor."""
+def _write_heartbeat(
+    tmp_path: Path, published_as_of: str | None, *, failures: list[tuple] | None = None
+) -> Path:
+    """Aynı tmp_path'te tekrar çağrılabilir olmalı: CLI testleri iki kez koşuyor.
+
+    Şema gerçek `HeartbeatStore` ile aynı kolonları taşır: `detail` olmadan kesintinin
+    SEBEBİ okunamaz ve bu sütun tam olarak bugün eksik olan bilgiydi.
+    """
     path = tmp_path / "heartbeat.sqlite"
     connection = sqlite3.connect(path)
     try:
         connection.execute(
-            "CREATE TABLE IF NOT EXISTS heartbeats (task TEXT, status TEXT, as_of TEXT)"
+            "CREATE TABLE IF NOT EXISTS heartbeats ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, task TEXT, status TEXT, "
+            "as_of TEXT, finished_at TEXT, detail TEXT)"
         )
         connection.execute("DELETE FROM heartbeats")
         if published_as_of is not None:
             connection.execute(
-                "INSERT INTO heartbeats VALUES ('publish','ok',?)", (published_as_of,)
+                "INSERT INTO heartbeats (task, status, as_of, finished_at, detail) "
+                "VALUES ('publish','ok',?,?,'{}')",
+                (published_as_of, published_as_of),
+            )
+        for task, finished_at, error_type, message in failures or []:
+            connection.execute(
+                "INSERT INTO heartbeats (task, status, as_of, finished_at, detail) "
+                "VALUES (?,'error',NULL,?,?)",
+                (
+                    task,
+                    finished_at,
+                    json.dumps({"error_type": error_type, "error": message}),
+                ),
             )
         connection.commit()
     finally:
@@ -427,3 +450,112 @@ def test_a_missing_ledger_is_an_error_not_a_zero(tmp_path: Path):
 
     assert result is None
     assert errors and "forward defteri yok" in errors[0]
+
+
+# --- ADR-0053: tekrar eden özdeş hata geçici değildir --------------------------------------
+
+SAMPLING_MODE_ERROR = (
+    "1 validation error for SignalRulesConfig collection_metrics.spot_close.sampling_mode "
+    "Extra inputs are not permitted"
+)
+
+
+def _failure(consecutive: int, *, error_type: str = "ValidationError", task: str = "collect"):
+    return {
+        "task": task,
+        "consecutive": consecutive,
+        "error_type": error_type,
+        "error": SAMPLING_MODE_ERROR,
+        "since_utc": "2026-08-10T09:00:00Z",
+    }
+
+
+def _evaluate_failure(failure):
+    return evaluate(
+        now_utc=NOW,
+        latest_due_utc=DUE,
+        last_forward_observation_utc=_iso(DUE),  # forward duruyor gibi görünmüyor
+        producer_published_as_of_utc=_iso(DUE),  # producer geride de değil
+        config=CONFIG,
+        read_errors=[],
+        producer_failure=failure,
+    )
+
+
+def test_the_repeated_schema_error_becomes_an_incident_that_names_the_cause():
+    """11 Ağu 2026: 6798 özdeş ValidationError vardı ve hiçbiri alarma ulaşmadı."""
+    incidents = _evaluate_failure(_failure(47))
+
+    assert [item.condition for item in incidents] == [CONDITION_PRODUCER_FAILING]
+    detail = incidents[0].detail
+    assert "47" in detail
+    assert "ValidationError" in detail
+    assert "sampling_mode" in detail
+    assert "sürüm ayrışması" in detail  # operatöre nereye bakacağını söylüyor
+
+
+def test_a_short_failure_streak_is_not_an_incident():
+    """Tek tük ağ hatası kesinti değildir; eşik gürültüyü dışarıda tutar."""
+    assert _evaluate_failure(_failure(2)) == []
+
+
+def test_the_streak_at_the_threshold_fires():
+    assert [item.condition for item in _evaluate_failure(_failure(3))] == [
+        CONDITION_PRODUCER_FAILING
+    ]
+
+
+def test_no_failure_streak_means_no_incident():
+    assert _evaluate_failure(None) == []
+
+
+def test_the_incident_is_anchored_to_the_start_of_the_outage_not_to_now():
+    """Geç fark edilen bir kesinti süresini OLDUĞUNDAN KISA göstermemeli."""
+    incident = _evaluate_failure(_failure(47))[0]
+
+    assert incident.since_utc == "2026-08-10T09:00:00Z"
+    assert incident.gap_hours == 6  # 09:00 -> 15:00 due
+
+
+def test_the_reader_counts_only_the_current_streak(tmp_path: Path):
+    """Başarıdan ÖNCEKİ eski hatalar sayıya girmez; seri son başarıda kapanır."""
+    path = _write_heartbeat(
+        tmp_path,
+        "2026-08-10T12:00:00Z",
+        failures=[
+            ("collect", "2026-08-10T14:00:00Z", "ValidationError", SAMPLING_MODE_ERROR),
+            ("collect", "2026-08-10T13:00:00Z", "ValidationError", SAMPLING_MODE_ERROR),
+        ],
+    )
+    errors: list[str] = []
+
+    failure = cli._read_producer_failure(path, errors)
+
+    assert failure["task"] == "collect"
+    assert failure["consecutive"] == 2
+    assert failure["error_type"] == "ValidationError"
+    assert errors == []
+
+
+def test_the_reader_reports_the_worst_task_when_several_are_failing(tmp_path: Path):
+    path = _write_heartbeat(
+        tmp_path,
+        None,
+        failures=[
+            ("collect", "2026-08-10T14:00:00Z", "ValidationError", SAMPLING_MODE_ERROR),
+            ("collect", "2026-08-10T13:00:00Z", "ValidationError", SAMPLING_MODE_ERROR),
+            ("collect", "2026-08-10T12:00:00Z", "ValidationError", SAMPLING_MODE_ERROR),
+            ("publish", "2026-08-10T14:00:00Z", "ConnectTimeout", "ag hatasi"),
+        ],
+    )
+
+    failure = cli._read_producer_failure(path, [])
+
+    assert failure["task"] == "collect"
+    assert failure["consecutive"] == 3
+
+
+def test_a_heartbeat_without_a_failure_streak_returns_nothing(tmp_path: Path):
+    path = _write_heartbeat(tmp_path, "2026-08-10T14:00:00Z")
+
+    assert cli._read_producer_failure(path, []) is None
